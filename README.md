@@ -19,10 +19,10 @@ This repo starts with:
 
 The Python side is intentionally `uv`-first:
 
-- dependency resolution via `uv sync`
-- commands via `uv run`
-- tests via `uv run pytest -q`
-- linting via `uv run ruff check .`
+- dependency resolution via `UV_PROJECT_ENVIRONMENT=attention99 uv sync`
+- commands via `UV_PROJECT_ENVIRONMENT=attention99 uv run`
+- tests via `UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q`
+- linting via `UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .`
 
 That keeps the reference layer lightweight and reproducible without introducing a larger environment stack.
 
@@ -48,12 +48,24 @@ Rust is the long-term systems layer for block tables, cache layout, benchmark ha
 - [ ] real GPU kernels
 - [ ] end-to-end model integration
 
+## Current milestone
+
+This repo currently validates the reference-level mechanics of:
+
+- GQA decode attention
+- paged KV lookup
+- latent KV reconstruction
+- paged latent KV lookup
+- KV memory estimation
+
+It does not yet contain CUDA/cuTile kernels or real model inference.
+
 ## Setup
 
 ```bash
-uv sync
-uv run pytest -q
-uv run ruff check .
+UV_PROJECT_ENVIRONMENT=attention99 uv sync
+UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
+UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
 cargo test --workspace
 bash scripts/env_check.sh
 ```
@@ -61,7 +73,7 @@ bash scripts/env_check.sh
 ## Example memory-model command
 
 ```bash
-uv run plkv-memory \
+UV_PROJECT_ENVIRONMENT=attention99 uv run plkv-memory \
   --layers 28 \
   --seq-len 4096 \
   --batch-size 1 \
