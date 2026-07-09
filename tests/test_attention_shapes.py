@@ -2,48 +2,144 @@ import numpy as np
 from latent_paged_attention.attention_ref import (
     gqa_decode_attention_ref,
     latent_kv_decode_attention_ref,
+    paged_gqa_decode_attention_ref,
+    paged_latent_kv_decode_attention_ref,
     paged_lookup_ref,
+    softmax_stable,
 )
 
 
-def test_paged_lookup_returns_token_major_slice() -> None:
-    paged = np.arange(2 * 4 * 1 * 2, dtype=np.float32).reshape(2, 4, 1, 2)
-    logical = np.array([1, 0], dtype=np.int64)
+def _make_tiny_case() -> tuple[np.ndarray, ...]:
+    rng = np.random.default_rng(7)
+    batch = 1
+    seq_len = 5
+    q_heads = 4
+    kv_heads = 2
+    head_dim = 8
+    latent_dim = 6
 
-    out = paged_lookup_ref(paged, logical, seq_len=6)
+    q = rng.normal(size=(batch, q_heads, head_dim)).astype(np.float32)
+    k_cache = rng.normal(size=(batch, seq_len, kv_heads, head_dim)).astype(np.float32)
+    v_cache = rng.normal(size=(batch, seq_len, kv_heads, head_dim)).astype(np.float32)
+    latent_cache = rng.normal(size=(batch, seq_len, latent_dim)).astype(np.float32)
+    k_proj = rng.normal(size=(latent_dim, kv_heads * head_dim)).astype(np.float32)
+    v_proj = rng.normal(size=(latent_dim, kv_heads * head_dim)).astype(np.float32)
+    return q, k_cache, v_cache, latent_cache, k_proj, v_proj
 
-    assert out.shape == (6, 1, 2)
-    np.testing.assert_array_equal(out[0], paged[1, 0])
-    np.testing.assert_array_equal(out[4], paged[0, 0])
+
+def test_softmax_stable_normalizes_last_axis() -> None:
+    x = np.array([[1000.0, 1001.0, 1002.0], [0.0, 0.0, 0.0]], dtype=np.float32)
+    out = softmax_stable(x, axis=-1)
+
+    np.testing.assert_allclose(out.sum(axis=-1), np.ones(2, dtype=np.float32), atol=1e-6)
 
 
-def test_gqa_decode_attention_output_shape_and_finiteness() -> None:
-    query = np.array(
-        [[1.0, 0.0], [0.5, 0.5], [0.0, 1.0], [1.0, 1.0]],
-        dtype=np.float32,
-    )
-    keys = np.array(
-        [[[1.0, 0.0], [0.0, 1.0]], [[0.5, 0.5], [1.0, 0.0]]],
-        dtype=np.float32,
-    )
-    values = np.array(
-        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
-        dtype=np.float32,
-    )
+def test_paged_lookup_reconstructs_expected_token_order() -> None:
+    paged = np.arange(3 * 2 * 2 * 3, dtype=np.float32).reshape(3, 2, 2, 3)
+    block_table = np.array([2, 0, 1], dtype=np.int64)
 
-    out = gqa_decode_attention_ref(query, keys, values)
+    out = paged_lookup_ref(paged, block_table, seq_len=5, block_size=2)
 
-    assert out.shape == query.shape
+    assert out.shape == (5, 2, 3)
+    np.testing.assert_array_equal(out[0], paged[2, 0])
+    np.testing.assert_array_equal(out[1], paged[2, 1])
+    np.testing.assert_array_equal(out[2], paged[0, 0])
+    np.testing.assert_array_equal(out[4], paged[1, 0])
+
+
+def test_gqa_decode_attention_output_shape_is_correct() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+    out = gqa_decode_attention_ref(q, k_cache, v_cache, group_size=2)
+
+    assert out.shape == q.shape
     assert np.isfinite(out).all()
 
 
-def test_latent_attention_matches_reconstructed_gqa_path() -> None:
-    query = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
-    latent = np.array([[1.0, 2.0], [0.5, 1.5]], dtype=np.float32)
-    k_proj = np.array([[[1.0, 0.0]], [[0.0, 1.0]]], dtype=np.float32)
-    v_proj = np.array([[[0.5, 0.5]], [[1.0, -1.0]]], dtype=np.float32)
+def test_paged_gqa_matches_dense_gqa_for_same_cache() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+    block_size = 2
+    seq_len = k_cache.shape[1]
+    block_table = np.array([1, 0, 2], dtype=np.int64)
 
-    out = latent_kv_decode_attention_ref(query, latent, k_proj, v_proj)
+    pad_tokens = block_size * len(block_table) - seq_len
+    k_tokens = np.pad(k_cache[0], ((0, pad_tokens), (0, 0), (0, 0)))
+    v_tokens = np.pad(v_cache[0], ((0, pad_tokens), (0, 0), (0, 0)))
+    k_blocks = np.empty((len(block_table), block_size, *k_tokens.shape[1:]), dtype=np.float32)
+    v_blocks = np.empty((len(block_table), block_size, *v_tokens.shape[1:]), dtype=np.float32)
+    logical_k_blocks = k_tokens.reshape(len(block_table), block_size, *k_tokens.shape[1:])
+    logical_v_blocks = v_tokens.reshape(len(block_table), block_size, *v_tokens.shape[1:])
+    for logical_idx, physical_idx in enumerate(block_table):
+        k_blocks[physical_idx] = logical_k_blocks[logical_idx]
+        v_blocks[physical_idx] = logical_v_blocks[logical_idx]
 
-    assert out.shape == query.shape
+    dense_out = gqa_decode_attention_ref(q, k_cache, v_cache, group_size=2)
+    paged_out = paged_gqa_decode_attention_ref(
+        q,
+        k_blocks,
+        v_blocks,
+        block_table,
+        seq_len,
+        block_size,
+        group_size=2,
+    )
+
+    np.testing.assert_allclose(paged_out, dense_out, atol=1e-6)
+
+
+def test_latent_kv_decode_attention_output_shape_is_correct() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+    out = latent_kv_decode_attention_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+    assert out.shape == q.shape
     assert np.isfinite(out).all()
+
+
+def test_paged_latent_kv_matches_dense_latent_kv() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+    block_size = 2
+    seq_len = latent_cache.shape[1]
+    block_table = np.array([2, 0, 1], dtype=np.int64)
+
+    pad_tokens = block_size * len(block_table) - seq_len
+    latent_tokens = np.pad(latent_cache[0], ((0, pad_tokens), (0, 0)))
+    latent_blocks = np.empty(
+        (len(block_table), block_size, latent_tokens.shape[1]), dtype=np.float32
+    )
+    logical_blocks = latent_tokens.reshape(len(block_table), block_size, latent_tokens.shape[1])
+    for logical_idx, physical_idx in enumerate(block_table):
+        latent_blocks[physical_idx] = logical_blocks[logical_idx]
+
+    dense_out = latent_kv_decode_attention_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+    paged_out = paged_latent_kv_decode_attention_ref(
+        q,
+        latent_blocks,
+        block_table,
+        seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+    np.testing.assert_allclose(paged_out, dense_out, atol=1e-6)
