@@ -1,5 +1,6 @@
 """Simple paged KV cache block-table model."""
 
+import math
 from dataclasses import dataclass, field
 
 
@@ -54,3 +55,14 @@ class PagedBlockTable:
     @property
     def num_blocks(self) -> int:
         return len(self.logical_to_physical)
+
+    def to_numpy(self) -> list[int]:
+        """Return the logical-to-physical mapping in logical block order."""
+        return list(self.logical_to_physical)
+
+
+def logical_blocks_for_seq_len(seq_len: int, block_size: int) -> int:
+    """Return the number of logical blocks needed to cover seq_len tokens."""
+    _validate_positive_int("seq_len", seq_len)
+    _validate_positive_int("block_size", block_size)
+    return math.ceil(seq_len / block_size)
