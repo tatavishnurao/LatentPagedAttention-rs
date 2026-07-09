@@ -1,5 +1,8 @@
 .venv/
+attention99/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
 target/
+*.egg-info/
+Cargo.lock
