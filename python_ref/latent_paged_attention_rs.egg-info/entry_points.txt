@@ -1,2 +1,0 @@
-[console_scripts]
-plkv-memory = latent_paged_attention.cli:run
