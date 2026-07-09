@@ -11,7 +11,6 @@ from .memory_model import (
     kv_bytes_per_token_latent,
 )
 
-app = typer.Typer(add_completion=False)
 console = Console()
 
 
@@ -19,8 +18,7 @@ def _format_mib(num_bytes: int) -> str:
     return f"{num_bytes / (1024 ** 2):.2f} MiB"
 
 
-@app.command()
-def main(
+def estimate(
     layers: int = typer.Option(..., min=1),
     seq_len: int = typer.Option(..., min=1),
     batch_size: int = typer.Option(..., min=1),
@@ -40,9 +38,9 @@ def main(
 
     table = Table(title="KV Cache Estimate")
     table.add_column("Variant")
-    table.add_column("Bytes/token/layer", justify="right")
-    table.add_column("Total bytes", justify="right")
-    table.add_column("Total MiB", justify="right")
+    table.add_column("KV bytes/token/layer", justify="right")
+    table.add_column("Total KV cache bytes", justify="right")
+    table.add_column("Total KV cache MiB", justify="right")
     table.add_row("GQA KV", str(gqa_bytes_per_token), str(gqa_total), _format_mib(gqa_total))
     table.add_row(
         "Latent KV", str(latent_bytes_per_token), str(latent_total), _format_mib(latent_total)
@@ -50,13 +48,14 @@ def main(
 
     console.print(table)
     console.print(
-        f"Compression ratio (full / latent): {compression_ratio(gqa_total, latent_total):.3f}x"
+        "Compression ratio (GQA bytes/token/layer / latent bytes/token/layer): "
+        f"{compression_ratio(gqa_bytes_per_token, latent_bytes_per_token):.3f}x"
     )
 
 
-def run() -> None:
-    app()
+def main() -> None:
+    typer.run(estimate)
 
 
 if __name__ == "__main__":
-    run()
+    main()
