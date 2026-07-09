@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "latent-paged-attention-rs"
+version = "0.1.0"
+description = "uv-centric Rust + Python research scaffold for paged latent-KV attention studies"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy>=2.1,<3",
+  "rich>=14,<15",
+  "typer>=0.16,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<0.13",
+]
+
+[project.scripts]
+plkv-memory = "latent_paged_attention.cli:run"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<0.13",
+]
+
+[tool.setuptools]
+package-dir = {"" = "python_ref"}
+
+[tool.setuptools.packages.find]
+where = ["python_ref"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["python_ref"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
