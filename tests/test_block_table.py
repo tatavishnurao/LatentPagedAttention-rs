@@ -1,5 +1,5 @@
 import pytest
-from latent_paged_attention.block_table import PagedBlockTable
+from latent_paged_attention.block_table import PagedBlockTable, logical_blocks_for_seq_len
 
 
 def test_allocate_and_translate_across_boundary() -> None:
@@ -24,3 +24,7 @@ def test_translate_rejects_unallocated_position() -> None:
 def test_invalid_block_size_rejected() -> None:
     with pytest.raises(ValueError):
         PagedBlockTable(block_size=0)
+
+
+def test_logical_blocks_for_seq_len_rounds_up() -> None:
+    assert logical_blocks_for_seq_len(5, 2) == 3
