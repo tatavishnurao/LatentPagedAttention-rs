@@ -1,7 +1,10 @@
 import json
 
+import numpy as np
+
 from latent_paged_attention.fixtures import (
     block_table_fixture,
+    gqa_decode_f32_fixture,
     memory_model_fixture,
     paged_kv_write_fixture,
     paged_lookup_f32_fixture,
@@ -49,6 +52,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "block_table_seq128_block16.json",
         "paged_lookup_f32_seq5_block2_width4.json",
         "paged_kv_write_f32.json",
+        "gqa_decode_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -82,3 +86,32 @@ def test_paged_kv_write_fixture_has_two_locations_and_is_deterministic() -> None
         (1, 0),
     ]
     assert fixture == paged_kv_write_fixture()
+
+
+def test_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:
+    fixture = gqa_decode_f32_fixture()
+    assert fixture["q_to_kv"] == [0, 0, 1, 1]
+    assert fixture["batch"] == 1
+    assert fixture["q_heads"] == 4
+    assert fixture["kv_heads"] == 2
+    assert fixture["seq_len"] == 8
+    assert fixture["head_dim"] == 8
+
+    for case in fixture["cases"]:
+        k_token = np.asarray(case["k_token_major"], dtype=np.float32)
+        v_token = np.asarray(case["v_token_major"], dtype=np.float32)
+        k_head = np.asarray(case["k_head_major"], dtype=np.float32)
+        v_head = np.asarray(case["v_head_major"], dtype=np.float32)
+        np.testing.assert_array_equal(k_head, np.transpose(k_token, (1, 0, 2)))
+        np.testing.assert_array_equal(v_head, np.transpose(v_token, (1, 0, 2)))
+
+        probabilities = np.asarray(case["expected_probabilities"], dtype=np.float32)
+        np.testing.assert_allclose(probabilities.sum(axis=-1), np.ones(4), atol=1e-6)
+        assert np.isfinite(np.asarray(case["expected_scores"], dtype=np.float32)).all()
+        assert np.isfinite(probabilities).all()
+        assert np.isfinite(np.asarray(case["expected_context"], dtype=np.float32)).all()
+
+    balanced = np.asarray(fixture["cases"][0]["expected_context"], dtype=np.float32)
+    stable = np.asarray(fixture["cases"][1]["expected_context"], dtype=np.float32)
+    assert not np.array_equal(balanced, stable)
+    assert fixture == gqa_decode_f32_fixture()
