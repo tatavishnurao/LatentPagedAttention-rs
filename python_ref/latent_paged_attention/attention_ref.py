@@ -81,6 +81,32 @@ def gqa_decode_attention_ref(
     Returns:
         Context: [batch, q_heads, head_dim]
     """
+    _, _, context = gqa_decode_attention_intermediates_ref(
+        q, k_cache, v_cache, group_size=group_size
+    )
+    return context
+
+
+def gqa_decode_attention_intermediates_ref(
+    q: np.ndarray,
+    k_cache: np.ndarray,
+    v_cache: np.ndarray,
+    *,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Reference GQA decode attention with intermediates.
+
+    Args:
+        q: [batch, q_heads, head_dim]
+        k_cache: [batch, seq_len, kv_heads, head_dim]
+        v_cache: [batch, seq_len, kv_heads, head_dim]
+        group_size: q_head grouping factor such that kv_head = q_head // group_size
+    Returns:
+        scores: [batch, q_heads, seq_len]
+        probabilities: [batch, q_heads, seq_len]
+        context: [batch, q_heads, head_dim]
+    """
     if q.ndim != 3 or k_cache.ndim != 4 or v_cache.ndim != 4:
         raise ValueError(
             "expected q [batch, q_heads, head_dim], "
@@ -104,9 +130,15 @@ def gqa_decode_attention_ref(
     scores = np.einsum("bqh,btqh->bqt", q, selected_k) / np.sqrt(float(head_dim))
     probs = softmax_stable(scores, axis=-1)
     context = np.einsum("bqt,btqh->bqh", probs, selected_v)
+    if not np.all(np.isfinite(scores)):
+        raise ValueError("scores must be finite")
+    if not np.all(np.isfinite(probs)):
+        raise ValueError("probabilities must be finite")
+    if not np.allclose(np.sum(probs, axis=-1), 1.0, atol=1e-6):
+        raise ValueError("probability rows must sum to one")
     assert context.shape == (batch, q_heads, head_dim)
     assert seq_len == k_cache.shape[1]
-    return context
+    return scores, probs, context
 
 
 def paged_gqa_decode_attention_ref(
