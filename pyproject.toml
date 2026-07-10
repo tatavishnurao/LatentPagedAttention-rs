@@ -22,6 +22,7 @@ dev = [
 
 [project.scripts]
 plkv-memory = "latent_paged_attention.cli:main"
+plkv-bench-ref = "latent_paged_attention.bench_ref:main"
 
 [dependency-groups]
 dev = [
