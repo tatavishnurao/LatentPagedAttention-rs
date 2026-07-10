@@ -26,16 +26,16 @@ The Python side is intentionally `uv`-first:
 
 That keeps the reference layer lightweight and reproducible without introducing a larger environment stack.
 
-## Why Rust and cuTile are planned
+## Why Rust and cuTile matter
 
-Rust is the long-term systems layer for block tables, cache layout, benchmark harnesses, and future GPU integration. cuTile-related work is planned later, after the reference models and measurement harness are stable enough to justify kernel work.
+Rust is the systems layer for block tables, cache layout, validation harnesses, and GPU integration. cuTile `0.2.0` is integrated behind the optional `gpu-cutile` feature.
 
 ## What this project is not
 
 - Not a production inference runtime
 - Not a claim of beating vLLM, FlashAttention, or llama.cpp
 - Not a promise that MLA-style latent KV is a drop-in runtime swap for existing Llama or Qwen checkpoints
-- Not a validated cuTile kernel stack yet
+- Not a production cuTile kernel stack
 
 ## First milestone checklist
 
@@ -45,18 +45,27 @@ Rust is the long-term systems layer for block tables, cache layout, benchmark ha
 - [x] paged block-table model in Python and Rust
 - [x] repo docs for scope, formulas, and reporting discipline
 - [x] validation scripts
-- [ ] real GPU kernels
+- [x] cuTile vector-add smoke test on RTX 4060
+- [x] non-identity GPU paged lookup
+- [x] Python/Rust/GPU parity fixtures
+- [ ] single-token paged KV write completion
 - [ ] end-to-end model integration
 
 ## Current milestone
 
-This repo currently validates the reference-level mechanics of:
+This repo currently validates:
 
 - GQA decode attention
 - paged KV lookup
 - latent KV reconstruction
 - paged latent KV lookup
 - KV memory estimation
+- cuTile vector-add execution on the RTX 4060
+- non-identity GPU paged lookup
+- Python/Rust/GPU paged lookup parity
+
+The current GPU milestone adds single-token paged KV-cache write validation.
+GQA, latent-KV reconstruction, and real model inference remain unimplemented.
 
 It does not yet contain CUDA/cuTile kernels or real model inference.
 
@@ -123,16 +132,33 @@ UV_PROJECT_ENVIRONMENT=attention99 bash scripts/rtx4060_memory_sanity.sh
 
 These scripts do not benchmark cuTile or CUDA kernels. They capture environment and memory-model context only.
 
-## cuTile smoke test and GPU paged lookup
+## GPU status
 
 cuTile `0.2.0` is pinned behind the optional `gpu-cutile` feature. The first GPU
-pass validates a vector-add smoke test and a small non-identity `f32` paged-cache
-lookup against Python and Rust references.
+pass has completed the following:
+
+- cuTile `0.2.0` integration
+- RTX 4060 vector-add smoke test
+- GPU non-identity paged lookup
+- Python/Rust/GPU parity
+
+In progress:
+
+- GPU single-token paged KV write
+
+Not implemented:
+
+- GQA decode
+- Paged GQA
+- latent-KV reconstruction
+- Paged Latent KV
+- real model inference
 
 ```bash
 source scripts/cutile_env.sh
 bash scripts/run_cutile_smoke.sh
 bash scripts/run_gpu_paged_lookup.sh
+bash scripts/run_gpu_paged_kv_write.sh
 ```
 
 These commands validate compilation, JIT execution, synchronization, host
@@ -159,10 +185,10 @@ represent production inference.
 2. NumPy reference benchmark — done
 3. Rust parity and golden fixtures — done
 4. RTX 4060 baseline — done
-5. cuTile smoke test — this pass
-6. GPU paged lookup — this pass
-7. GPU KV write
-8. GPU GQA decode
+5. cuTile smoke test — done
+6. GPU paged lookup — done
+7. GPU single-token KV write — this pass
+8. GPU contiguous GQA decode
 9. GPU Paged GQA
 10. GPU latent-KV reconstruction
 11. GPU Paged Latent KV

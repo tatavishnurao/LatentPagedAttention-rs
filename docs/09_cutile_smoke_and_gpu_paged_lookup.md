@@ -37,6 +37,9 @@ Python fixture -> Rust CPU reference -> cuTile GPU kernel -> host comparison.
 The GPU example checks both Python and Rust outputs with `atol=1e-6` and
 `rtol=0`.
 
+The next GPU primitive is the single-token paged KV write described in
+`docs/10_gpu_paged_kv_write.md`.
+
 ## Commands
 
 ```bash
