@@ -83,6 +83,46 @@ UV_PROJECT_ENVIRONMENT=attention99 uv run plkv-memory \
   --dtype-bytes 2
 ```
 
+## Reference benchmark
+
+This repo includes a NumPy-only reference benchmark for GQA, Paged GQA, Latent KV, and Paged Latent KV.
+
+```bash
+UV_PROJECT_ENVIRONMENT=attention99 uv run plkv-bench-ref --config small --iters 20
+UV_PROJECT_ENVIRONMENT=attention99 uv run plkv-bench-ref --config medium --iters 10
+bash scripts/run_reference_benchmarks.sh
+```
+
+CSV outputs are written to `reports/reference_benchmarks/`. These are not GPU benchmarks and should not be interpreted as cuTile or CUDA performance.
+
+## Golden fixtures
+
+The repo includes Python-generated JSON fixtures under `fixtures/reference/`. These validate that Rust memory and block-table logic matches the Python reference implementation.
+
+Generate fixtures:
+
+```bash
+UV_PROJECT_ENVIRONMENT=attention99 bash scripts/generate_golden_fixtures.sh
+```
+
+Validate:
+
+```bash
+UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
+cargo test --workspace
+```
+
+## RTX 4060 baseline
+
+The project targets an RTX 4060 Laptop GPU with 8 GB VRAM. Before writing GPU kernels, capture the local hardware and toolchain state:
+
+```bash
+UV_PROJECT_ENVIRONMENT=attention99 bash scripts/rtx4060_env_snapshot.sh
+UV_PROJECT_ENVIRONMENT=attention99 bash scripts/rtx4060_memory_sanity.sh
+```
+
+These scripts do not benchmark cuTile or CUDA kernels. They capture environment and memory-model context only.
+
 ## Repo layout
 
 ```text
@@ -99,12 +139,13 @@ UV_PROJECT_ENVIRONMENT=attention99 uv run plkv-memory \
 
 ## Research roadmap
 
-1. Python reference correctness
-2. Rust block-table and cache model
-3. cuTile kernel validation
-4. GQA decode kernel
-5. Paged GQA
-6. Latent KV
-7. Paged Latent KV
-8. Quantized cache
-9. RTX 4060 benchmark report
+1. Python reference correctness — done
+2. NumPy reference benchmark — done
+3. Rust parity + golden fixtures — this pass
+4. RTX 4060 baseline — this pass
+5. cuTile smoke test
+6. GPU paged lookup / KV write primitive
+7. GPU GQA decode
+8. GPU paged GQA
+9. GPU latent KV reconstruction
+10. GPU paged latent KV
