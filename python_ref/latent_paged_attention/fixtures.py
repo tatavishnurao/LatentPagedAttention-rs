@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .attention_ref import paged_lookup_ref
+from .attention_ref import gqa_decode_attention_intermediates_ref, paged_lookup_ref
 from .block_table import PagedBlockTable
 from .cache_ref import paged_kv_write_ref, resolve_paged_token_location
 from .memory_model import (
@@ -162,6 +162,108 @@ def paged_kv_write_fixture() -> dict:
     }
 
 
+def _to_head_major(cache: np.ndarray) -> np.ndarray:
+    """Convert [seq_len, kv_heads, head_dim] to [kv_heads, seq_len, head_dim]."""
+    return np.transpose(cache, (1, 0, 2)).copy()
+
+
+def _balanced_gqa_case() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    q_heads = 4
+    kv_heads = 2
+    seq_len = 8
+    head_dim = 8
+    q = np.zeros((1, q_heads, head_dim), dtype=np.float32)
+    k = np.zeros((1, seq_len, kv_heads, head_dim), dtype=np.float32)
+    v = np.zeros((1, seq_len, kv_heads, head_dim), dtype=np.float32)
+    for q_head in range(q_heads):
+        for dim in range(head_dim):
+            q[0, q_head, dim] = (
+                (q_head + 1) * 0.17 + (dim + 1) * 0.031 + ((q_head + dim) % 3) * 0.007
+            )
+    for token in range(seq_len):
+        for kv_head in range(kv_heads):
+            for dim in range(head_dim):
+                k[0, token, kv_head, dim] = (
+                    (kv_head + 1) * 0.23
+                    + (token + 1) * 0.019
+                    - (dim + 1) * 0.011
+                    + ((token + dim + kv_head) % 4) * 0.005
+                )
+                v[0, token, kv_head, dim] = (
+                    (kv_head + 1) * 0.41
+                    - (token + 1) * 0.013
+                    + (dim + 1) * 0.027
+                    + ((2 * token + dim + kv_head) % 5) * 0.003
+                )
+    return q, k, v
+
+
+def _stable_softmax_gqa_case() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    q_heads = 4
+    kv_heads = 2
+    seq_len = 8
+    head_dim = 8
+    q = np.zeros((1, q_heads, head_dim), dtype=np.float32)
+    k = np.zeros((1, seq_len, kv_heads, head_dim), dtype=np.float32)
+    v = np.zeros((1, seq_len, kv_heads, head_dim), dtype=np.float32)
+    for q_head in range(q_heads):
+        sign = -1.0 if q_head % 2 else 1.0
+        for dim in range(head_dim):
+            q[0, q_head, dim] = sign * (6.0 + q_head * 1.25 + dim * 0.5)
+    for token in range(seq_len):
+        for kv_head in range(kv_heads):
+            token_scale = (token - 3.5) * (1.6 + kv_head * 0.35)
+            for dim in range(head_dim):
+                k[0, token, kv_head, dim] = token_scale + dim * 0.42 - kv_head * 0.9
+                v[0, token, kv_head, dim] = (
+                    (token + 1) * 0.21 + (kv_head + 1) * 0.33 - dim * 0.017
+                )
+    return q, k, v
+
+
+def _gqa_case(name: str, q: np.ndarray, k: np.ndarray, v: np.ndarray) -> dict:
+    scores, probabilities, context = gqa_decode_attention_intermediates_ref(
+        q, k, v, group_size=2
+    )
+    return {
+        "name": name,
+        "q": q[0].tolist(),
+        "k_token_major": k[0].tolist(),
+        "v_token_major": v[0].tolist(),
+        "k_head_major": _to_head_major(k[0]).tolist(),
+        "v_head_major": _to_head_major(v[0]).tolist(),
+        "expected_scores": scores[0].tolist(),
+        "expected_probabilities": probabilities[0].tolist(),
+        "expected_context": context[0].tolist(),
+    }
+
+
+def gqa_decode_f32_fixture() -> dict:
+    """Return deterministic contiguous GQA decode fixtures with intermediates."""
+    q_heads = 4
+    kv_heads = 2
+    group_size = 2
+    seq_len = 8
+    head_dim = 8
+    balanced_q, balanced_k, balanced_v = _balanced_gqa_case()
+    stable_q, stable_k, stable_v = _stable_softmax_gqa_case()
+    return {
+        "dtype": "f32",
+        "batch": 1,
+        "q_heads": q_heads,
+        "kv_heads": kv_heads,
+        "group_size": group_size,
+        "seq_len": seq_len,
+        "head_dim": head_dim,
+        "scale": 1.0 / np.sqrt(float(head_dim)),
+        "q_to_kv": (np.arange(q_heads) // group_size).tolist(),
+        "cases": [
+            _gqa_case("balanced", balanced_q, balanced_k, balanced_v),
+            _gqa_case("stable_softmax", stable_q, stable_k, stable_v),
+        ],
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -172,6 +274,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "block_table_seq128_block16.json": block_table_fixture(128, 16),
         "paged_lookup_f32_seq5_block2_width4.json": paged_lookup_f32_fixture(),
         "paged_kv_write_f32.json": paged_kv_write_fixture(),
+        "gqa_decode_f32.json": gqa_decode_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
