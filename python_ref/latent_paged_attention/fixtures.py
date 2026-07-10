@@ -4,6 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
+
+from .attention_ref import paged_lookup_ref
 from .block_table import PagedBlockTable
 from .memory_model import (
     compression_ratio,
@@ -66,6 +69,33 @@ def block_table_fixture(seq_len: int, block_size: int) -> dict:
     }
 
 
+def paged_lookup_f32_fixture() -> dict:
+    """Return a deterministic non-identity paged lookup fixture."""
+    seq_len = 5
+    block_size = 2
+    width = 4
+    block_table = np.asarray([2, 0, 1], dtype=np.int32)
+    physical_blocks = np.asarray(
+        [
+            [[0.0, 1.0, 2.0, 3.0], [4.0, 5.0, 6.0, 7.0]],
+            [[10.0, 11.0, 12.0, 13.0], [14.0, 15.0, 16.0, 17.0]],
+            [[20.0, 21.0, 22.0, 23.0], [24.0, 25.0, 26.0, 27.0]],
+        ],
+        dtype=np.float32,
+    )
+    expected = paged_lookup_ref(physical_blocks, block_table, seq_len, block_size)
+    return {
+        "dtype": "f32",
+        "seq_len": seq_len,
+        "block_size": block_size,
+        "width": width,
+        "num_physical_blocks": 3,
+        "block_table": block_table.tolist(),
+        "physical_blocks": physical_blocks.tolist(),
+        "expected_logical_output": expected.tolist(),
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -74,6 +104,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "memory_model_small.json": memory_model_fixture(),
         "block_table_seq5_block2.json": block_table_fixture(5, 2),
         "block_table_seq128_block16.json": block_table_fixture(128, 16),
+        "paged_lookup_f32_seq5_block2_width4.json": paged_lookup_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():

@@ -3,6 +3,8 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlkvError {
     ZeroValue { name: &'static str },
+    ArithmeticOverflow,
+    InvalidPagedLookup { reason: &'static str },
     TokenOutOfRange { token_pos: usize, seq_len: usize },
     TokenNotAllocated { token_pos: usize, num_tokens: usize },
 }
@@ -11,6 +13,8 @@ impl fmt::Display for PlkvError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroValue { name } => write!(f, "{name} must be > 0"),
+            Self::ArithmeticOverflow => write!(f, "paged lookup size arithmetic overflowed"),
+            Self::InvalidPagedLookup { reason } => write!(f, "invalid paged lookup: {reason}"),
             Self::TokenOutOfRange { token_pos, seq_len } => {
                 write!(
                     f,
@@ -47,7 +51,11 @@ pub fn kv_bytes_per_token_gqa(
     require_positive("head_dim", head_dim)?;
     require_positive("dtype_bytes", dtype_bytes)?;
     let components = if include_k_and_v { 2 } else { 1 };
-    Ok(n_kv_heads * head_dim * dtype_bytes * components)
+    n_kv_heads
+        .checked_mul(head_dim)
+        .and_then(|value| value.checked_mul(dtype_bytes))
+        .and_then(|value| value.checked_mul(components))
+        .ok_or(PlkvError::ArithmeticOverflow)
 }
 
 pub fn kv_bytes_per_token_latent(
@@ -56,7 +64,9 @@ pub fn kv_bytes_per_token_latent(
 ) -> Result<usize, PlkvError> {
     require_positive("latent_dim", latent_dim)?;
     require_positive("dtype_bytes", dtype_bytes)?;
-    Ok(latent_dim * dtype_bytes)
+    latent_dim
+        .checked_mul(dtype_bytes)
+        .ok_or(PlkvError::ArithmeticOverflow)
 }
 
 pub fn compression_ratio(full_kv_bytes: usize, latent_kv_bytes: usize) -> Result<f64, PlkvError> {
@@ -75,7 +85,65 @@ pub fn estimate_total_kv_cache_bytes(
     require_positive("seq_len", seq_len)?;
     require_positive("batch_size", batch_size)?;
     require_positive("bytes_per_token_per_layer", bytes_per_token_per_layer)?;
-    Ok(num_layers * seq_len * batch_size * bytes_per_token_per_layer)
+    num_layers
+        .checked_mul(seq_len)
+        .and_then(|value| value.checked_mul(batch_size))
+        .and_then(|value| value.checked_mul(bytes_per_token_per_layer))
+        .ok_or(PlkvError::ArithmeticOverflow)
+}
+
+pub fn paged_lookup_f32(
+    physical_blocks: &[f32],
+    block_table: &[usize],
+    seq_len: usize,
+    block_size: usize,
+    width: usize,
+) -> Result<Vec<f32>, PlkvError> {
+    require_positive("seq_len", seq_len)?;
+    require_positive("block_size", block_size)?;
+    require_positive("width", width)?;
+    let logical_blocks = seq_len.div_ceil(block_size);
+    if block_table.len() < logical_blocks {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover seq_len",
+        });
+    }
+    let block_stride = block_size
+        .checked_mul(width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if physical_blocks.len() % block_stride != 0 {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "physical storage length is not divisible by block stride",
+        });
+    }
+    let num_physical_blocks = physical_blocks.len() / block_stride;
+    let output_len = seq_len
+        .checked_mul(width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let mut output = Vec::with_capacity(output_len);
+    for token in 0..seq_len {
+        let logical_block = token / block_size;
+        let offset = token % block_size;
+        let physical_block = block_table[logical_block];
+        if physical_block >= num_physical_blocks {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "block table contains an invalid physical block",
+            });
+        }
+        let start = physical_block
+            .checked_mul(block_stride)
+            .and_then(|value| value.checked_add(offset.checked_mul(width)?))
+            .ok_or(PlkvError::ArithmeticOverflow)?;
+        let end = start
+            .checked_add(width)
+            .ok_or(PlkvError::ArithmeticOverflow)?;
+        output.extend_from_slice(physical_blocks.get(start..end).ok_or(
+            PlkvError::InvalidPagedLookup {
+                reason: "physical storage indexing exceeded storage length",
+            },
+        )?);
+    }
+    Ok(output)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,6 +298,7 @@ mod tests {
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
         estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa, kv_bytes_per_token_latent,
+        paged_lookup_f32,
     };
 
     #[test]
@@ -320,6 +389,17 @@ mod tests {
         offset: usize,
     }
 
+    #[derive(Debug, Deserialize)]
+    struct PagedLookupFixture {
+        seq_len: usize,
+        block_size: usize,
+        width: usize,
+        num_physical_blocks: usize,
+        block_table: Vec<usize>,
+        physical_blocks: Vec<Vec<Vec<f32>>>,
+        expected_logical_output: Vec<Vec<f32>>,
+    }
+
     #[test]
     fn memory_model_matches_python_golden_fixture() {
         let fixture: MemoryFixture = serde_json::from_str(include_str!(
@@ -379,5 +459,46 @@ mod tests {
             assert_eq!(actual.physical_block, expected.physical_block);
             assert_eq!(actual.offset, expected.offset);
         }
+    }
+
+    #[test]
+    fn paged_lookup_matches_python_golden_fixture() {
+        let fixture: PagedLookupFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/paged_lookup_f32_seq5_block2_width4.json"
+        ))
+        .unwrap();
+        assert_eq!(fixture.physical_blocks.len(), fixture.num_physical_blocks);
+        let physical_blocks: Vec<f32> = fixture
+            .physical_blocks
+            .iter()
+            .flatten()
+            .flatten()
+            .copied()
+            .collect();
+        let expected: Vec<f32> = fixture
+            .expected_logical_output
+            .iter()
+            .flatten()
+            .copied()
+            .collect();
+        assert_eq!(
+            paged_lookup_f32(
+                &physical_blocks,
+                &fixture.block_table,
+                fixture.seq_len,
+                fixture.block_size,
+                fixture.width,
+            )
+            .unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn paged_lookup_rejects_invalid_storage_and_dimensions() {
+        assert!(paged_lookup_f32(&[1.0], &[0], 1, 1, 2).is_err());
+        assert!(paged_lookup_f32(&[1.0], &[], 1, 1, 1).is_err());
+        assert!(paged_lookup_f32(&[1.0], &[1], 1, 1, 1).is_err());
+        assert!(paged_lookup_f32(&[1.0], &[0], 1, 0, 1).is_err());
     }
 }

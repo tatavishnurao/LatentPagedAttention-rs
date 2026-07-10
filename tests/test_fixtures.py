@@ -3,6 +3,7 @@ import json
 from latent_paged_attention.fixtures import (
     block_table_fixture,
     memory_model_fixture,
+    paged_lookup_f32_fixture,
     write_fixtures,
 )
 
@@ -45,6 +46,26 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "memory_model_small.json",
         "block_table_seq5_block2.json",
         "block_table_seq128_block16.json",
+        "paged_lookup_f32_seq5_block2_width4.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_paged_lookup_fixture_crosses_non_identity_physical_blocks() -> None:
+    fixture = paged_lookup_f32_fixture()
+    assert fixture["block_table"] == [2, 0, 1]
+    assert fixture["block_table"] != [0, 1, 2]
+    assert fixture["expected_logical_output"] == [
+        [20.0, 21.0, 22.0, 23.0],
+        [24.0, 25.0, 26.0, 27.0],
+        [0.0, 1.0, 2.0, 3.0],
+        [4.0, 5.0, 6.0, 7.0],
+        [10.0, 11.0, 12.0, 13.0],
+    ]
+    assert len(fixture["expected_logical_output"]) == 5
+    assert all(len(row) == 4 for row in fixture["expected_logical_output"])
+
+
+def test_paged_lookup_fixture_is_deterministic() -> None:
+    assert paged_lookup_f32_fixture() == paged_lookup_f32_fixture()
