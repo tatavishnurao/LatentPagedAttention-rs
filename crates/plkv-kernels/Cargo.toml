@@ -4,5 +4,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+gpu-cutile = ["dep:cutile", "dep:cutile-compiler", "dep:serde", "dep:serde_json"]
+
+[dependencies]
+cutile = { version = "=0.2.0", optional = true }
+cutile-compiler = { version = "=0.2.0", optional = true }
+plkv-core = { path = "../plkv-core" }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
 [lib]
 path = "src/lib.rs"
+
+[[example]]
+name = "cutile_smoke"
+required-features = ["gpu-cutile"]
+
+[[example]]
+name = "paged_lookup_gpu"
+required-features = ["gpu-cutile"]
