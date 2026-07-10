@@ -5,6 +5,6 @@ attention99/
 __pycache__/
 target/
 *.egg-info/
-Cargo.lock
 reports/rtx4060_baseline/*.txt
 reports/rtx4060_baseline/*.csv
+reports/rtx4060_gpu_smoke/*.txt

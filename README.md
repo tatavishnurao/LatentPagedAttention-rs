@@ -123,6 +123,22 @@ UV_PROJECT_ENVIRONMENT=attention99 bash scripts/rtx4060_memory_sanity.sh
 
 These scripts do not benchmark cuTile or CUDA kernels. They capture environment and memory-model context only.
 
+## cuTile smoke test and GPU paged lookup
+
+cuTile `0.2.0` is pinned behind the optional `gpu-cutile` feature. The first GPU
+pass validates a vector-add smoke test and a small non-identity `f32` paged-cache
+lookup against Python and Rust references.
+
+```bash
+source scripts/cutile_env.sh
+bash scripts/run_cutile_smoke.sh
+bash scripts/run_gpu_paged_lookup.sh
+```
+
+These commands validate compilation, JIT execution, synchronization, host
+readback, and correctness. They do not benchmark attention, claim speedups, or
+represent production inference.
+
 ## Repo layout
 
 ```text
@@ -141,11 +157,13 @@ These scripts do not benchmark cuTile or CUDA kernels. They capture environment 
 
 1. Python reference correctness — done
 2. NumPy reference benchmark — done
-3. Rust parity + golden fixtures — this pass
-4. RTX 4060 baseline — this pass
-5. cuTile smoke test
-6. GPU paged lookup / KV write primitive
-7. GPU GQA decode
-8. GPU paged GQA
-9. GPU latent KV reconstruction
-10. GPU paged latent KV
+3. Rust parity and golden fixtures — done
+4. RTX 4060 baseline — done
+5. cuTile smoke test — this pass
+6. GPU paged lookup — this pass
+7. GPU KV write
+8. GPU GQA decode
+9. GPU Paged GQA
+10. GPU latent-KV reconstruction
+11. GPU Paged Latent KV
+12. RTX 4060 performance study
