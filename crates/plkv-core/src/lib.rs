@@ -238,6 +238,120 @@ pub fn paged_kv_write_f32(
     Ok(location)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct GqaDecodeResult {
+    pub scores: Vec<f32>,
+    pub probabilities: Vec<f32>,
+    pub context: Vec<f32>,
+}
+
+pub fn contiguous_gqa_decode_f32(
+    q: &[f32],
+    k_head_major: &[f32],
+    v_head_major: &[f32],
+    q_heads: usize,
+    kv_heads: usize,
+    seq_len: usize,
+    head_dim: usize,
+    group_size: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("seq_len", seq_len)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    if q_heads != kv_heads.checked_mul(group_size).ok_or(PlkvError::ArithmeticOverflow)? {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "expected q_heads == kv_heads * group_size",
+        });
+    }
+    let q_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let kv_len = kv_heads
+        .checked_mul(seq_len)
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if q.len() != q_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "Q length does not match q_heads * head_dim",
+        });
+    }
+    if k_head_major.len() != kv_len || v_head_major.len() != kv_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "K/V length does not match kv_heads * seq_len * head_dim",
+        });
+    }
+    let scores_len = q_heads
+        .checked_mul(seq_len)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let context_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let mut scores = vec![0.0f32; scores_len];
+    let mut probabilities = vec![0.0f32; scores_len];
+    let mut context = vec![0.0f32; context_len];
+    let scale = 1.0f32 / (head_dim as f32).sqrt();
+
+    for q_head in 0..q_heads {
+        let kv_head = q_head / group_size;
+        let q_start = q_head * head_dim;
+        let scores_start = q_head * seq_len;
+        for token in 0..seq_len {
+            let k_start = (kv_head * seq_len + token) * head_dim;
+            let mut dot = 0.0f32;
+            for dim in 0..head_dim {
+                dot += q[q_start + dim] * k_head_major[k_start + dim];
+            }
+            scores[scores_start + token] = dot * scale;
+        }
+
+        let row = &scores[scores_start..scores_start + seq_len];
+        let row_max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        if !row_max.is_finite() {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "score row maximum is not finite",
+            });
+        }
+        let mut denom = 0.0f32;
+        for token in 0..seq_len {
+            let value = (scores[scores_start + token] - row_max).exp();
+            probabilities[scores_start + token] = value;
+            denom += value;
+        }
+        if !denom.is_finite() || denom == 0.0 {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "softmax denominator must be finite and non-zero",
+            });
+        }
+        for token in 0..seq_len {
+            let value = probabilities[scores_start + token] / denom;
+            if !value.is_finite() {
+                return Err(PlkvError::InvalidPagedLookup {
+                    reason: "probability must be finite",
+                });
+            }
+            probabilities[scores_start + token] = value;
+        }
+
+        let context_start = q_head * head_dim;
+        for dim in 0..head_dim {
+            let mut value = 0.0f32;
+            for token in 0..seq_len {
+                let v_start = (kv_head * seq_len + token) * head_dim;
+                value += probabilities[scores_start + token] * v_head_major[v_start + dim];
+            }
+            context[context_start + dim] = value;
+        }
+    }
+
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
@@ -389,8 +503,9 @@ mod tests {
 
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
-        estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa, kv_bytes_per_token_latent,
-        paged_kv_write_f32, paged_lookup_f32, resolve_paged_token_location,
+        contiguous_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
+        kv_bytes_per_token_latent, paged_kv_write_f32, paged_lookup_f32,
+        resolve_paged_token_location,
     };
 
     #[test]
@@ -512,6 +627,27 @@ mod tests {
         new_v: Vec<f32>,
         expected_k_cache: Vec<Vec<Vec<f32>>>,
         expected_v_cache: Vec<Vec<Vec<f32>>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct GqaDecodeFixture {
+        q_heads: usize,
+        kv_heads: usize,
+        group_size: usize,
+        seq_len: usize,
+        head_dim: usize,
+        q_to_kv: Vec<usize>,
+        cases: Vec<GqaCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct GqaCase {
+        q: Vec<Vec<f32>>,
+        k_head_major: Vec<Vec<Vec<f32>>>,
+        v_head_major: Vec<Vec<Vec<f32>>>,
+        expected_scores: Vec<Vec<f32>>,
+        expected_probabilities: Vec<Vec<f32>>,
+        expected_context: Vec<Vec<f32>>,
     }
 
     #[test]
@@ -701,5 +837,67 @@ mod tests {
             paged_kv_write_f32(&mut [0.0; 4], &mut [0.0; 4], &[0], 0, 2, 2, &[1.0], &[1.0])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn contiguous_gqa_decode_matches_python_fixture() {
+        let fixture: GqaDecodeFixture =
+            serde_json::from_str(include_str!("../../../fixtures/reference/gqa_decode_f32.json"))
+                .unwrap();
+        assert_eq!(fixture.q_to_kv, vec![0, 0, 1, 1]);
+        for case in fixture.cases {
+            let q: Vec<f32> = case.q.iter().flatten().copied().collect();
+            let k: Vec<f32> = case.k_head_major.iter().flatten().flatten().copied().collect();
+            let v: Vec<f32> = case.v_head_major.iter().flatten().flatten().copied().collect();
+            let expected_scores: Vec<f32> =
+                case.expected_scores.iter().flatten().copied().collect();
+            let expected_probabilities: Vec<f32> =
+                case.expected_probabilities.iter().flatten().copied().collect();
+            let expected_context: Vec<f32> =
+                case.expected_context.iter().flatten().copied().collect();
+            let actual = contiguous_gqa_decode_f32(
+                &q,
+                &k,
+                &v,
+                fixture.q_heads,
+                fixture.kv_heads,
+                fixture.seq_len,
+                fixture.head_dim,
+                fixture.group_size,
+            )
+            .unwrap();
+            assert_close(&actual.scores, &expected_scores, 1e-5, 1e-5);
+            assert_close(&actual.probabilities, &expected_probabilities, 1e-5, 1e-5);
+            assert_close(&actual.context, &expected_context, 1e-5, 1e-5);
+            for q_head in 0..fixture.q_heads {
+                let start = q_head * fixture.seq_len;
+                let row_sum: f32 = actual.probabilities[start..start + fixture.seq_len]
+                    .iter()
+                    .sum();
+                assert!(
+                    (row_sum - 1.0).abs() <= 1e-5,
+                    "probability row sum was {row_sum}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn contiguous_gqa_decode_rejects_invalid_inputs() {
+        assert!(contiguous_gqa_decode_f32(&[], &[], &[], 0, 2, 8, 8, 2).is_err());
+        assert!(contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 128], &[0.0; 128], 3, 2, 8, 8, 2).is_err());
+        assert!(contiguous_gqa_decode_f32(&[0.0; 31], &[0.0; 128], &[0.0; 128], 4, 2, 8, 8, 2).is_err());
+        assert!(contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 127], &[0.0; 128], 4, 2, 8, 8, 2).is_err());
+    }
+
+    fn assert_close(actual: &[f32], expected: &[f32], atol: f32, rtol: f32) {
+        assert_eq!(actual.len(), expected.len());
+        for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+            let tolerance = atol + rtol * expected.abs();
+            assert!(
+                (actual - expected).abs() <= tolerance,
+                "index {index}: actual={actual}, expected={expected}, tolerance={tolerance}"
+            );
+        }
     }
 }
