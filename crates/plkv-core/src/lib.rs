@@ -147,6 +147,98 @@ pub fn paged_lookup_f32(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PagedTokenLocation {
+    pub logical_block: usize,
+    pub physical_block: usize,
+    pub block_offset: usize,
+}
+
+pub fn resolve_paged_token_location(
+    block_table: &[usize],
+    token_position: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<PagedTokenLocation, PlkvError> {
+    require_positive("block_size", block_size)?;
+    require_positive("num_physical_blocks", num_physical_blocks)?;
+    let logical_block = token_position / block_size;
+    let physical_block = *block_table
+        .get(logical_block)
+        .ok_or(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover token position",
+        })?;
+    if physical_block >= num_physical_blocks {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table contains an invalid physical block",
+        });
+    }
+    Ok(PagedTokenLocation {
+        logical_block,
+        physical_block,
+        block_offset: token_position % block_size,
+    })
+}
+
+pub fn paged_kv_write_f32(
+    k_cache: &mut [f32],
+    v_cache: &mut [f32],
+    block_table: &[usize],
+    token_position: usize,
+    block_size: usize,
+    width: usize,
+    new_k: &[f32],
+    new_v: &[f32],
+) -> Result<PagedTokenLocation, PlkvError> {
+    require_positive("block_size", block_size)?;
+    require_positive("width", width)?;
+    if k_cache.len() != v_cache.len() {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "K and V cache lengths must match",
+        });
+    }
+    if new_k.len() != width || new_v.len() != width {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "new K and V vectors must match width",
+        });
+    }
+    let block_stride = block_size
+        .checked_mul(width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if k_cache.len() % block_stride != 0 {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "cache length is not divisible by block stride",
+        });
+    }
+    let location = resolve_paged_token_location(
+        block_table,
+        token_position,
+        block_size,
+        k_cache.len() / block_stride,
+    )?;
+    let start = location
+        .physical_block
+        .checked_mul(block_stride)
+        .and_then(|value| value.checked_add(location.block_offset.checked_mul(width)?))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let end = start
+        .checked_add(width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let k_target = k_cache
+        .get_mut(start..end)
+        .ok_or(PlkvError::InvalidPagedLookup {
+            reason: "K cache indexing exceeded storage length",
+        })?;
+    let v_target = v_cache
+        .get_mut(start..end)
+        .ok_or(PlkvError::InvalidPagedLookup {
+            reason: "V cache indexing exceeded storage length",
+        })?;
+    k_target.copy_from_slice(new_k);
+    v_target.copy_from_slice(new_v);
+    Ok(location)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
     pub num_layers: usize,
@@ -298,7 +390,7 @@ mod tests {
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
         estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa, kv_bytes_per_token_latent,
-        paged_lookup_f32,
+        paged_kv_write_f32, paged_lookup_f32, resolve_paged_token_location,
     };
 
     #[test]
@@ -398,6 +490,28 @@ mod tests {
         block_table: Vec<usize>,
         physical_blocks: Vec<Vec<Vec<f32>>>,
         expected_logical_output: Vec<Vec<f32>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedKvWriteFixture {
+        block_size: usize,
+        width: usize,
+        block_table: Vec<usize>,
+        cases: Vec<PagedKvCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedKvCase {
+        token_position: usize,
+        logical_block: usize,
+        physical_block: usize,
+        block_offset: usize,
+        initial_k_cache: Vec<Vec<Vec<f32>>>,
+        initial_v_cache: Vec<Vec<Vec<f32>>>,
+        new_k: Vec<f32>,
+        new_v: Vec<f32>,
+        expected_k_cache: Vec<Vec<Vec<f32>>>,
+        expected_v_cache: Vec<Vec<Vec<f32>>>,
     }
 
     #[test]
@@ -500,5 +614,92 @@ mod tests {
         assert!(paged_lookup_f32(&[1.0], &[], 1, 1, 1).is_err());
         assert!(paged_lookup_f32(&[1.0], &[1], 1, 1, 1).is_err());
         assert!(paged_lookup_f32(&[1.0], &[0], 1, 0, 1).is_err());
+    }
+
+    #[test]
+    fn paged_kv_write_matches_python_fixture_and_preserves_other_rows() {
+        let fixture: PagedKvWriteFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/paged_kv_write_f32.json"
+        ))
+        .unwrap();
+        for case in fixture.cases {
+            let mut k: Vec<f32> = case
+                .initial_k_cache
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let mut v: Vec<f32> = case
+                .initial_v_cache
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let original_k = k.clone();
+            let original_v = v.clone();
+            let location = paged_kv_write_f32(
+                &mut k,
+                &mut v,
+                &fixture.block_table,
+                case.token_position,
+                fixture.block_size,
+                fixture.width,
+                &case.new_k,
+                &case.new_v,
+            )
+            .unwrap();
+            assert_eq!(location.logical_block, case.logical_block);
+            assert_eq!(location.physical_block, case.physical_block);
+            assert_eq!(location.block_offset, case.block_offset);
+            let expected_k: Vec<f32> = case
+                .expected_k_cache
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_v: Vec<f32> = case
+                .expected_v_cache
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            assert_eq!(k, expected_k);
+            assert_eq!(v, expected_v);
+            assert_eq!(
+                k.iter().zip(original_k).filter(|(a, b)| *a != b).count(),
+                fixture.width
+            );
+            assert_eq!(
+                v.iter().zip(original_v).filter(|(a, b)| *a != b).count(),
+                fixture.width
+            );
+        }
+    }
+
+    #[test]
+    fn paged_kv_write_rejects_invalid_inputs() {
+        assert!(resolve_paged_token_location(&[0], 2, 2, 1).is_err());
+        assert!(resolve_paged_token_location(&[2], 0, 2, 2).is_err());
+        assert!(
+            paged_kv_write_f32(
+                &mut [0.0; 4],
+                &mut [0.0; 8],
+                &[0],
+                0,
+                2,
+                2,
+                &[1.0, 2.0],
+                &[1.0, 2.0]
+            )
+            .is_err()
+        );
+        assert!(
+            paged_kv_write_f32(&mut [0.0; 4], &mut [0.0; 4], &[0], 0, 2, 2, &[1.0], &[1.0])
+                .is_err()
+        );
     }
 }

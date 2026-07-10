@@ -25,3 +25,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "paged_lookup_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "paged_kv_write_gpu"
+required-features = ["gpu-cutile"]

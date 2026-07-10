@@ -3,6 +3,7 @@ import json
 from latent_paged_attention.fixtures import (
     block_table_fixture,
     memory_model_fixture,
+    paged_kv_write_fixture,
     paged_lookup_f32_fixture,
     write_fixtures,
 )
@@ -47,6 +48,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "block_table_seq5_block2.json",
         "block_table_seq128_block16.json",
         "paged_lookup_f32_seq5_block2_width4.json",
+        "paged_kv_write_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -69,3 +71,14 @@ def test_paged_lookup_fixture_crosses_non_identity_physical_blocks() -> None:
 
 def test_paged_lookup_fixture_is_deterministic() -> None:
     assert paged_lookup_f32_fixture() == paged_lookup_f32_fixture()
+
+
+def test_paged_kv_write_fixture_has_two_locations_and_is_deterministic() -> None:
+    fixture = paged_kv_write_fixture()
+    assert fixture["block_table"] == [2, 0, 1]
+    assert fixture["gpu_padded_block_table"] == [2, 0, 1, 3]
+    assert [(case["physical_block"], case["block_offset"]) for case in fixture["cases"]] == [
+        (0, 1),
+        (1, 0),
+    ]
+    assert fixture == paged_kv_write_fixture()

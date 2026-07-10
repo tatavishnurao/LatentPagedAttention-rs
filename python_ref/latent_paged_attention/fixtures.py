@@ -8,6 +8,7 @@ import numpy as np
 
 from .attention_ref import paged_lookup_ref
 from .block_table import PagedBlockTable
+from .cache_ref import paged_kv_write_ref, resolve_paged_token_location
 from .memory_model import (
     compression_ratio,
     estimate_total_kv_cache_bytes,
@@ -96,6 +97,71 @@ def paged_lookup_f32_fixture() -> dict:
     }
 
 
+def paged_kv_write_fixture() -> dict:
+    """Return deterministic full-cache K/V write cases."""
+    num_physical_blocks = 4
+    block_size = 2
+    kv_heads = 2
+    head_dim = 4
+    width = kv_heads * head_dim
+    block_table = np.asarray([2, 0, 1], dtype=np.int32)
+    padded_block_table = np.asarray([2, 0, 1, 3], dtype=np.int32)
+    initial_k = np.arange(num_physical_blocks * block_size * width, dtype=np.float32).reshape(
+        num_physical_blocks, block_size, width
+    )
+    initial_v = (
+        np.arange(num_physical_blocks * block_size * width, dtype=np.float32) + 1000
+    ).reshape(num_physical_blocks, block_size, width)
+    writes = (
+        (
+            "position_3_offset_1",
+            3,
+            np.arange(100, 108, dtype=np.float32),
+            np.arange(200, 208, dtype=np.float32),
+        ),
+        (
+            "position_4_offset_0",
+            4,
+            np.arange(300, 308, dtype=np.float32),
+            np.arange(400, 408, dtype=np.float32),
+        ),
+    )
+    cases = []
+    for name, token_position, new_k, new_v in writes:
+        logical_block, physical_block, block_offset = resolve_paged_token_location(
+            block_table, token_position, block_size
+        )
+        expected_k, expected_v = paged_kv_write_ref(
+            initial_k, initial_v, block_table, token_position, new_k, new_v
+        )
+        cases.append(
+            {
+                "name": name,
+                "token_position": token_position,
+                "logical_block": logical_block,
+                "physical_block": physical_block,
+                "block_offset": block_offset,
+                "initial_k_cache": initial_k.tolist(),
+                "initial_v_cache": initial_v.tolist(),
+                "new_k": new_k.tolist(),
+                "new_v": new_v.tolist(),
+                "expected_k_cache": expected_k.tolist(),
+                "expected_v_cache": expected_v.tolist(),
+            }
+        )
+    return {
+        "dtype": "f32",
+        "num_physical_blocks": num_physical_blocks,
+        "block_size": block_size,
+        "kv_heads": kv_heads,
+        "head_dim": head_dim,
+        "width": width,
+        "block_table": block_table.tolist(),
+        "gpu_padded_block_table": padded_block_table.tolist(),
+        "cases": cases,
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -105,6 +171,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "block_table_seq5_block2.json": block_table_fixture(5, 2),
         "block_table_seq128_block16.json": block_table_fixture(128, 16),
         "paged_lookup_f32_seq5_block2_width4.json": paged_lookup_f32_fixture(),
+        "paged_kv_write_f32.json": paged_kv_write_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
