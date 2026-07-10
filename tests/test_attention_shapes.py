@@ -1,5 +1,6 @@
 import numpy as np
 from latent_paged_attention.attention_ref import (
+    gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_ref,
     latent_kv_decode_attention_ref,
     paged_gqa_decode_attention_ref,
@@ -53,6 +54,57 @@ def test_gqa_decode_attention_output_shape_is_correct() -> None:
 
     assert out.shape == q.shape
     assert np.isfinite(out).all()
+
+
+def test_gqa_decode_attention_intermediates_are_correct() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+    scores, probs, context = gqa_decode_attention_intermediates_ref(
+        q, k_cache, v_cache, group_size=2
+    )
+
+    assert scores.shape == (1, 4, 5)
+    assert probs.shape == (1, 4, 5)
+    assert context.shape == q.shape
+    np.testing.assert_allclose(probs.sum(axis=-1), np.ones((1, 4)), atol=1e-6)
+    np.testing.assert_allclose(context, gqa_decode_attention_ref(q, k_cache, v_cache, group_size=2))
+
+    scale = 1.0 / np.sqrt(float(q.shape[-1]))
+    np.testing.assert_allclose(
+        scores[0, 0, 0],
+        np.dot(q[0, 0], k_cache[0, 0, 0]) * scale,
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        scores[0, 2, 0],
+        np.dot(q[0, 2], k_cache[0, 0, 1]) * scale,
+        atol=1e-6,
+    )
+
+
+def test_gqa_decode_attention_stable_softmax_handles_large_scores() -> None:
+    q = np.full((1, 4, 8), 80.0, dtype=np.float32)
+    k_cache = np.arange(1 * 8 * 2 * 8, dtype=np.float32).reshape(1, 8, 2, 8)
+    v_cache = np.linspace(-1.0, 1.0, 1 * 8 * 2 * 8, dtype=np.float32).reshape(1, 8, 2, 8)
+
+    scores, probs, context = gqa_decode_attention_intermediates_ref(
+        q, k_cache, v_cache, group_size=2
+    )
+
+    assert np.isfinite(scores).all()
+    assert np.isfinite(probs).all()
+    assert np.isfinite(context).all()
+    np.testing.assert_allclose(probs.sum(axis=-1), np.ones((1, 4)), atol=1e-6)
+
+
+def test_gqa_decode_attention_rejects_invalid_shapes() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+
+    with np.testing.assert_raises(ValueError):
+        gqa_decode_attention_intermediates_ref(q[:, :3], k_cache, v_cache, group_size=2)
+    with np.testing.assert_raises(ValueError):
+        gqa_decode_attention_intermediates_ref(q, k_cache[..., :7], v_cache, group_size=2)
+    with np.testing.assert_raises(ValueError):
+        gqa_decode_attention_intermediates_ref(q, k_cache, v_cache[:, :, :1], group_size=2)
 
 
 def test_paged_gqa_matches_dense_gqa_for_same_cache() -> None:
