@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from .attention_ref import gqa_decode_attention_intermediates_ref, paged_lookup_ref
+from .attention_ref import (
+    gqa_decode_attention_intermediates_ref,
+    paged_gqa_decode_attention_intermediates_ref,
+    paged_lookup_ref,
+)
 from .block_table import PagedBlockTable
 from .cache_ref import paged_kv_write_ref, resolve_paged_token_location
 from .memory_model import (
@@ -167,6 +171,11 @@ def _to_head_major(cache: np.ndarray) -> np.ndarray:
     return np.transpose(cache, (1, 0, 2)).copy()
 
 
+def _physical_to_gpu_head_major(cache: np.ndarray) -> np.ndarray:
+    """Convert physical token-major blocks to the GPU head-major block layout."""
+    return np.transpose(cache, (0, 2, 1, 3)).copy()
+
+
 def _balanced_gqa_case() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     q_heads = 4
     kv_heads = 2
@@ -264,6 +273,79 @@ def gqa_decode_f32_fixture() -> dict:
     }
 
 
+def _to_physical_blocks(
+    token_major: np.ndarray, block_table: np.ndarray, block_size: int
+) -> np.ndarray:
+    """Map logical token-major cache [seq_len, kv_heads, head_dim] into physical blocks."""
+    num_logical_blocks = len(block_table)
+    pad_tokens = num_logical_blocks * block_size - token_major.shape[0]
+    padded = np.pad(token_major, ((0, pad_tokens), (0, 0), (0, 0)))
+    logical_blocks = padded.reshape(num_logical_blocks, block_size, *token_major.shape[1:])
+    physical_blocks = np.empty_like(logical_blocks)
+    for logical_block, physical_block in enumerate(block_table):
+        physical_blocks[physical_block] = logical_blocks[logical_block]
+    return physical_blocks
+
+
+def _paged_gqa_case(name: str, q: np.ndarray, k: np.ndarray, v: np.ndarray) -> dict:
+    block_table = np.asarray([2, 0, 3, 1], dtype=np.int32)
+    block_size = 2
+    k_physical = _to_physical_blocks(k[0], block_table, block_size)
+    v_physical = _to_physical_blocks(v[0], block_table, block_size)
+    scores, probabilities, context = paged_gqa_decode_attention_intermediates_ref(
+        q,
+        k_physical,
+        v_physical,
+        block_table,
+        seq_len=8,
+        block_size=block_size,
+        group_size=2,
+    )
+    return {
+        "name": name,
+        "q": q[0].tolist(),
+        "k_physical_token_major": k_physical.tolist(),
+        "v_physical_token_major": v_physical.tolist(),
+        "k_physical_gpu_head_major": _physical_to_gpu_head_major(k_physical).tolist(),
+        "v_physical_gpu_head_major": _physical_to_gpu_head_major(v_physical).tolist(),
+        "expected_scores": scores[0].tolist(),
+        "expected_probabilities": probabilities[0].tolist(),
+        "expected_context": context[0].tolist(),
+    }
+
+
+def paged_gqa_decode_f32_fixture() -> dict:
+    """Return deterministic direct paged GQA fixtures with physical K/V layouts."""
+    q_heads = 4
+    kv_heads = 2
+    group_size = 2
+    seq_len = 8
+    head_dim = 8
+    block_size = 2
+    block_table = np.asarray([2, 0, 3, 1], dtype=np.int32)
+    balanced_q, balanced_k, balanced_v = _balanced_gqa_case()
+    stable_q, stable_k, stable_v = _stable_softmax_gqa_case()
+    return {
+        "dtype": "f32",
+        "batch": 1,
+        "q_heads": q_heads,
+        "kv_heads": kv_heads,
+        "group_size": group_size,
+        "seq_len": seq_len,
+        "head_dim": head_dim,
+        "block_size": block_size,
+        "num_logical_blocks": 4,
+        "num_physical_blocks": 4,
+        "block_table": block_table.tolist(),
+        "scale": 1.0 / np.sqrt(float(head_dim)),
+        "q_to_kv": (np.arange(q_heads) // group_size).tolist(),
+        "cases": [
+            _paged_gqa_case("balanced", balanced_q, balanced_k, balanced_v),
+            _paged_gqa_case("stable_softmax", stable_q, stable_k, stable_v),
+        ],
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -275,6 +357,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "paged_lookup_f32_seq5_block2_width4.json": paged_lookup_f32_fixture(),
         "paged_kv_write_f32.json": paged_kv_write_fixture(),
         "gqa_decode_f32.json": gqa_decode_f32_fixture(),
+        "paged_gqa_decode_f32.json": paged_gqa_decode_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():

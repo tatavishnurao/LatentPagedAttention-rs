@@ -5,6 +5,7 @@ from latent_paged_attention.fixtures import (
     block_table_fixture,
     gqa_decode_f32_fixture,
     memory_model_fixture,
+    paged_gqa_decode_f32_fixture,
     paged_kv_write_fixture,
     paged_lookup_f32_fixture,
     write_fixtures,
@@ -52,6 +53,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "paged_lookup_f32_seq5_block2_width4.json",
         "paged_kv_write_f32.json",
         "gqa_decode_f32.json",
+        "paged_gqa_decode_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -114,3 +116,56 @@ def test_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:
     stable = np.asarray(fixture["cases"][1]["expected_context"], dtype=np.float32)
     assert not np.array_equal(balanced, stable)
     assert fixture == gqa_decode_f32_fixture()
+
+
+def test_paged_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:
+    fixture = paged_gqa_decode_f32_fixture()
+    assert fixture["block_table"] == [2, 0, 3, 1]
+    assert fixture["block_table"] != [0, 1, 2, 3]
+    assert sorted(fixture["block_table"]) == [0, 1, 2, 3]
+    assert fixture["q_to_kv"] == [0, 0, 1, 1]
+
+    contiguous = gqa_decode_f32_fixture()
+    for paged_case, contiguous_case in zip(
+        fixture["cases"], contiguous["cases"], strict=True
+    ):
+        k_physical_token = np.asarray(paged_case["k_physical_token_major"], dtype=np.float32)
+        v_physical_token = np.asarray(paged_case["v_physical_token_major"], dtype=np.float32)
+        k_physical_head = np.asarray(paged_case["k_physical_gpu_head_major"], dtype=np.float32)
+        v_physical_head = np.asarray(paged_case["v_physical_gpu_head_major"], dtype=np.float32)
+        np.testing.assert_array_equal(k_physical_head, np.transpose(k_physical_token, (0, 2, 1, 3)))
+        np.testing.assert_array_equal(v_physical_head, np.transpose(v_physical_token, (0, 2, 1, 3)))
+
+        reconstructed_k = np.asarray(
+            [
+                k_physical_token[fixture["block_table"][logical_block]]
+                for logical_block in range(fixture["num_logical_blocks"])
+            ],
+            dtype=np.float32,
+        ).reshape(fixture["seq_len"], fixture["kv_heads"], fixture["head_dim"])
+        reconstructed_v = np.asarray(
+            [
+                v_physical_token[fixture["block_table"][logical_block]]
+                for logical_block in range(fixture["num_logical_blocks"])
+            ],
+            dtype=np.float32,
+        ).reshape(fixture["seq_len"], fixture["kv_heads"], fixture["head_dim"])
+        np.testing.assert_array_equal(
+            reconstructed_k, np.asarray(contiguous_case["k_token_major"], dtype=np.float32)
+        )
+        np.testing.assert_array_equal(
+            reconstructed_v, np.asarray(contiguous_case["v_token_major"], dtype=np.float32)
+        )
+
+        np.testing.assert_allclose(
+            np.asarray(paged_case["expected_scores"], dtype=np.float32),
+            np.asarray(contiguous_case["expected_scores"], dtype=np.float32),
+            atol=1e-6,
+        )
+        probabilities = np.asarray(paged_case["expected_probabilities"], dtype=np.float32)
+        np.testing.assert_allclose(probabilities.sum(axis=-1), np.ones(4), atol=1e-6)
+        assert np.isfinite(np.asarray(paged_case["expected_scores"], dtype=np.float32)).all()
+        assert np.isfinite(probabilities).all()
+        assert np.isfinite(np.asarray(paged_case["expected_context"], dtype=np.float32)).all()
+
+    assert fixture == paged_gqa_decode_f32_fixture()
