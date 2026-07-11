@@ -260,7 +260,11 @@ pub fn contiguous_gqa_decode_f32(
     require_positive("seq_len", seq_len)?;
     require_positive("head_dim", head_dim)?;
     require_positive("group_size", group_size)?;
-    if q_heads != kv_heads.checked_mul(group_size).ok_or(PlkvError::ArithmeticOverflow)? {
+    if q_heads
+        != kv_heads
+            .checked_mul(group_size)
+            .ok_or(PlkvError::ArithmeticOverflow)?
+    {
         return Err(PlkvError::InvalidPagedLookup {
             reason: "expected q_heads == kv_heads * group_size",
         });
@@ -350,6 +354,74 @@ pub fn contiguous_gqa_decode_f32(
         probabilities,
         context,
     })
+}
+
+pub fn paged_gqa_decode_f32(
+    q: &[f32],
+    k_physical_head_major: &[f32],
+    v_physical_head_major: &[f32],
+    block_table: &[usize],
+    q_heads: usize,
+    kv_heads: usize,
+    seq_len: usize,
+    head_dim: usize,
+    group_size: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("seq_len", seq_len)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    require_positive("block_size", block_size)?;
+    require_positive("num_physical_blocks", num_physical_blocks)?;
+    let logical_blocks = seq_len.div_ceil(block_size);
+    if block_table.len() < logical_blocks {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover seq_len",
+        });
+    }
+    for &physical_block in &block_table[..logical_blocks] {
+        if physical_block >= num_physical_blocks {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "block table contains an invalid physical block",
+            });
+        }
+    }
+    let physical_len = num_physical_blocks
+        .checked_mul(kv_heads)
+        .and_then(|value| value.checked_mul(block_size))
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if k_physical_head_major.len() != physical_len || v_physical_head_major.len() != physical_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "K/V physical length does not match [num_physical_blocks, kv_heads, block_size, head_dim]",
+        });
+    }
+    let logical_len = kv_heads
+        .checked_mul(seq_len)
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let mut logical_k = vec![0.0f32; logical_len];
+    let mut logical_v = vec![0.0f32; logical_len];
+    for token in 0..seq_len {
+        let logical_block = token / block_size;
+        let block_offset = token % block_size;
+        let physical_block = block_table[logical_block];
+        for kv_head in 0..kv_heads {
+            let physical_row =
+                ((physical_block * kv_heads + kv_head) * block_size + block_offset) * head_dim;
+            let logical_row = (kv_head * seq_len + token) * head_dim;
+            logical_k[logical_row..logical_row + head_dim]
+                .copy_from_slice(&k_physical_head_major[physical_row..physical_row + head_dim]);
+            logical_v[logical_row..logical_row + head_dim]
+                .copy_from_slice(&v_physical_head_major[physical_row..physical_row + head_dim]);
+        }
+    }
+    contiguous_gqa_decode_f32(
+        q, &logical_k, &logical_v, q_heads, kv_heads, seq_len, head_dim, group_size,
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -504,7 +576,7 @@ mod tests {
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
         contiguous_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
-        kv_bytes_per_token_latent, paged_kv_write_f32, paged_lookup_f32,
+        kv_bytes_per_token_latent, paged_gqa_decode_f32, paged_kv_write_f32, paged_lookup_f32,
         resolve_paged_token_location,
     };
 
@@ -645,6 +717,31 @@ mod tests {
         q: Vec<Vec<f32>>,
         k_head_major: Vec<Vec<Vec<f32>>>,
         v_head_major: Vec<Vec<Vec<f32>>>,
+        expected_scores: Vec<Vec<f32>>,
+        expected_probabilities: Vec<Vec<f32>>,
+        expected_context: Vec<Vec<f32>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedGqaFixture {
+        q_heads: usize,
+        kv_heads: usize,
+        group_size: usize,
+        seq_len: usize,
+        head_dim: usize,
+        block_size: usize,
+        num_logical_blocks: usize,
+        num_physical_blocks: usize,
+        block_table: Vec<usize>,
+        q_to_kv: Vec<usize>,
+        cases: Vec<PagedGqaCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedGqaCase {
+        q: Vec<Vec<f32>>,
+        k_physical_gpu_head_major: Vec<Vec<Vec<Vec<f32>>>>,
+        v_physical_gpu_head_major: Vec<Vec<Vec<Vec<f32>>>>,
         expected_scores: Vec<Vec<f32>>,
         expected_probabilities: Vec<Vec<f32>>,
         expected_context: Vec<Vec<f32>>,
@@ -841,18 +938,35 @@ mod tests {
 
     #[test]
     fn contiguous_gqa_decode_matches_python_fixture() {
-        let fixture: GqaDecodeFixture =
-            serde_json::from_str(include_str!("../../../fixtures/reference/gqa_decode_f32.json"))
-                .unwrap();
+        let fixture: GqaDecodeFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/gqa_decode_f32.json"
+        ))
+        .unwrap();
         assert_eq!(fixture.q_to_kv, vec![0, 0, 1, 1]);
         for case in fixture.cases {
             let q: Vec<f32> = case.q.iter().flatten().copied().collect();
-            let k: Vec<f32> = case.k_head_major.iter().flatten().flatten().copied().collect();
-            let v: Vec<f32> = case.v_head_major.iter().flatten().flatten().copied().collect();
+            let k: Vec<f32> = case
+                .k_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let v: Vec<f32> = case
+                .v_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
             let expected_scores: Vec<f32> =
                 case.expected_scores.iter().flatten().copied().collect();
-            let expected_probabilities: Vec<f32> =
-                case.expected_probabilities.iter().flatten().copied().collect();
+            let expected_probabilities: Vec<f32> = case
+                .expected_probabilities
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
             let expected_context: Vec<f32> =
                 case.expected_context.iter().flatten().copied().collect();
             let actual = contiguous_gqa_decode_f32(
@@ -885,9 +999,137 @@ mod tests {
     #[test]
     fn contiguous_gqa_decode_rejects_invalid_inputs() {
         assert!(contiguous_gqa_decode_f32(&[], &[], &[], 0, 2, 8, 8, 2).is_err());
-        assert!(contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 128], &[0.0; 128], 3, 2, 8, 8, 2).is_err());
-        assert!(contiguous_gqa_decode_f32(&[0.0; 31], &[0.0; 128], &[0.0; 128], 4, 2, 8, 8, 2).is_err());
-        assert!(contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 127], &[0.0; 128], 4, 2, 8, 8, 2).is_err());
+        assert!(
+            contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 128], &[0.0; 128], 3, 2, 8, 8, 2).is_err()
+        );
+        assert!(
+            contiguous_gqa_decode_f32(&[0.0; 31], &[0.0; 128], &[0.0; 128], 4, 2, 8, 8, 2).is_err()
+        );
+        assert!(
+            contiguous_gqa_decode_f32(&[0.0; 32], &[0.0; 127], &[0.0; 128], 4, 2, 8, 8, 2).is_err()
+        );
+    }
+
+    #[test]
+    fn paged_gqa_decode_matches_python_fixture() {
+        let fixture: PagedGqaFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/paged_gqa_decode_f32.json"
+        ))
+        .unwrap();
+        assert_eq!(fixture.block_table, vec![2, 0, 3, 1]);
+        assert_eq!(fixture.q_to_kv, vec![0, 0, 1, 1]);
+        assert_eq!(fixture.num_logical_blocks, 4);
+
+        for case in fixture.cases {
+            let q: Vec<f32> = case.q.iter().flatten().copied().collect();
+            let k: Vec<f32> = case
+                .k_physical_gpu_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let v: Vec<f32> = case
+                .v_physical_gpu_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_scores: Vec<f32> =
+                case.expected_scores.iter().flatten().copied().collect();
+            let expected_probabilities: Vec<f32> = case
+                .expected_probabilities
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_context: Vec<f32> =
+                case.expected_context.iter().flatten().copied().collect();
+            let actual = paged_gqa_decode_f32(
+                &q,
+                &k,
+                &v,
+                &fixture.block_table,
+                fixture.q_heads,
+                fixture.kv_heads,
+                fixture.seq_len,
+                fixture.head_dim,
+                fixture.group_size,
+                fixture.block_size,
+                fixture.num_physical_blocks,
+            )
+            .unwrap();
+            assert_close(&actual.scores, &expected_scores, 1e-5, 1e-5);
+            assert_close(&actual.probabilities, &expected_probabilities, 1e-5, 1e-5);
+            assert_close(&actual.context, &expected_context, 1e-5, 1e-5);
+            assert!(actual.scores.iter().all(|value| value.is_finite()));
+            assert!(actual.probabilities.iter().all(|value| value.is_finite()));
+            assert!(actual.context.iter().all(|value| value.is_finite()));
+            for q_head in 0..fixture.q_heads {
+                let start = q_head * fixture.seq_len;
+                let row_sum: f32 = actual.probabilities[start..start + fixture.seq_len]
+                    .iter()
+                    .sum();
+                assert!((row_sum - 1.0).abs() <= 1e-5);
+            }
+        }
+    }
+
+    #[test]
+    fn paged_gqa_decode_rejects_invalid_inputs() {
+        let q = vec![0.0f32; 32];
+        let physical = vec![0.0f32; 128];
+        assert!(
+            paged_gqa_decode_f32(&q, &physical, &physical, &[2, 0, 3], 4, 2, 8, 8, 2, 2, 4)
+                .is_err()
+        );
+        assert!(
+            paged_gqa_decode_f32(&q, &physical, &physical, &[2, 0, 4, 1], 4, 2, 8, 8, 2, 2, 4)
+                .is_err()
+        );
+        assert!(
+            paged_gqa_decode_f32(
+                &q,
+                &physical[..127],
+                &physical,
+                &[2, 0, 3, 1],
+                4,
+                2,
+                8,
+                8,
+                2,
+                2,
+                4
+            )
+            .is_err()
+        );
+        assert!(
+            paged_gqa_decode_f32(
+                &q,
+                &physical,
+                &physical[..127],
+                &[2, 0, 3, 1],
+                4,
+                2,
+                8,
+                8,
+                2,
+                2,
+                4
+            )
+            .is_err()
+        );
+        assert!(
+            paged_gqa_decode_f32(&q, &physical, &physical, &[2, 0, 3, 1], 4, 2, 8, 8, 2, 0, 4)
+                .is_err()
+        );
+        assert!(
+            paged_gqa_decode_f32(&q, &physical, &physical, &[2, 0, 3, 1], 3, 2, 8, 8, 2, 2, 4)
+                .is_err()
+        );
     }
 
     fn assert_close(actual: &[f32], expected: &[f32], atol: f32, rtol: f32) {
