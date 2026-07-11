@@ -29,3 +29,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "paged_kv_write_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "gqa_decode_gpu"
+required-features = ["gpu-cutile"]
