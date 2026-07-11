@@ -3,6 +3,7 @@ from latent_paged_attention.attention_ref import (
     gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_ref,
     latent_kv_decode_attention_ref,
+    paged_gqa_decode_attention_intermediates_ref,
     paged_gqa_decode_attention_ref,
     paged_latent_kv_decode_attention_ref,
     paged_lookup_ref,
@@ -136,6 +137,103 @@ def test_paged_gqa_matches_dense_gqa_for_same_cache() -> None:
     )
 
     np.testing.assert_allclose(paged_out, dense_out, atol=1e-6)
+
+
+def test_paged_gqa_intermediates_match_dense_gqa_for_same_cache() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+    block_size = 2
+    seq_len = k_cache.shape[1]
+    block_table = np.array([1, 0, 2], dtype=np.int64)
+    pad_tokens = block_size * len(block_table) - seq_len
+    k_tokens = np.pad(k_cache[0], ((0, pad_tokens), (0, 0), (0, 0)))
+    v_tokens = np.pad(v_cache[0], ((0, pad_tokens), (0, 0), (0, 0)))
+    k_blocks = np.empty((len(block_table), block_size, *k_tokens.shape[1:]), dtype=np.float32)
+    v_blocks = np.empty((len(block_table), block_size, *v_tokens.shape[1:]), dtype=np.float32)
+    logical_k_blocks = k_tokens.reshape(len(block_table), block_size, *k_tokens.shape[1:])
+    logical_v_blocks = v_tokens.reshape(len(block_table), block_size, *v_tokens.shape[1:])
+    for logical_idx, physical_idx in enumerate(block_table):
+        k_blocks[physical_idx] = logical_k_blocks[logical_idx]
+        v_blocks[physical_idx] = logical_v_blocks[logical_idx]
+
+    dense_scores, dense_probs, dense_context = gqa_decode_attention_intermediates_ref(
+        q, k_cache, v_cache, group_size=2
+    )
+    paged_scores, paged_probs, paged_context = paged_gqa_decode_attention_intermediates_ref(
+        q,
+        k_blocks,
+        v_blocks,
+        block_table,
+        seq_len,
+        block_size,
+        group_size=2,
+    )
+
+    assert paged_scores.shape == (1, 4, seq_len)
+    assert paged_probs.shape == (1, 4, seq_len)
+    assert paged_context.shape == q.shape
+    np.testing.assert_allclose(paged_scores, dense_scores, atol=1e-6)
+    np.testing.assert_allclose(paged_probs, dense_probs, atol=1e-6)
+    np.testing.assert_allclose(paged_context, dense_context, atol=1e-6)
+    np.testing.assert_allclose(paged_probs.sum(axis=-1), np.ones((1, 4)), atol=1e-6)
+    assert np.isfinite(paged_scores).all()
+    assert np.isfinite(paged_probs).all()
+    assert np.isfinite(paged_context).all()
+
+
+def test_paged_gqa_intermediates_reject_invalid_shapes_and_mapping() -> None:
+    q, k_cache, v_cache, _, _, _ = _make_tiny_case()
+    block_table = np.array([0, 1, 2], dtype=np.int64)
+
+    with np.testing.assert_raises(ValueError):
+        paged_gqa_decode_attention_intermediates_ref(
+            q,
+            k_cache[0],
+            v_cache[0],
+            block_table,
+            seq_len=5,
+            block_size=2,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        paged_gqa_decode_attention_intermediates_ref(
+            q,
+            k_cache[0],
+            v_cache[0, :, :1],
+            block_table,
+            seq_len=5,
+            block_size=2,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        paged_gqa_decode_attention_intermediates_ref(
+            q[:, :3],
+            k_cache[0],
+            v_cache[0],
+            block_table,
+            seq_len=5,
+            block_size=2,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        paged_gqa_decode_attention_intermediates_ref(
+            q,
+            k_cache[0],
+            v_cache[0],
+            block_table[:2],
+            seq_len=5,
+            block_size=2,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        paged_gqa_decode_attention_intermediates_ref(
+            q,
+            k_cache[0],
+            v_cache[0],
+            block_table,
+            seq_len=5,
+            block_size=0,
+            group_size=2,
+        )
 
 
 def test_latent_kv_decode_attention_output_shape_is_correct() -> None:

@@ -157,12 +157,71 @@ def paged_gqa_decode_attention_ref(
     The current helper uses a single logical block table shared across the batch
     dimension and broadcasts the reconstructed cache to each batch item.
     """
+    _, _, context = paged_gqa_decode_attention_intermediates_ref(
+        q,
+        k_blocks,
+        v_blocks,
+        block_table,
+        seq_len,
+        block_size,
+        group_size=group_size,
+    )
+    return context
+
+
+def paged_gqa_decode_attention_intermediates_ref(
+    q: np.ndarray,
+    k_blocks: np.ndarray,
+    v_blocks: np.ndarray,
+    block_table: np.ndarray,
+    seq_len: int,
+    block_size: int,
+    *,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Reference paged GQA decode attention with intermediates.
+
+    Args:
+        q: [batch, q_heads, head_dim]
+        k_blocks: [num_physical_blocks, block_size, kv_heads, head_dim]
+        v_blocks: [num_physical_blocks, block_size, kv_heads, head_dim]
+        block_table: [num_logical_blocks]
+    Returns:
+        scores: [batch, q_heads, seq_len]
+        probabilities: [batch, q_heads, seq_len]
+        context: [batch, q_heads, head_dim]
+    """
+    if q.ndim != 3:
+        raise ValueError("q must have shape [batch, q_heads, head_dim]")
+    if k_blocks.ndim != 4 or v_blocks.ndim != 4:
+        raise ValueError(
+            "k_blocks and v_blocks must have shape "
+            "[num_physical_blocks, block_size, kv_heads, head_dim]"
+        )
+    if k_blocks.shape != v_blocks.shape:
+        raise ValueError("k_blocks and v_blocks must share the same shape")
+    if block_table.ndim != 1:
+        raise ValueError("block_table must be 1D")
+    if seq_len <= 0:
+        raise ValueError(f"seq_len must be > 0, got {seq_len}")
+    if block_size <= 0:
+        raise ValueError(f"block_size must be > 0, got {block_size}")
+    if k_blocks.shape[1] != block_size:
+        raise ValueError(
+            f"block_size mismatch: cache has {k_blocks.shape[1]}, argument was {block_size}"
+        )
+    if q.shape[2] != k_blocks.shape[3]:
+        raise ValueError("head_dim mismatch between q and paged cache tensors")
+    if block_table.size * block_size < seq_len:
+        raise ValueError("block_table does not cover the requested seq_len")
+
     logical_k = paged_lookup_ref(k_blocks, block_table, seq_len, block_size)
     logical_v = paged_lookup_ref(v_blocks, block_table, seq_len, block_size)
     batch = q.shape[0]
     k_cache = np.broadcast_to(logical_k[None, ...], (batch, *logical_k.shape))
     v_cache = np.broadcast_to(logical_v[None, ...], (batch, *logical_v.shape))
-    return gqa_decode_attention_ref(q, k_cache, v_cache, group_size=group_size)
+    return gqa_decode_attention_intermediates_ref(q, k_cache, v_cache, group_size=group_size)
 
 
 def latent_kv_decode_attention_ref(
