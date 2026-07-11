@@ -48,7 +48,9 @@ Rust is the systems layer for block tables, cache layout, validation harnesses, 
 - [x] cuTile vector-add smoke test on RTX 4060
 - [x] non-identity GPU paged lookup
 - [x] Python/Rust/GPU parity fixtures
-- [ ] single-token paged KV write completion
+- [x] single-token paged KV write completion
+- [x] contiguous f32 GQA CPU reference
+- [x] contiguous f32 GQA cuTile validation
 - [ ] end-to-end model integration
 
 ## Current milestone
@@ -63,11 +65,13 @@ This repo currently validates:
 - cuTile vector-add execution on the RTX 4060
 - non-identity GPU paged lookup
 - Python/Rust/GPU paged lookup parity
+- single-token paged KV-cache write validation
+- GPU write-to-lookup round trip
+- contiguous f32 GQA CPU reference
+- contiguous f32 GQA cuTile validation
 
-The current GPU milestone adds single-token paged KV-cache write validation.
-GQA, latent-KV reconstruction, and real model inference remain unimplemented.
-
-It does not yet contain CUDA/cuTile kernels or real model inference.
+The current milestone is GPU Paged GQA. Latent-KV reconstruction and real model
+inference remain unimplemented.
 
 ## Setup
 
@@ -140,25 +144,31 @@ pass has completed the following:
 - cuTile `0.2.0` integration
 - RTX 4060 vector-add smoke test
 - GPU non-identity paged lookup
+- GPU single-token paged K/V write
+- GPU write-to-lookup round trip
+- contiguous f32 GQA CPU reference
+- contiguous f32 GQA cuTile validation
 - Python/Rust/GPU parity
 
-In progress:
+Current milestone:
 
-- GPU single-token paged KV write
+- GPU Paged GQA
 
 Not implemented:
 
-- GQA decode
 - Paged GQA
 - latent-KV reconstruction
 - Paged Latent KV
+- FP16/BF16
 - real model inference
+- performance benchmarking
 
 ```bash
 source scripts/cutile_env.sh
 bash scripts/run_cutile_smoke.sh
 bash scripts/run_gpu_paged_lookup.sh
 bash scripts/run_gpu_paged_kv_write.sh
+bash scripts/run_gpu_gqa_decode.sh
 ```
 
 These commands validate compilation, JIT execution, synchronization, host
@@ -187,9 +197,10 @@ represent production inference.
 4. RTX 4060 baseline — done
 5. cuTile smoke test — done
 6. GPU paged lookup — done
-7. GPU single-token KV write — this pass
-8. GPU contiguous GQA decode
-9. GPU Paged GQA
+7. GPU single-token paged KV write — done
+8. GPU contiguous f32 GQA decode — done
+9. GPU Paged GQA — next
 10. GPU latent-KV reconstruction
 11. GPU Paged Latent KV
-12. RTX 4060 performance study
+12. FP16/BF16
+13. RTX 4060 performance study

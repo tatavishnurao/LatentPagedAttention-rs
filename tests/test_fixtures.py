@@ -1,7 +1,6 @@
 import json
 
 import numpy as np
-
 from latent_paged_attention.fixtures import (
     block_table_fixture,
     gqa_decode_f32_fixture,
