@@ -510,7 +510,7 @@ def direct_paged_latent_gqa_decode_attention_intermediates_ref(
     for b in range(batch):
         for q_head in range(q_heads):
             kv_head = q_head // group_size
-            projected = k_heads[:, kv_head, :].T @ q[b, q_head]
+            projected = k_heads[:, kv_head, :] @ q[b, q_head]
             for logical_block in range((seq_len + block_size - 1) // block_size):
                 physical = int(block_table[logical_block])
                 start = logical_block * block_size
