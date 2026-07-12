@@ -238,6 +238,59 @@ pub fn paged_kv_write_f32(
     Ok(location)
 }
 
+pub fn paged_latent_write_f32(
+    latent_cache: &mut [f32],
+    block_table: &[usize],
+    token_position: usize,
+    block_size: usize,
+    latent_dim: usize,
+    new_latent: &[f32],
+) -> Result<PagedTokenLocation, PlkvError> {
+    require_positive("block_size", block_size)?;
+    require_positive("latent_dim", latent_dim)?;
+    let block_stride = block_size
+        .checked_mul(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if latent_cache.is_empty() || latent_cache.len() % block_stride != 0 {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "latent cache length is not divisible by block stride",
+        });
+    }
+    if new_latent.len() != latent_dim {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "new latent vector does not match latent_dim",
+        });
+    }
+    if !latent_cache.iter().all(|value| value.is_finite())
+        || !new_latent.iter().all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "latent write inputs must be finite",
+        });
+    }
+    let location = resolve_paged_token_location(
+        block_table,
+        token_position,
+        block_size,
+        latent_cache.len() / block_stride,
+    )?;
+    let start = location
+        .physical_block
+        .checked_mul(block_stride)
+        .and_then(|value| value.checked_add(location.block_offset.checked_mul(latent_dim)?))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let end = start
+        .checked_add(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    latent_cache
+        .get_mut(start..end)
+        .ok_or(PlkvError::InvalidPagedLookup {
+            reason: "latent cache indexing exceeded storage length",
+        })?
+        .copy_from_slice(new_latent);
+    Ok(location)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct GqaDecodeResult {
     pub scores: Vec<f32>,
@@ -953,9 +1006,10 @@ mod tests {
 
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
-        contiguous_gqa_decode_f32, direct_latent_gqa_decode_f32, estimate_total_kv_cache_bytes,
-        kv_bytes_per_token_gqa, kv_bytes_per_token_latent, paged_gqa_decode_f32,
-        paged_kv_write_f32, paged_lookup_f32, reconstruct_latent_kv_f32,
+        contiguous_gqa_decode_f32, direct_latent_gqa_decode_f32,
+        direct_paged_latent_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
+        kv_bytes_per_token_latent, paged_gqa_decode_f32, paged_kv_write_f32,
+        paged_latent_write_f32, paged_lookup_f32, reconstruct_latent_kv_f32,
         resolve_paged_token_location,
     };
 
@@ -1182,6 +1236,37 @@ mod tests {
         materialized_scores: Vec<Vec<f32>>,
         materialized_probabilities: Vec<Vec<f32>>,
         materialized_context: Vec<Vec<f32>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedLatentWriteFixture {
+        seq_len: usize,
+        q_heads: usize,
+        kv_heads: usize,
+        group_size: usize,
+        head_dim: usize,
+        latent_dim: usize,
+        block_size: usize,
+        num_physical_blocks: usize,
+        block_table: Vec<usize>,
+        cases: Vec<PagedLatentWriteCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PagedLatentWriteCase {
+        token_position: usize,
+        logical_block: usize,
+        physical_block: usize,
+        block_offset: usize,
+        q: Vec<Vec<f32>>,
+        initial_latent_physical_blocks: Vec<Vec<Vec<f32>>>,
+        new_latent: Vec<f32>,
+        expected_updated_latent_physical_blocks: Vec<Vec<Vec<f32>>>,
+        k_projection: Vec<Vec<f32>>,
+        v_projection: Vec<Vec<f32>>,
+        post_write_scores: Vec<Vec<f32>>,
+        post_write_probabilities: Vec<Vec<f32>>,
+        post_write_context: Vec<Vec<f32>>,
     }
 
     #[test]
@@ -1878,6 +1963,78 @@ mod tests {
             direct_latent_gqa_decode_f32(&q, &latent, &projection, &projection, 4, 2, 8, 8, 8, 0)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn paged_latent_write_matches_python_and_post_write_attention_fixture() {
+        let fixture: PagedLatentWriteFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/paged_latent_write_attention_f32.json"
+        ))
+        .unwrap();
+        for case in fixture.cases {
+            let initial = flatten_3d(&case.initial_latent_physical_blocks);
+            let expected = flatten_3d(&case.expected_updated_latent_physical_blocks);
+            let mut updated = initial.clone();
+            let location = paged_latent_write_f32(
+                &mut updated,
+                &fixture.block_table,
+                case.token_position,
+                fixture.block_size,
+                fixture.latent_dim,
+                &case.new_latent,
+            )
+            .unwrap();
+            assert_eq!(location.logical_block, case.logical_block);
+            assert_eq!(location.physical_block, case.physical_block);
+            assert_eq!(location.block_offset, case.block_offset);
+            assert_eq!(updated, expected);
+            let result = direct_paged_latent_gqa_decode_f32(
+                &flatten_2d(&case.q),
+                &updated,
+                &fixture.block_table,
+                &flatten_2d(&case.k_projection),
+                &flatten_2d(&case.v_projection),
+                fixture.q_heads,
+                fixture.kv_heads,
+                fixture.seq_len,
+                fixture.latent_dim,
+                fixture.head_dim,
+                fixture.group_size,
+                fixture.block_size,
+                fixture.num_physical_blocks,
+            )
+            .unwrap();
+            assert_close(
+                &result.scores,
+                &flatten_2d(&case.post_write_scores),
+                2e-4,
+                1e-5,
+            );
+            assert_close(
+                &result.probabilities,
+                &flatten_2d(&case.post_write_probabilities),
+                1e-4,
+                1e-5,
+            );
+            assert_close(
+                &result.context,
+                &flatten_2d(&case.post_write_context),
+                1e-4,
+                1e-5,
+            );
+        }
+        let mut cache = vec![0.0f32; 64];
+        assert!(paged_latent_write_f32(&mut cache, &[2, 0, 3, 1], 8, 2, 8, &[0.0; 8]).is_err());
+        assert!(paged_latent_write_f32(&mut cache, &[4, 0, 3, 1], 0, 2, 8, &[0.0; 8]).is_err());
+        assert!(paged_latent_write_f32(&mut cache, &[2, 0, 3, 1], 0, 2, 8, &[0.0; 7]).is_err());
+    }
+
+    fn flatten_2d(values: &[Vec<f32>]) -> Vec<f32> {
+        values.iter().flatten().copied().collect()
+    }
+
+    fn flatten_3d(values: &[Vec<Vec<f32>>]) -> Vec<f32> {
+        values.iter().flatten().flatten().copied().collect()
     }
 
     fn token_major_to_head_major(
