@@ -17,7 +17,11 @@ from .attention_ref import (
     paged_lookup_ref,
 )
 from .block_table import PagedBlockTable
-from .cache_ref import paged_kv_write_ref, resolve_paged_token_location
+from .cache_ref import (
+    paged_kv_write_ref,
+    paged_latent_write_ref,
+    resolve_paged_token_location,
+)
 from .memory_model import (
     compression_ratio,
     estimate_total_kv_cache_bytes,
@@ -614,6 +618,70 @@ def direct_paged_latent_gqa_decode_f32_fixture() -> dict:
             "theoretical_cache_compression_ratio":4.0, "cases":cases}
 
 
+def paged_latent_write_attention_f32_fixture() -> dict:
+    """Return deterministic write-to-attention round-trip fixtures."""
+    base = direct_paged_latent_gqa_decode_f32_fixture()
+    table = np.asarray(base["block_table"], dtype=np.int32)
+    write_specs = [
+        (
+            "balanced_position_3_offset_1",
+            3,
+            np.array(
+                [0.73, -0.41, 1.17, -0.29, 0.58, -0.86, 0.34, 1.02],
+                dtype=np.float32,
+            ),
+        ),
+        (
+            "stable_position_4_offset_0",
+            4,
+            np.array(
+                [-1.11, 0.47, -0.68, 1.26, -0.35, 0.92, -0.79, 0.18],
+                dtype=np.float32,
+            ),
+        ),
+    ]
+    cases = []
+    for source, (name, token_position, new_latent) in zip(base["cases"], write_specs, strict=True):
+        initial = np.asarray(source["latent_physical_blocks"], dtype=np.float32)
+        updated = paged_latent_write_ref(initial, table, token_position, new_latent)
+        q = np.asarray(source["q"], dtype=np.float32)[None, ...]
+        kp = np.asarray(source["k_projection"], dtype=np.float32)
+        vp = np.asarray(source["v_projection"], dtype=np.float32)
+        pre = direct_paged_latent_gqa_decode_attention_intermediates_ref(
+            q, initial, table, 8, 2, kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        post = direct_paged_latent_gqa_decode_attention_intermediates_ref(
+            q, updated, table, 8, 2, kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        logical_block, physical_block, block_offset = resolve_paged_token_location(
+            table, token_position, 2
+        )
+        cases.append({
+            "name": name, "token_position": token_position,
+            "logical_block": logical_block, "physical_block": physical_block,
+            "block_offset": block_offset, "q": source["q"],
+            "initial_latent_physical_blocks": initial.tolist(),
+            "new_latent": new_latent.tolist(),
+            "expected_updated_latent_physical_blocks": updated.tolist(),
+            "k_projection": source["k_projection"], "v_projection": source["v_projection"],
+            "k_projection_gpu_head_major": source["k_projection_gpu_head_major"],
+            "v_projection_gpu_head_major": source["v_projection_gpu_head_major"],
+            "pre_write_scores": pre[0][0].tolist(),
+            "pre_write_probabilities": pre[1][0].tolist(),
+            "pre_write_context": pre[2][0].tolist(),
+            "post_write_scores": post[0][0].tolist(),
+            "post_write_probabilities": post[1][0].tolist(),
+            "post_write_context": post[2][0].tolist(),
+        })
+    return {
+        "dtype": "f32", "batch": 1, "seq_len": 8, "q_heads": 4, "kv_heads": 2,
+        "group_size": 2, "head_dim": 8, "latent_dim": 8, "block_size": 2,
+        "num_logical_blocks": 4, "num_physical_blocks": 4, "block_table": table.tolist(),
+        "q_to_kv": [0, 0, 1, 1], "theoretical_cache_compression_ratio": 4.0,
+        "cases": cases,
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -629,6 +697,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "latent_kv_reconstruction_f32.json": latent_kv_reconstruction_f32_fixture(),
         "direct_latent_gqa_decode_f32.json": direct_latent_gqa_decode_f32_fixture(),
         "direct_paged_latent_gqa_decode_f32.json": direct_paged_latent_gqa_decode_f32_fixture(),
+        "paged_latent_write_attention_f32.json": paged_latent_write_attention_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
