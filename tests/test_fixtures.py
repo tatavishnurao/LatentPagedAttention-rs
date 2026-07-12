@@ -14,6 +14,7 @@ from latent_paged_attention.fixtures import (
     memory_model_fixture,
     paged_gqa_decode_f32_fixture,
     paged_kv_write_fixture,
+    paged_latent_write_attention_f32_fixture,
     paged_lookup_f32_fixture,
     write_fixtures,
 )
@@ -64,6 +65,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "latent_kv_reconstruction_f32.json",
         "direct_latent_gqa_decode_f32.json",
         "direct_paged_latent_gqa_decode_f32.json",
+        "paged_latent_write_attention_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -97,6 +99,31 @@ def test_paged_kv_write_fixture_has_two_locations_and_is_deterministic() -> None
         (1, 0),
     ]
     assert fixture == paged_kv_write_fixture()
+
+
+def test_paged_latent_write_attention_fixture_has_expected_locations() -> None:
+    fixture = paged_latent_write_attention_f32_fixture()
+    assert fixture["block_table"] == [2, 0, 3, 1]
+    assert fixture["block_table"] != [0, 1, 2, 3]
+    assert [(case["physical_block"], case["block_offset"]) for case in fixture["cases"]] == [
+        (0, 1),
+        (3, 0),
+    ]
+    for case in fixture["cases"]:
+        initial = np.asarray(case["initial_latent_physical_blocks"], dtype=np.float32)
+        updated = np.asarray(case["expected_updated_latent_physical_blocks"], dtype=np.float32)
+        changed = np.flatnonzero(initial != updated)
+        assert changed.size == 8
+        np.testing.assert_allclose(
+            np.asarray(case["post_write_probabilities"], dtype=np.float32).sum(axis=-1),
+            np.ones(4),
+            atol=1e-6,
+        )
+        assert np.isfinite(updated).all()
+        assert np.isfinite(np.asarray(case["post_write_scores"], dtype=np.float32)).all()
+        assert np.isfinite(np.asarray(case["post_write_context"], dtype=np.float32)).all()
+        assert not np.array_equal(case["pre_write_context"], case["post_write_context"])
+    assert fixture == paged_latent_write_attention_f32_fixture()
 
 
 def test_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:

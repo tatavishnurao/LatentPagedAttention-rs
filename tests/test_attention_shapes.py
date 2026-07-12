@@ -12,6 +12,7 @@ from latent_paged_attention.attention_ref import (
     paged_lookup_ref,
     softmax_stable,
 )
+from latent_paged_attention.cache_ref import paged_latent_write_ref
 
 
 def _make_tiny_case() -> tuple[np.ndarray, ...]:
@@ -50,6 +51,41 @@ def test_paged_lookup_reconstructs_expected_token_order() -> None:
     np.testing.assert_array_equal(out[1], paged[2, 1])
     np.testing.assert_array_equal(out[2], paged[0, 0])
     np.testing.assert_array_equal(out[4], paged[1, 0])
+
+
+def test_paged_latent_write_targets_non_identity_physical_row() -> None:
+    cache = np.arange(4 * 2 * 8, dtype=np.float32).reshape(4, 2, 8)
+    table = np.array([2, 0, 3, 1], dtype=np.int64)
+    replacement = np.linspace(-1.0, 1.0, 8, dtype=np.float32)
+
+    updated = paged_latent_write_ref(cache, table, 3, replacement)
+
+    np.testing.assert_array_equal(updated[0, 1], replacement)
+    np.testing.assert_array_equal(updated[0, 0], cache[0, 0])
+    np.testing.assert_array_equal(cache[0, 1], np.arange(8, 16, dtype=np.float32))
+
+    identity = paged_latent_write_ref(cache, np.arange(4), 3, replacement)
+    assert not np.array_equal(identity, updated)
+
+
+def test_paged_latent_write_rejects_invalid_inputs() -> None:
+    cache = np.zeros((4, 2, 8), dtype=np.float32)
+    table = np.array([2, 0, 3, 1], dtype=np.int64)
+    replacement = np.zeros(8, dtype=np.float32)
+    with np.testing.assert_raises(ValueError):
+        paged_latent_write_ref(cache.reshape(8, 8), table, 0, replacement)
+    with np.testing.assert_raises(ValueError):
+        paged_latent_write_ref(cache, table.reshape(2, 2), 0, replacement)
+    with np.testing.assert_raises(ValueError):
+        paged_latent_write_ref(cache, table, 0, replacement[:7])
+    with np.testing.assert_raises(ValueError):
+        paged_latent_write_ref(cache, table, 0, replacement.reshape(1, 8))
+    with np.testing.assert_raises(ValueError):
+        paged_latent_write_ref(cache, table, 0, np.full(8, np.inf, dtype=np.float32))
+    with np.testing.assert_raises(IndexError):
+        paged_latent_write_ref(cache, table, 8, replacement)
+    with np.testing.assert_raises(IndexError):
+        paged_latent_write_ref(cache, np.array([4, 0, 1, 2]), 0, replacement)
 
 
 def test_gqa_decode_attention_output_shape_is_correct() -> None:
