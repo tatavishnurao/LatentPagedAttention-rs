@@ -45,8 +45,8 @@ Observed maximum absolute errors were:
 Reports from the two required runs were:
 
 ```text
-reports/rtx4060_gpu_smoke/direct_paged_latent_gqa_20260712T193639Z.txt
-reports/rtx4060_gpu_smoke/direct_paged_latent_gqa_20260712T193641Z.txt
+reports/rtx4060_gpu_smoke/direct_paged_latent_gqa_20260712T193810Z.txt
+reports/rtx4060_gpu_smoke/direct_paged_latent_gqa_20260712T193813Z.txt
 ```
 
 This is direct paged latent-space attention for a fixed synthetic linear
