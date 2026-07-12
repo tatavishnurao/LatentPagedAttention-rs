@@ -49,3 +49,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "direct_paged_latent_gqa_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "paged_latent_write_attention_gpu"
+required-features = ["gpu-cutile"]
