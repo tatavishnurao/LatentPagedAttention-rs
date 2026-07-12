@@ -63,6 +63,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "paged_gqa_decode_f32.json",
         "latent_kv_reconstruction_f32.json",
         "direct_latent_gqa_decode_f32.json",
+        "direct_paged_latent_gqa_decode_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -269,7 +270,9 @@ def test_direct_latent_gqa_fixture_layouts_are_valid() -> None:
         expected_probabilities = np.asarray(case["expected_probabilities"], dtype=np.float32)
         expected_context = np.asarray(case["expected_context"], dtype=np.float32)
         materialized_scores = np.asarray(case["materialized_scores"], dtype=np.float32)
-        materialized_probabilities = np.asarray(case["materialized_probabilities"], dtype=np.float32)
+        materialized_probabilities = np.asarray(
+            case["materialized_probabilities"], dtype=np.float32
+        )
         materialized_context = np.asarray(case["materialized_context"], dtype=np.float32)
 
         assert q.shape == (1, 4, 8)
