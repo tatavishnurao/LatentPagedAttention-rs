@@ -73,9 +73,10 @@ This repo currently validates:
 - contiguous f32 GQA cuTile validation
 - direct paged f32 GQA cuTile validation
 - standalone f32 latent-KV reconstruction
+- direct contiguous latent-KV GQA
 
-The current milestone is direct contiguous latent-KV GQA. Paged Latent KV and
-real model inference remain unimplemented.
+The current milestone is GPU direct contiguous latent-KV GQA. Paged Latent KV
+and real model inference remain unimplemented.
 
 ## Setup
 
@@ -154,11 +155,12 @@ pass has completed the following:
 - contiguous f32 GQA cuTile validation
 - direct paged f32 GQA cuTile validation
 - GPU latent-KV reconstruction
+- GPU direct contiguous latent-KV GQA
 - Python/Rust/GPU parity
 
 Current milestone:
 
-- direct contiguous latent-KV GQA
+- GPU direct contiguous latent-KV GQA
 
 Not implemented:
 
@@ -175,6 +177,7 @@ bash scripts/run_gpu_paged_kv_write.sh
 bash scripts/run_gpu_gqa_decode.sh
 bash scripts/run_gpu_paged_gqa_decode.sh
 bash scripts/run_gpu_latent_kv_reconstruction.sh
+bash scripts/run_gpu_direct_latent_gqa.sh
 ```
 
 These commands validate compilation, JIT execution, synchronization, host
@@ -207,7 +210,9 @@ represent production inference.
 8. GPU contiguous f32 GQA decode — done
 9. GPU direct Paged f32 GQA decode — done
 10. GPU latent-KV reconstruction — done
-11. GPU direct contiguous latent-KV GQA — next
-12. GPU Paged Latent KV
-13. FP16/BF16
-14. RTX 4060 performance study
+11. GPU direct contiguous latent-KV GQA — done
+12. GPU direct Paged Latent KV GQA — next
+13. GPU Paged Latent KV
+14. FP16/BF16
+15. variable-shape scaling
+16. RTX 4060 performance study
