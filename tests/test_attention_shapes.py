@@ -1,8 +1,10 @@
 import numpy as np
 from latent_paged_attention.attention_ref import (
+    direct_latent_gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_ref,
     latent_kv_decode_attention_ref,
+    latent_kv_decode_attention_intermediates_ref,
     latent_kv_reconstruction_ref,
     paged_gqa_decode_attention_intermediates_ref,
     paged_gqa_decode_attention_ref,
@@ -252,6 +254,152 @@ def test_latent_kv_decode_attention_output_shape_is_correct() -> None:
 
     assert out.shape == q.shape
     assert np.isfinite(out).all()
+
+
+def test_latent_kv_materialized_intermediates_use_reconstruction() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+    scores, probs, context = latent_kv_decode_attention_intermediates_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+    assert scores.shape == (1, 4, 5)
+    assert probs.shape == (1, 4, 5)
+    assert context.shape == q.shape
+    np.testing.assert_allclose(probs.sum(axis=-1), np.ones((1, 4)), atol=1e-6)
+    assert np.isfinite(scores).all()
+    assert np.isfinite(probs).all()
+    assert np.isfinite(context).all()
+
+
+def test_direct_latent_gqa_matches_materialized_reference() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+    direct = direct_latent_gqa_decode_attention_intermediates_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+    materialized = latent_kv_decode_attention_intermediates_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+    np.testing.assert_allclose(direct[0], materialized[0], atol=1e-6)
+    np.testing.assert_allclose(direct[1], materialized[1], atol=1e-6)
+    np.testing.assert_allclose(direct[2], materialized[2], atol=1e-6)
+
+
+def test_direct_latent_gqa_does_not_call_reconstruction_helper(monkeypatch) -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+
+    def _boom(*args, **kwargs):  # noqa: ANN001, ANN002
+        raise AssertionError("reconstruction helper should not be called")
+
+    monkeypatch.setattr(
+        "latent_paged_attention.attention_ref.latent_kv_reconstruction_ref", _boom
+    )
+    direct_latent_gqa_decode_attention_intermediates_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+
+def test_direct_latent_gqa_rejects_invalid_inputs() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q[:, :3], latent_cache, k_proj, v_proj, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache[0],
+            k_proj,
+            v_proj,
+            q_heads=4,
+            kv_heads=2,
+            head_dim=8,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache,
+            k_proj[:, None],
+            v_proj,
+            q_heads=4,
+            kv_heads=2,
+            head_dim=8,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache,
+            k_proj,
+            v_proj[:, :7],
+            q_heads=4,
+            kv_heads=2,
+            head_dim=8,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache,
+            k_proj,
+            v_proj,
+            q_heads=3,
+            kv_heads=2,
+            head_dim=8,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache,
+            k_proj,
+            v_proj,
+            q_heads=4,
+            kv_heads=0,
+            head_dim=8,
+            group_size=2,
+        )
+    with np.testing.assert_raises(ValueError):
+        direct_latent_gqa_decode_attention_intermediates_ref(
+            q,
+            latent_cache,
+            k_proj,
+            v_proj,
+            q_heads=4,
+            kv_heads=2,
+            head_dim=0,
+            group_size=2,
+        )
 
 
 def test_latent_kv_reconstruction_shapes_and_manual_matmul() -> None:

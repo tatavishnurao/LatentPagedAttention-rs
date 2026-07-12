@@ -296,6 +296,36 @@ def latent_kv_decode_attention_ref(
     Returns:
         Context: [batch, q_heads, head_dim]
     """
+    _, _, context = latent_kv_decode_attention_intermediates_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
+    return context
+
+
+def latent_kv_decode_attention_intermediates_ref(
+    q: np.ndarray,
+    latent_cache: np.ndarray,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Materialized correctness oracle.
+
+    Reconstruct full K/V using latent_kv_reconstruction_ref,
+    then run gqa_decode_attention_intermediates_ref.
+    """
     if q.ndim != 3:
         raise ValueError("q must have shape [batch, q_heads, head_dim]")
     if q.shape[1] != q_heads or q.shape[2] != head_dim:
@@ -309,7 +339,88 @@ def latent_kv_decode_attention_ref(
         kv_heads=kv_heads,
         head_dim=head_dim,
     )
-    return gqa_decode_attention_ref(q, k_cache, v_cache, group_size=group_size)
+    return gqa_decode_attention_intermediates_ref(q, k_cache, v_cache, group_size=group_size)
+
+
+def direct_latent_gqa_decode_attention_intermediates_ref(
+    q: np.ndarray,
+    latent_cache: np.ndarray,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Direct latent-space GQA without materializing full K/V.
+
+    Returns:
+        scores: [batch, q_heads, seq_len]
+        probabilities: [batch, q_heads, seq_len]
+        context: [batch, q_heads, head_dim]
+    """
+    if q.ndim != 3:
+        raise ValueError("q must have shape [batch, q_heads, head_dim]")
+    if latent_cache.ndim != 3:
+        raise ValueError("latent_cache must have shape [batch, seq_len, latent_dim]")
+    if k_proj.ndim != 2 or v_proj.ndim != 2:
+        raise ValueError("k_proj and v_proj must have shape [latent_dim, kv_heads * head_dim]")
+    if k_proj.shape != v_proj.shape:
+        raise ValueError("k_proj and v_proj shapes must match")
+    if q.shape[1] != q_heads or q.shape[2] != head_dim:
+        raise ValueError("q shape does not match q_heads/head_dim arguments")
+
+    batch, seq_len, latent_dim = latent_cache.shape
+    if batch <= 0 or seq_len <= 0 or latent_dim <= 0:
+        raise ValueError("latent_cache dimensions must be > 0")
+    if q.shape[0] != batch:
+        raise ValueError("batch size mismatch between q and latent_cache tensors")
+    if kv_heads <= 0 or head_dim <= 0:
+        raise ValueError("kv_heads and head_dim must be > 0")
+    _validate_group_mapping(q_heads, kv_heads, group_size)
+    if k_proj.shape[0] != latent_dim:
+        raise ValueError("latent_dim mismatch between cache and projections")
+    projection_width = kv_heads * head_dim
+    if k_proj.shape[1] != projection_width:
+        raise ValueError("projection width must equal kv_heads * head_dim")
+
+    k_proj_head_major = np.asarray(k_proj.reshape(latent_dim, kv_heads, head_dim), dtype=np.float32)
+    v_proj_head_major = np.asarray(v_proj.reshape(latent_dim, kv_heads, head_dim), dtype=np.float32)
+    latent_cache = np.asarray(latent_cache, dtype=np.float32)
+    q = np.asarray(q, dtype=np.float32)
+
+    scores = np.empty((batch, q_heads, seq_len), dtype=np.float32)
+    probabilities = np.empty_like(scores)
+    context = np.empty((batch, q_heads, head_dim), dtype=np.float32)
+    scale = np.float32(1.0 / np.sqrt(float(head_dim)))
+
+    for q_head in range(q_heads):
+        kv_head = q_head // group_size
+        projected_query_latent = np.einsum(
+            "ld,bd->bl", k_proj_head_major[:, kv_head, :], q[:, q_head, :], optimize=True
+        ).astype(np.float32, copy=False)
+        row_scores = np.einsum("bsl,bl->bs", latent_cache, projected_query_latent, optimize=True)
+        row_scores = np.asarray(row_scores * scale, dtype=np.float32)
+        row_probs = softmax_stable(row_scores, axis=-1).astype(np.float32, copy=False)
+        latent_context = np.einsum("bs,bsl->bl", row_probs, latent_cache, optimize=True)
+        row_context = np.einsum(
+            "bl,ld->bd", latent_context, v_proj_head_major[:, kv_head, :], optimize=True
+        ).astype(np.float32, copy=False)
+        scores[:, q_head, :] = row_scores
+        probabilities[:, q_head, :] = row_probs
+        context[:, q_head, :] = row_context
+
+    if not np.all(np.isfinite(scores)):
+        raise ValueError("scores must be finite")
+    if not np.all(np.isfinite(probabilities)):
+        raise ValueError("probabilities must be finite")
+    if not np.all(np.isfinite(context)):
+        raise ValueError("context must be finite")
+    if not np.allclose(np.sum(probabilities, axis=-1), 1.0, atol=1e-6):
+        raise ValueError("probability rows must sum to one")
+    return scores, probabilities, context
 
 
 def paged_latent_kv_decode_attention_ref(
