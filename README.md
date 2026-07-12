@@ -74,8 +74,9 @@ This repo currently validates:
 - direct paged f32 GQA cuTile validation
 - standalone f32 latent-KV reconstruction
 - direct contiguous latent-KV GQA
+- direct paged latent-KV GQA
 
-The current milestone is GPU direct contiguous latent-KV GQA. Paged Latent KV
+The current milestone is GPU direct paged latent-KV GQA. Paged latent-cache writes
 and real model inference remain unimplemented.
 
 ## Setup
@@ -156,15 +157,16 @@ pass has completed the following:
 - direct paged f32 GQA cuTile validation
 - GPU latent-KV reconstruction
 - GPU direct contiguous latent-KV GQA
+- GPU direct paged latent-KV GQA
 - Python/Rust/GPU parity
 
 Current milestone:
 
-- GPU direct contiguous latent-KV GQA
+- GPU direct paged latent-KV GQA
 
 Not implemented:
 
-- Paged Latent KV
+- paged latent-cache write and write-to-attention round trip
 - FP16/BF16
 - real model inference
 - performance benchmarking
@@ -211,8 +213,8 @@ represent production inference.
 9. GPU direct Paged f32 GQA decode — done
 10. GPU latent-KV reconstruction — done
 11. GPU direct contiguous latent-KV GQA — done
-12. GPU direct Paged Latent KV GQA — next
-13. GPU Paged Latent KV
+12. GPU direct Paged Latent KV GQA — done
+13. GPU paged latent-cache write and attention round trip — next
 14. FP16/BF16
 15. variable-shape scaling
 16. RTX 4060 performance study
