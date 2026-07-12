@@ -25,8 +25,7 @@ pub mod direct_paged_latent_gqa_kernel {
         let kp: Tile<f32, { [8, 8] }> = k_projection.load_tile(const_shape![8, 8], [kv, 0]);
         let q_b: Tile<f32, { [8, 8] }> = q_row.broadcast(const_shape![8, 8]);
         let projected: Tile<f32, { [8] }> = reduce_sum(kp * q_b, 1i32);
-        let block: Tile<f32, { [2, 8] }> =
-            latent.load_tile(const_shape![2, 8], [physical * 2i32, 0]);
+        let block: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [physical, 0]);
         let p_b: Tile<f32, { [2, 8] }> = projected
             .reshape(const_shape![1, 8])
             .broadcast(const_shape![2, 8]);
@@ -47,17 +46,17 @@ pub mod direct_paged_latent_gqa_kernel {
         let h = get_tile_block_id().0;
         let kv = h / 2i32;
         let p0: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 0]);
-        let p1: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 2]);
-        let p2: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 4]);
-        let p3: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 6]);
+        let p1: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 1]);
+        let p2: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 2]);
+        let p3: Tile<f32, { [1, 2] }> = probabilities.load_tile(const_shape![1, 2], [h, 3]);
         let b0 = physical_block(table, 0i32);
         let b1 = physical_block(table, 1i32);
         let b2 = physical_block(table, 2i32);
         let b3 = physical_block(table, 3i32);
-        let l0: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b0 * 2i32, 0]);
-        let l1: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b1 * 2i32, 0]);
-        let l2: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b2 * 2i32, 0]);
-        let l3: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b3 * 2i32, 0]);
+        let l0: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b0, 0]);
+        let l1: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b1, 0]);
+        let l2: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b2, 0]);
+        let l3: Tile<f32, { [2, 8] }> = latent.load_tile(const_shape![2, 8], [b3, 0]);
         let c0: Tile<f32, { [8] }> = reduce_sum(
             p0.reshape(const_shape![2, 1]).broadcast(const_shape![2, 8]) * l0,
             0i32,
