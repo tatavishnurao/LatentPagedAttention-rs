@@ -205,16 +205,16 @@ mod gpu_impl {
             .expect("failed to reshape latent cache");
         let k_projection_device =
             api::copy_host_vec_to_device(&Arc::new(k_projection_head_major.clone()))
-            .sync()
-            .expect("failed to upload K projection")
-            .reshape(&[fixture.kv_heads * fixture.latent_dim, fixture.head_dim])
-            .expect("failed to reshape K projection");
+                .sync()
+                .expect("failed to upload K projection")
+                .reshape(&[fixture.kv_heads * fixture.latent_dim, fixture.head_dim])
+                .expect("failed to reshape K projection");
         let v_projection_device =
             api::copy_host_vec_to_device(&Arc::new(v_projection_head_major.clone()))
-            .sync()
-            .expect("failed to upload V projection")
-            .reshape(&[fixture.kv_heads * fixture.latent_dim, fixture.head_dim])
-            .expect("failed to reshape V projection");
+                .sync()
+                .expect("failed to upload V projection")
+                .reshape(&[fixture.kv_heads * fixture.latent_dim, fixture.head_dim])
+                .expect("failed to reshape V projection");
 
         let scores_out = api::zeros::<f32>(&[fixture.q_heads, fixture.seq_len])
             .sync()
