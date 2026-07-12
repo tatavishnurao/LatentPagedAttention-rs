@@ -424,6 +424,86 @@ pub fn paged_gqa_decode_f32(
     )
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct LatentKvReconstruction {
+    pub k_token_major: Vec<f32>,
+    pub v_token_major: Vec<f32>,
+}
+
+pub fn reconstruct_latent_kv_f32(
+    latent_cache: &[f32],
+    k_projection: &[f32],
+    v_projection: &[f32],
+    seq_len: usize,
+    latent_dim: usize,
+    kv_heads: usize,
+    head_dim: usize,
+) -> Result<LatentKvReconstruction, PlkvError> {
+    require_positive("seq_len", seq_len)?;
+    require_positive("latent_dim", latent_dim)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("head_dim", head_dim)?;
+    let projection_width = kv_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let latent_len = seq_len
+        .checked_mul(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let projection_len = latent_dim
+        .checked_mul(projection_width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let output_len = seq_len
+        .checked_mul(projection_width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+
+    if latent_cache.len() != latent_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "latent cache length does not match seq_len * latent_dim",
+        });
+    }
+    if k_projection.len() != projection_len || v_projection.len() != projection_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "K/V projection length does not match latent_dim * projection_width",
+        });
+    }
+    if !latent_cache.iter().all(|value| value.is_finite())
+        || !k_projection.iter().all(|value| value.is_finite())
+        || !v_projection.iter().all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "latent reconstruction inputs must be finite",
+        });
+    }
+
+    let mut k_token_major = vec![0.0f32; output_len];
+    let mut v_token_major = vec![0.0f32; output_len];
+    for token in 0..seq_len {
+        for out_dim in 0..projection_width {
+            let mut k_sum = 0.0f32;
+            let mut v_sum = 0.0f32;
+            for latent_idx in 0..latent_dim {
+                let latent_value = latent_cache[token * latent_dim + latent_idx];
+                let projection_idx = latent_idx * projection_width + out_dim;
+                k_sum += latent_value * k_projection[projection_idx];
+                v_sum += latent_value * v_projection[projection_idx];
+            }
+            if !k_sum.is_finite() || !v_sum.is_finite() {
+                return Err(PlkvError::InvalidPagedLookup {
+                    reason: "latent reconstruction output must be finite",
+                });
+            }
+            let output_idx = token * projection_width + out_dim;
+            k_token_major[output_idx] = k_sum;
+            v_token_major[output_idx] = v_sum;
+        }
+    }
+
+    Ok(LatentKvReconstruction {
+        k_token_major,
+        v_token_major,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
@@ -577,7 +657,7 @@ mod tests {
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
         contiguous_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
         kv_bytes_per_token_latent, paged_gqa_decode_f32, paged_kv_write_f32, paged_lookup_f32,
-        resolve_paged_token_location,
+        reconstruct_latent_kv_f32, resolve_paged_token_location,
     };
 
     #[test]
@@ -745,6 +825,28 @@ mod tests {
         expected_scores: Vec<Vec<f32>>,
         expected_probabilities: Vec<Vec<f32>>,
         expected_context: Vec<Vec<f32>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct LatentKvFixture {
+        seq_len: usize,
+        latent_dim: usize,
+        kv_heads: usize,
+        head_dim: usize,
+        projection_width: usize,
+        theoretical_cache_compression_ratio: f32,
+        cases: Vec<LatentKvCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct LatentKvCase {
+        latent_cache: Vec<Vec<f32>>,
+        k_projection: Vec<Vec<f32>>,
+        v_projection: Vec<Vec<f32>>,
+        expected_k_token_major: Vec<Vec<Vec<f32>>>,
+        expected_v_token_major: Vec<Vec<Vec<f32>>>,
+        expected_k_head_major: Vec<Vec<Vec<f32>>>,
+        expected_v_head_major: Vec<Vec<Vec<f32>>>,
     }
 
     #[test]
@@ -1130,6 +1232,132 @@ mod tests {
             paged_gqa_decode_f32(&q, &physical, &physical, &[2, 0, 3, 1], 3, 2, 8, 8, 2, 2, 4)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn latent_kv_reconstruction_matches_python_fixture() {
+        let fixture: LatentKvFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/latent_kv_reconstruction_f32.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            fixture.projection_width,
+            fixture.kv_heads * fixture.head_dim
+        );
+        assert_eq!(fixture.theoretical_cache_compression_ratio, 4.0);
+
+        for case in fixture.cases {
+            let latent: Vec<f32> = case.latent_cache.iter().flatten().copied().collect();
+            let k_projection: Vec<f32> = case.k_projection.iter().flatten().copied().collect();
+            let v_projection: Vec<f32> = case.v_projection.iter().flatten().copied().collect();
+            let expected_k: Vec<f32> = case
+                .expected_k_token_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_v: Vec<f32> = case
+                .expected_v_token_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let actual = reconstruct_latent_kv_f32(
+                &latent,
+                &k_projection,
+                &v_projection,
+                fixture.seq_len,
+                fixture.latent_dim,
+                fixture.kv_heads,
+                fixture.head_dim,
+            )
+            .unwrap();
+            assert_close(&actual.k_token_major, &expected_k, 1e-5, 1e-5);
+            assert_close(&actual.v_token_major, &expected_v, 1e-5, 1e-5);
+            assert!(actual.k_token_major.iter().all(|value| value.is_finite()));
+            assert!(actual.v_token_major.iter().all(|value| value.is_finite()));
+
+            let expected_k_head: Vec<f32> = case
+                .expected_k_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_v_head: Vec<f32> = case
+                .expected_v_head_major
+                .iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            assert_close(
+                &token_major_to_head_major(
+                    &actual.k_token_major,
+                    fixture.seq_len,
+                    fixture.kv_heads,
+                    fixture.head_dim,
+                ),
+                &expected_k_head,
+                1e-5,
+                1e-5,
+            );
+            assert_close(
+                &token_major_to_head_major(
+                    &actual.v_token_major,
+                    fixture.seq_len,
+                    fixture.kv_heads,
+                    fixture.head_dim,
+                ),
+                &expected_v_head,
+                1e-5,
+                1e-5,
+            );
+        }
+    }
+
+    #[test]
+    fn latent_kv_reconstruction_rejects_invalid_inputs() {
+        let latent = vec![0.0f32; 64];
+        let projection = vec![0.0f32; 128];
+        assert!(reconstruct_latent_kv_f32(&latent, &projection, &projection, 0, 8, 2, 8).is_err());
+        assert!(
+            reconstruct_latent_kv_f32(&latent[..63], &projection, &projection, 8, 8, 2, 8).is_err()
+        );
+        assert!(
+            reconstruct_latent_kv_f32(&latent, &projection[..127], &projection, 8, 8, 2, 8)
+                .is_err()
+        );
+        assert!(
+            reconstruct_latent_kv_f32(&latent, &projection, &projection[..127], 8, 8, 2, 8)
+                .is_err()
+        );
+        let mut non_finite = latent.clone();
+        non_finite[0] = f32::NAN;
+        assert!(
+            reconstruct_latent_kv_f32(&non_finite, &projection, &projection, 8, 8, 2, 8).is_err()
+        );
+    }
+
+    fn token_major_to_head_major(
+        token_major: &[f32],
+        seq_len: usize,
+        kv_heads: usize,
+        head_dim: usize,
+    ) -> Vec<f32> {
+        let mut out = vec![0.0f32; token_major.len()];
+        for kv_head in 0..kv_heads {
+            for token in 0..seq_len {
+                for dim in 0..head_dim {
+                    let src = (token * kv_heads + kv_head) * head_dim + dim;
+                    let dst = (kv_head * seq_len + token) * head_dim + dim;
+                    out[dst] = token_major[src];
+                }
+            }
+        }
+        out
     }
 
     fn assert_close(actual: &[f32], expected: &[f32], atol: f32, rtol: f32) {
