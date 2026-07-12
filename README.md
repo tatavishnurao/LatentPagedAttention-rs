@@ -52,6 +52,7 @@ Rust is the systems layer for block tables, cache layout, validation harnesses, 
 - [x] contiguous f32 GQA CPU reference
 - [x] contiguous f32 GQA cuTile validation
 - [x] direct paged f32 GQA cuTile validation
+- [x] standalone f32 latent-KV reconstruction
 - [ ] end-to-end model integration
 
 ## Current milestone
@@ -71,9 +72,10 @@ This repo currently validates:
 - contiguous f32 GQA CPU reference
 - contiguous f32 GQA cuTile validation
 - direct paged f32 GQA cuTile validation
+- standalone f32 latent-KV reconstruction
 
-The current milestone is GPU latent-KV reconstruction. Paged Latent KV and real
-model inference remain unimplemented.
+The current milestone is direct contiguous latent-KV GQA. Paged Latent KV and
+real model inference remain unimplemented.
 
 ## Setup
 
@@ -151,15 +153,15 @@ pass has completed the following:
 - contiguous f32 GQA CPU reference
 - contiguous f32 GQA cuTile validation
 - direct paged f32 GQA cuTile validation
+- GPU latent-KV reconstruction
 - Python/Rust/GPU parity
 
 Current milestone:
 
-- GPU latent-KV reconstruction
+- direct contiguous latent-KV GQA
 
 Not implemented:
 
-- latent-KV reconstruction
 - Paged Latent KV
 - FP16/BF16
 - real model inference
@@ -172,6 +174,7 @@ bash scripts/run_gpu_paged_lookup.sh
 bash scripts/run_gpu_paged_kv_write.sh
 bash scripts/run_gpu_gqa_decode.sh
 bash scripts/run_gpu_paged_gqa_decode.sh
+bash scripts/run_gpu_latent_kv_reconstruction.sh
 ```
 
 These commands validate compilation, JIT execution, synchronization, host
@@ -203,7 +206,8 @@ represent production inference.
 7. GPU single-token paged KV write — done
 8. GPU contiguous f32 GQA decode — done
 9. GPU direct Paged f32 GQA decode — done
-10. GPU latent-KV reconstruction — next
-11. GPU Paged Latent KV
-12. FP16/BF16
-13. RTX 4060 performance study
+10. GPU latent-KV reconstruction — done
+11. GPU direct contiguous latent-KV GQA — next
+12. GPU Paged Latent KV
+13. FP16/BF16
+14. RTX 4060 performance study
