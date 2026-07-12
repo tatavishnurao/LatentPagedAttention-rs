@@ -1,9 +1,11 @@
 import json
 
 import numpy as np
+from latent_paged_attention.attention_ref import latent_kv_reconstruction_ref
 from latent_paged_attention.fixtures import (
     block_table_fixture,
     gqa_decode_f32_fixture,
+    latent_kv_reconstruction_f32_fixture,
     memory_model_fixture,
     paged_gqa_decode_f32_fixture,
     paged_kv_write_fixture,
@@ -54,6 +56,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "paged_kv_write_f32.json",
         "gqa_decode_f32.json",
         "paged_gqa_decode_f32.json",
+        "latent_kv_reconstruction_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -169,3 +172,67 @@ def test_paged_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:
         assert np.isfinite(np.asarray(paged_case["expected_context"], dtype=np.float32)).all()
 
     assert fixture == paged_gqa_decode_f32_fixture()
+
+
+def test_latent_kv_reconstruction_fixture_layouts_are_valid() -> None:
+    fixture = latent_kv_reconstruction_f32_fixture()
+
+    assert fixture["batch"] == 1
+    assert fixture["seq_len"] == 8
+    assert fixture["latent_dim"] == 8
+    assert fixture["kv_heads"] == 2
+    assert fixture["head_dim"] == 8
+    assert fixture["projection_width"] == 16
+    assert fixture["latent_values_per_token"] == 8
+    assert fixture["full_kv_values_per_token"] == 32
+    assert fixture["theoretical_cache_compression_ratio"] == 4.0
+
+    for case in fixture["cases"]:
+        latent = np.asarray(case["latent_cache"], dtype=np.float32)[None, ...]
+        k_proj = np.asarray(case["k_projection"], dtype=np.float32)
+        v_proj = np.asarray(case["v_projection"], dtype=np.float32)
+        k_token = np.asarray(case["expected_k_token_major"], dtype=np.float32)
+        v_token = np.asarray(case["expected_v_token_major"], dtype=np.float32)
+        k_head = np.asarray(case["expected_k_head_major"], dtype=np.float32)
+        v_head = np.asarray(case["expected_v_head_major"], dtype=np.float32)
+
+        assert latent.shape == (1, 8, 8)
+        assert k_proj.shape == (8, 16)
+        assert v_proj.shape == (8, 16)
+        assert k_token.shape == (8, 2, 8)
+        assert v_token.shape == (8, 2, 8)
+        assert k_head.shape == (2, 8, 8)
+        assert v_head.shape == (2, 8, 8)
+        assert not np.array_equal(k_proj, v_proj)
+        assert not np.array_equal(k_token, v_token)
+        np.testing.assert_array_equal(k_head, np.transpose(k_token, (1, 0, 2)))
+        np.testing.assert_array_equal(v_head, np.transpose(v_token, (1, 0, 2)))
+
+        expected_k, expected_v = latent_kv_reconstruction_ref(
+            latent,
+            k_proj,
+            v_proj,
+            kv_heads=fixture["kv_heads"],
+            head_dim=fixture["head_dim"],
+        )
+        np.testing.assert_allclose(k_token, expected_k[0], atol=1e-6)
+        np.testing.assert_allclose(v_token, expected_v[0], atol=1e-6)
+        assert np.isfinite(k_token).all()
+        assert np.isfinite(v_token).all()
+
+        _, wrong_v = latent_kv_reconstruction_ref(
+            latent,
+            k_proj,
+            k_proj,
+            kv_heads=fixture["kv_heads"],
+            head_dim=fixture["head_dim"],
+        )
+        assert not np.allclose(wrong_v[0], v_token, atol=1e-6)
+
+    signed = fixture["cases"][1]
+    signed_latent = np.asarray(signed["latent_cache"], dtype=np.float32)
+    signed_k_proj = np.asarray(signed["k_projection"], dtype=np.float32)
+    signed_products = signed_latent[0, :, None] * signed_k_proj
+    assert np.any(signed_products > 0)
+    assert np.any(signed_products < 0)
+    assert fixture == latent_kv_reconstruction_f32_fixture()
