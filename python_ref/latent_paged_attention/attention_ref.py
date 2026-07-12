@@ -224,6 +224,56 @@ def paged_gqa_decode_attention_intermediates_ref(
     return gqa_decode_attention_intermediates_ref(q, k_cache, v_cache, group_size=group_size)
 
 
+def latent_kv_reconstruction_ref(
+    latent_cache: np.ndarray,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    kv_heads: int,
+    head_dim: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Reconstruct K and V from a latent cache.
+
+    Args:
+        latent_cache: [batch, seq_len, latent_dim]
+        k_proj: [latent_dim, kv_heads * head_dim]
+        v_proj: [latent_dim, kv_heads * head_dim]
+    Returns:
+        k_cache: [batch, seq_len, kv_heads, head_dim]
+        v_cache: [batch, seq_len, kv_heads, head_dim]
+    """
+    if latent_cache.ndim != 3:
+        raise ValueError("latent_cache must have shape [batch, seq_len, latent_dim]")
+    if k_proj.ndim != 2 or v_proj.ndim != 2:
+        raise ValueError("k_proj and v_proj must have shape [latent_dim, kv_heads * head_dim]")
+    if k_proj.shape != v_proj.shape:
+        raise ValueError("k_proj and v_proj shapes must match")
+    if kv_heads <= 0:
+        raise ValueError(f"kv_heads must be > 0, got {kv_heads}")
+    if head_dim <= 0:
+        raise ValueError(f"head_dim must be > 0, got {head_dim}")
+
+    batch, seq_len, latent_dim = latent_cache.shape
+    if batch <= 0 or seq_len <= 0 or latent_dim <= 0:
+        raise ValueError("latent_cache dimensions must be > 0")
+    if k_proj.shape[0] != latent_dim:
+        raise ValueError("latent_dim mismatch between cache and projections")
+    projection_width = kv_heads * head_dim
+    if k_proj.shape[1] != projection_width:
+        raise ValueError("projection width must equal kv_heads * head_dim")
+
+    k_flat = np.asarray(latent_cache @ k_proj, dtype=np.float32)
+    v_flat = np.asarray(latent_cache @ v_proj, dtype=np.float32)
+    k_cache = k_flat.reshape(batch, seq_len, kv_heads, head_dim)
+    v_cache = v_flat.reshape(batch, seq_len, kv_heads, head_dim)
+    if not np.all(np.isfinite(k_cache)):
+        raise ValueError("reconstructed K cache must be finite")
+    if not np.all(np.isfinite(v_cache)):
+        raise ValueError("reconstructed V cache must be finite")
+    return k_cache, v_cache
+
+
 def latent_kv_decode_attention_ref(
     q: np.ndarray,
     latent_cache: np.ndarray,
@@ -248,21 +298,17 @@ def latent_kv_decode_attention_ref(
     """
     if q.ndim != 3:
         raise ValueError("q must have shape [batch, q_heads, head_dim]")
-    if latent_cache.ndim != 3:
-        raise ValueError("latent_cache must have shape [batch, seq_len, latent_dim]")
-    if k_proj.ndim != 2 or v_proj.ndim != 2 or k_proj.shape != v_proj.shape:
-        raise ValueError("k_proj and v_proj must have shape [latent_dim, kv_heads * head_dim]")
-    if latent_cache.shape[2] != k_proj.shape[0]:
-        raise ValueError("latent_dim mismatch between cache and projections")
     if q.shape[1] != q_heads or q.shape[2] != head_dim:
         raise ValueError("q shape does not match q_heads/head_dim arguments")
-    if k_proj.shape[1] != kv_heads * head_dim:
-        raise ValueError("projection width must equal kv_heads * head_dim")
     _validate_group_mapping(q_heads, kv_heads, group_size)
 
-    batch, seq_len, _ = latent_cache.shape
-    k_cache = (latent_cache @ k_proj).reshape(batch, seq_len, kv_heads, head_dim)
-    v_cache = (latent_cache @ v_proj).reshape(batch, seq_len, kv_heads, head_dim)
+    k_cache, v_cache = latent_kv_reconstruction_ref(
+        latent_cache,
+        k_proj,
+        v_proj,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+    )
     return gqa_decode_attention_ref(q, k_cache, v_cache, group_size=group_size)
 
 
