@@ -1,3 +1,4 @@
+pub mod direct_latent_gqa;
 pub mod gqa_decode;
 pub mod latent_kv_reconstruction;
 pub mod paged_gqa_decode;
