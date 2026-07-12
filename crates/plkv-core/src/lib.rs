@@ -504,6 +504,161 @@ pub fn reconstruct_latent_kv_f32(
     })
 }
 
+pub fn direct_latent_gqa_decode_f32(
+    q: &[f32],
+    latent_cache: &[f32],
+    k_projection: &[f32],
+    v_projection: &[f32],
+    q_heads: usize,
+    kv_heads: usize,
+    seq_len: usize,
+    latent_dim: usize,
+    head_dim: usize,
+    group_size: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("seq_len", seq_len)?;
+    require_positive("latent_dim", latent_dim)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    if q_heads
+        != kv_heads
+            .checked_mul(group_size)
+            .ok_or(PlkvError::ArithmeticOverflow)?
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "expected q_heads == kv_heads * group_size",
+        });
+    }
+    let q_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if q.len() != q_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "Q length does not match q_heads * head_dim",
+        });
+    }
+    let latent_len = seq_len
+        .checked_mul(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if latent_cache.len() != latent_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "latent cache length does not match seq_len * latent_dim",
+        });
+    }
+    let projection_width = kv_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let projection_len = latent_dim
+        .checked_mul(projection_width)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if k_projection.len() != projection_len || v_projection.len() != projection_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "projection length does not match latent_dim * kv_heads * head_dim",
+        });
+    }
+    if !q.iter().all(|value| value.is_finite())
+        || !latent_cache.iter().all(|value| value.is_finite())
+        || !k_projection.iter().all(|value| value.is_finite())
+        || !v_projection.iter().all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "direct latent GQA inputs must be finite",
+        });
+    }
+
+    let scores_len = q_heads
+        .checked_mul(seq_len)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let context_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let mut scores = vec![0.0f32; scores_len];
+    let mut probabilities = vec![0.0f32; scores_len];
+    let mut context = vec![0.0f32; context_len];
+    let scale = 1.0f32 / (head_dim as f32).sqrt();
+
+    for q_head in 0..q_heads {
+        let kv_head = q_head / group_size;
+        let q_start = q_head * head_dim;
+        let mut projected_query_latent = vec![0.0f32; latent_dim];
+        for latent_idx in 0..latent_dim {
+            let mut value = 0.0f32;
+            for dim in 0..head_dim {
+                let projection_idx = (latent_idx * kv_heads + kv_head) * head_dim + dim;
+                value += q[q_start + dim] * k_projection[projection_idx];
+            }
+            projected_query_latent[latent_idx] = value;
+        }
+
+        let scores_start = q_head * seq_len;
+        for token in 0..seq_len {
+            let latent_start = token * latent_dim;
+            let mut score = 0.0f32;
+            for latent_idx in 0..latent_dim {
+                score +=
+                    latent_cache[latent_start + latent_idx] * projected_query_latent[latent_idx];
+            }
+            scores[scores_start + token] = score * scale;
+        }
+
+        let row = &scores[scores_start..scores_start + seq_len];
+        let row_max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        if !row_max.is_finite() {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "score row maximum is not finite",
+            });
+        }
+        let mut denom = 0.0f32;
+        for token in 0..seq_len {
+            let value = (scores[scores_start + token] - row_max).exp();
+            probabilities[scores_start + token] = value;
+            denom += value;
+        }
+        if !denom.is_finite() || denom == 0.0 {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "softmax denominator must be finite and non-zero",
+            });
+        }
+        for token in 0..seq_len {
+            let value = probabilities[scores_start + token] / denom;
+            if !value.is_finite() {
+                return Err(PlkvError::InvalidPagedLookup {
+                    reason: "probability must be finite",
+                });
+            }
+            probabilities[scores_start + token] = value;
+        }
+
+        let mut latent_context = vec![0.0f32; latent_dim];
+        for latent_idx in 0..latent_dim {
+            let mut value = 0.0f32;
+            for token in 0..seq_len {
+                value += probabilities[scores_start + token]
+                    * latent_cache[token * latent_dim + latent_idx];
+            }
+            latent_context[latent_idx] = value;
+        }
+
+        let context_start = q_head * head_dim;
+        for dim in 0..head_dim {
+            let mut value = 0.0f32;
+            for latent_idx in 0..latent_dim {
+                let projection_idx = (latent_idx * kv_heads + kv_head) * head_dim + dim;
+                value += latent_context[latent_idx] * v_projection[projection_idx];
+            }
+            context[context_start + dim] = value;
+        }
+    }
+
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
@@ -655,9 +810,10 @@ mod tests {
 
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
-        contiguous_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
-        kv_bytes_per_token_latent, paged_gqa_decode_f32, paged_kv_write_f32, paged_lookup_f32,
-        reconstruct_latent_kv_f32, resolve_paged_token_location,
+        contiguous_gqa_decode_f32, direct_latent_gqa_decode_f32, estimate_total_kv_cache_bytes,
+        kv_bytes_per_token_gqa, kv_bytes_per_token_latent, paged_gqa_decode_f32,
+        paged_kv_write_f32, paged_lookup_f32, reconstruct_latent_kv_f32,
+        resolve_paged_token_location,
     };
 
     #[test]
@@ -847,6 +1003,42 @@ mod tests {
         expected_v_token_major: Vec<Vec<Vec<f32>>>,
         expected_k_head_major: Vec<Vec<Vec<f32>>>,
         expected_v_head_major: Vec<Vec<Vec<f32>>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct DirectLatentGqaFixture {
+        dtype: String,
+        batch: usize,
+        seq_len: usize,
+        q_heads: usize,
+        kv_heads: usize,
+        group_size: usize,
+        head_dim: usize,
+        latent_dim: usize,
+        projection_width: usize,
+        q_to_kv: Vec<usize>,
+        scale: f32,
+        latent_values_per_token: usize,
+        full_kv_values_per_token: usize,
+        theoretical_cache_compression_ratio: f32,
+        cases: Vec<DirectLatentGqaCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct DirectLatentGqaCase {
+        name: String,
+        q: Vec<Vec<f32>>,
+        latent_cache: Vec<Vec<f32>>,
+        k_projection: Vec<Vec<f32>>,
+        v_projection: Vec<Vec<f32>>,
+        k_projection_gpu_head_major: Vec<Vec<Vec<f32>>>,
+        v_projection_gpu_head_major: Vec<Vec<Vec<f32>>>,
+        expected_scores: Vec<Vec<f32>>,
+        expected_probabilities: Vec<Vec<f32>>,
+        expected_context: Vec<Vec<f32>>,
+        materialized_scores: Vec<Vec<f32>>,
+        materialized_probabilities: Vec<Vec<f32>>,
+        materialized_context: Vec<Vec<f32>>,
     }
 
     #[test]
@@ -1338,6 +1530,210 @@ mod tests {
         non_finite[0] = f32::NAN;
         assert!(
             reconstruct_latent_kv_f32(&non_finite, &projection, &projection, 8, 8, 2, 8).is_err()
+        );
+    }
+
+    #[test]
+    fn direct_latent_gqa_matches_python_and_materialized_fixtures() {
+        let fixture: DirectLatentGqaFixture = serde_json::from_str(include_str!(
+            "../../../fixtures/reference/direct_latent_gqa_decode_f32.json"
+        ))
+        .unwrap();
+        assert_eq!(fixture.dtype, "f32");
+        assert_eq!(fixture.batch, 1);
+        assert_eq!(fixture.q_to_kv, vec![0, 0, 1, 1]);
+        assert_eq!(
+            fixture.projection_width,
+            fixture.kv_heads * fixture.head_dim
+        );
+        assert_eq!(fixture.latent_values_per_token, fixture.latent_dim);
+        assert_eq!(fixture.full_kv_values_per_token, 32);
+        assert_eq!(fixture.theoretical_cache_compression_ratio, 4.0);
+
+        for case in fixture.cases {
+            let q: Vec<f32> = case.q.iter().flatten().copied().collect();
+            let latent: Vec<f32> = case.latent_cache.iter().flatten().copied().collect();
+            let k_projection: Vec<f32> = case.k_projection.iter().flatten().copied().collect();
+            let v_projection: Vec<f32> = case.v_projection.iter().flatten().copied().collect();
+            let expected_scores: Vec<f32> =
+                case.expected_scores.iter().flatten().copied().collect();
+            let expected_probabilities: Vec<f32> = case
+                .expected_probabilities
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            let expected_context: Vec<f32> =
+                case.expected_context.iter().flatten().copied().collect();
+            let materialized_scores: Vec<f32> =
+                case.materialized_scores.iter().flatten().copied().collect();
+            let materialized_probabilities: Vec<f32> = case
+                .materialized_probabilities
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            let materialized_context: Vec<f32> = case
+                .materialized_context
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+
+            let direct = direct_latent_gqa_decode_f32(
+                &q,
+                &latent,
+                &k_projection,
+                &v_projection,
+                fixture.q_heads,
+                fixture.kv_heads,
+                fixture.seq_len,
+                fixture.latent_dim,
+                fixture.head_dim,
+                fixture.group_size,
+            )
+            .unwrap();
+            let reconstructed = reconstruct_latent_kv_f32(
+                &latent,
+                &k_projection,
+                &v_projection,
+                fixture.seq_len,
+                fixture.latent_dim,
+                fixture.kv_heads,
+                fixture.head_dim,
+            )
+            .unwrap();
+            let reconstructed_k_head_major = token_major_to_head_major(
+                &reconstructed.k_token_major,
+                fixture.seq_len,
+                fixture.kv_heads,
+                fixture.head_dim,
+            );
+            let reconstructed_v_head_major = token_major_to_head_major(
+                &reconstructed.v_token_major,
+                fixture.seq_len,
+                fixture.kv_heads,
+                fixture.head_dim,
+            );
+            let materialized = contiguous_gqa_decode_f32(
+                &q,
+                &reconstructed_k_head_major,
+                &reconstructed_v_head_major,
+                fixture.q_heads,
+                fixture.kv_heads,
+                fixture.seq_len,
+                fixture.head_dim,
+                fixture.group_size,
+            )
+            .unwrap();
+
+            assert_close(&direct.scores, &expected_scores, 5e-5, 1e-5);
+            assert_close(&direct.probabilities, &expected_probabilities, 5e-5, 1e-5);
+            assert_close(&direct.context, &expected_context, 1e-4, 1e-5);
+            assert_close(&direct.scores, &materialized_scores, 5e-5, 1e-5);
+            assert_close(
+                &direct.probabilities,
+                &materialized_probabilities,
+                5e-5,
+                1e-5,
+            );
+            assert_close(&direct.context, &materialized_context, 1e-4, 1e-5);
+            assert_close(&direct.scores, &materialized.scores, 5e-5, 1e-5);
+            assert_close(
+                &direct.probabilities,
+                &materialized.probabilities,
+                5e-5,
+                1e-5,
+            );
+            assert_close(&direct.context, &materialized.context, 1e-4, 1e-5);
+            assert!(direct.scores.iter().all(|value| value.is_finite()));
+            assert!(direct.probabilities.iter().all(|value| value.is_finite()));
+            assert!(direct.context.iter().all(|value| value.is_finite()));
+            for q_head in 0..fixture.q_heads {
+                let start = q_head * fixture.seq_len;
+                let row_sum: f32 = direct.probabilities[start..start + fixture.seq_len]
+                    .iter()
+                    .sum();
+                assert!((row_sum - 1.0).abs() <= 1e-5);
+            }
+
+            assert_eq!(reconstructed.k_token_major.len(), 128);
+            assert_eq!(reconstructed.v_token_major.len(), 128);
+        }
+    }
+
+    #[test]
+    fn direct_latent_gqa_rejects_invalid_inputs() {
+        let q = vec![0.0f32; 32];
+        let latent = vec![0.0f32; 64];
+        let projection = vec![0.0f32; 128];
+        assert!(
+            direct_latent_gqa_decode_f32(
+                &q[..31],
+                &latent,
+                &projection,
+                &projection,
+                4,
+                2,
+                8,
+                8,
+                8,
+                2
+            )
+            .is_err()
+        );
+        assert!(
+            direct_latent_gqa_decode_f32(
+                &q,
+                &latent[..63],
+                &projection,
+                &projection,
+                4,
+                2,
+                8,
+                8,
+                8,
+                2
+            )
+            .is_err()
+        );
+        assert!(
+            direct_latent_gqa_decode_f32(
+                &q,
+                &latent,
+                &projection[..127],
+                &projection,
+                4,
+                2,
+                8,
+                8,
+                8,
+                2
+            )
+            .is_err()
+        );
+        assert!(
+            direct_latent_gqa_decode_f32(
+                &q,
+                &latent,
+                &projection,
+                &projection[..127],
+                4,
+                2,
+                8,
+                8,
+                8,
+                2
+            )
+            .is_err()
+        );
+        assert!(
+            direct_latent_gqa_decode_f32(&q, &latent, &projection, &projection, 3, 2, 8, 8, 8, 2)
+                .is_err()
+        );
+        assert!(
+            direct_latent_gqa_decode_f32(&q, &latent, &projection, &projection, 4, 2, 8, 8, 8, 0)
+                .is_err()
         );
     }
 
