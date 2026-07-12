@@ -15,6 +15,7 @@ from latent_paged_attention.fixtures import (
     paged_gqa_decode_f32_fixture,
     paged_kv_write_fixture,
     paged_latent_write_attention_f32_fixture,
+    paged_latent_write_attention_fp16_storage_fixture,
     paged_lookup_f32_fixture,
     write_fixtures,
 )
@@ -66,6 +67,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "direct_latent_gqa_decode_f32.json",
         "direct_paged_latent_gqa_decode_f32.json",
         "paged_latent_write_attention_f32.json",
+        "paged_latent_write_attention_fp16_storage.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -124,6 +126,33 @@ def test_paged_latent_write_attention_fixture_has_expected_locations() -> None:
         assert np.isfinite(np.asarray(case["post_write_context"], dtype=np.float32)).all()
         assert not np.array_equal(case["pre_write_context"], case["post_write_context"])
     assert fixture == paged_latent_write_attention_f32_fixture()
+
+
+def test_fp16_storage_fixture_has_exact_storage_and_finite_attention() -> None:
+    fixture = paged_latent_write_attention_fp16_storage_fixture()
+    assert fixture["storage_dtype"] == "f16"
+    assert fixture["compute_dtype"] == "f32"
+    assert fixture["latent_cache_bytes_fp16"] == 128
+    assert fixture["latent_cache_bytes_fp32"] == 256
+    assert fixture["hypothetical_full_kv_cache_bytes_fp16"] == 512
+    assert fixture["latent_storage_ratio_fp32_to_fp16"] == 2.0
+    for case in fixture["cases"]:
+        initial = np.asarray(case["initial_latent_stored_fp16_as_f32"], dtype=np.float32)
+        updated = np.asarray(case["expected_updated_latent_fp16_as_f32"], dtype=np.float32)
+        bits_initial = np.asarray(case["initial_latent_fp16_bits"], dtype=np.uint16)
+        bits_updated = np.asarray(case["expected_updated_latent_fp16_bits"], dtype=np.uint16)
+        assert bits_initial.shape == (4, 2, 8)
+        assert bits_updated.shape == (4, 2, 8)
+        assert np.count_nonzero(bits_initial != bits_updated) == 8
+        np.testing.assert_array_equal(initial.astype(np.float16).view(np.uint16), bits_initial)
+        np.testing.assert_array_equal(updated.astype(np.float16).view(np.uint16), bits_updated)
+        post_probs = np.asarray(case["fp16_storage_post_write_probabilities"], dtype=np.float32)
+        assert np.isfinite(post_probs).all()
+        np.testing.assert_allclose(post_probs.sum(axis=-1), np.ones(4), atol=1e-6)
+        assert not np.array_equal(
+            case["fp16_storage_post_write_context"], case["fp32_post_write_context"]
+        )
+    assert fixture == paged_latent_write_attention_fp16_storage_fixture()
 
 
 def test_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:

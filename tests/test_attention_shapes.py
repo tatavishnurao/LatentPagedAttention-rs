@@ -12,7 +12,12 @@ from latent_paged_attention.attention_ref import (
     paged_lookup_ref,
     softmax_stable,
 )
-from latent_paged_attention.cache_ref import paged_latent_write_ref
+from latent_paged_attention.cache_ref import (
+    fp16_storage_bits,
+    fp16_storage_roundtrip_f32,
+    paged_latent_write_fp16_storage_ref,
+    paged_latent_write_ref,
+)
 
 
 def _make_tiny_case() -> tuple[np.ndarray, ...]:
@@ -86,6 +91,34 @@ def test_paged_latent_write_rejects_invalid_inputs() -> None:
         paged_latent_write_ref(cache, table, 8, replacement)
     with np.testing.assert_raises(IndexError):
         paged_latent_write_ref(cache, np.array([4, 0, 1, 2]), 0, replacement)
+
+
+def test_fp16_storage_roundtrip_and_bits_are_deterministic() -> None:
+    values = np.array(
+        [0.0, -0.0, 1.0, -2.5, 2**-14, 2**-20, 65504.0], dtype=np.float32
+    )
+    rounded = fp16_storage_roundtrip_f32(values)
+    bits = fp16_storage_bits(values)
+    np.testing.assert_array_equal(rounded, values.astype(np.float16).astype(np.float32))
+    np.testing.assert_array_equal(bits, values.astype(np.float16).view(np.uint16))
+    np.testing.assert_array_equal(bits, fp16_storage_bits(values))
+
+
+def test_fp16_storage_write_rounds_cache_and_replacement() -> None:
+    cache = np.linspace(-1.0, 1.0, 64, dtype=np.float32).reshape(4, 2, 8)
+    table = np.array([2, 0, 3, 1], dtype=np.int64)
+    replacement = np.array([0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8], dtype=np.float32)
+
+    updated = paged_latent_write_fp16_storage_ref(cache, table, 4, replacement)
+    expected = cache.astype(np.float16).astype(np.float32)
+    expected[3, 0] = replacement.astype(np.float16).astype(np.float32)
+    np.testing.assert_array_equal(updated, expected)
+    assert not np.array_equal(updated, cache)
+
+    with np.testing.assert_raises(ValueError):
+        fp16_storage_roundtrip_f32(np.array([70000.0], dtype=np.float32))
+    with np.testing.assert_raises(ValueError):
+        fp16_storage_roundtrip_f32(np.array([np.inf], dtype=np.float32))
 
 
 def test_gqa_decode_attention_output_shape_is_correct() -> None:
