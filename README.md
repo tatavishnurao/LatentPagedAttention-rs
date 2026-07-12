@@ -76,8 +76,8 @@ This repo currently validates:
 - direct contiguous latent-KV GQA
 - direct paged latent-KV GQA
 
-The current milestone is GPU direct paged latent-KV GQA. Paged latent-cache writes
-and real model inference remain unimplemented.
+The current milestone is GPU paged latent-cache write and write-to-attention round
+trip. Real model inference remains unimplemented.
 
 ## Setup
 
@@ -162,7 +162,7 @@ pass has completed the following:
 
 Current milestone:
 
-- GPU direct paged latent-KV GQA
+- GPU paged latent-cache write and attention round trip
 
 Not implemented:
 
