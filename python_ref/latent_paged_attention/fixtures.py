@@ -8,6 +8,7 @@ import numpy as np
 
 from .attention_ref import (
     gqa_decode_attention_intermediates_ref,
+    latent_kv_reconstruction_ref,
     paged_gqa_decode_attention_intermediates_ref,
     paged_lookup_ref,
 )
@@ -346,6 +347,119 @@ def paged_gqa_decode_f32_fixture() -> dict:
     }
 
 
+def _latent_balanced_projection_case() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    seq_len = 8
+    latent_dim = 8
+    projection_width = 16
+    latent = np.zeros((1, seq_len, latent_dim), dtype=np.float32)
+    k_proj = np.zeros((latent_dim, projection_width), dtype=np.float32)
+    v_proj = np.zeros((latent_dim, projection_width), dtype=np.float32)
+    for token in range(seq_len):
+        for dim in range(latent_dim):
+            latent[0, token, dim] = (
+                (token + 1) * 0.11
+                - (dim + 1) * 0.037
+                + ((token + dim) % 3) * 0.013
+            )
+    for latent_idx in range(latent_dim):
+        for out_idx in range(projection_width):
+            k_proj[latent_idx, out_idx] = (
+                (latent_idx + 1) * 0.021
+                - (out_idx + 1) * 0.009
+                + ((latent_idx * 2 + out_idx) % 5) * 0.004
+            )
+            v_proj[latent_idx, out_idx] = (
+                -(latent_idx + 1) * 0.017
+                + (out_idx + 1) * 0.012
+                - ((latent_idx + out_idx * 3) % 7) * 0.003
+            )
+    return latent, k_proj, v_proj
+
+
+def _latent_signed_accumulation_case() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    seq_len = 8
+    latent_dim = 8
+    projection_width = 16
+    latent = np.zeros((1, seq_len, latent_dim), dtype=np.float32)
+    k_proj = np.zeros((latent_dim, projection_width), dtype=np.float32)
+    v_proj = np.zeros((latent_dim, projection_width), dtype=np.float32)
+    for token in range(seq_len):
+        for dim in range(latent_dim):
+            sign = -1.0 if (token + dim) % 2 else 1.0
+            latent[0, token, dim] = sign * (
+                0.19 + token * 0.023 + dim * 0.017 + ((token * dim) % 3) * 0.011
+            )
+    for latent_idx in range(latent_dim):
+        for out_idx in range(projection_width):
+            k_sign = -1.0 if (latent_idx + out_idx) % 2 else 1.0
+            v_sign = -1.0 if (latent_idx * 3 + out_idx) % 2 else 1.0
+            k_proj[latent_idx, out_idx] = k_sign * (
+                0.031 + latent_idx * 0.006 - out_idx * 0.0015
+            )
+            v_proj[latent_idx, out_idx] = v_sign * (
+                0.027 - latent_idx * 0.002 + out_idx * 0.004
+            )
+    return latent, k_proj, v_proj
+
+
+def _head_major_from_batched_token_major(cache: np.ndarray) -> np.ndarray:
+    """Convert [1, seq_len, kv_heads, head_dim] to [kv_heads, seq_len, head_dim]."""
+    return np.transpose(cache[0], (1, 0, 2)).copy()
+
+
+def _latent_kv_reconstruction_case(
+    name: str, latent: np.ndarray, k_proj: np.ndarray, v_proj: np.ndarray
+) -> dict:
+    k_cache, v_cache = latent_kv_reconstruction_ref(
+        latent,
+        k_proj,
+        v_proj,
+        kv_heads=2,
+        head_dim=8,
+    )
+    return {
+        "name": name,
+        "latent_cache": latent[0].tolist(),
+        "k_projection": k_proj.tolist(),
+        "v_projection": v_proj.tolist(),
+        "expected_k_token_major": k_cache[0].tolist(),
+        "expected_v_token_major": v_cache[0].tolist(),
+        "expected_k_head_major": _head_major_from_batched_token_major(k_cache).tolist(),
+        "expected_v_head_major": _head_major_from_batched_token_major(v_cache).tolist(),
+    }
+
+
+def latent_kv_reconstruction_f32_fixture() -> dict:
+    """Return deterministic MLA-style synthetic latent-KV reconstruction fixtures."""
+    seq_len = 8
+    latent_dim = 8
+    kv_heads = 2
+    head_dim = 8
+    projection_width = kv_heads * head_dim
+    balanced_latent, balanced_k_proj, balanced_v_proj = _latent_balanced_projection_case()
+    signed_latent, signed_k_proj, signed_v_proj = _latent_signed_accumulation_case()
+    return {
+        "dtype": "f32",
+        "batch": 1,
+        "seq_len": seq_len,
+        "latent_dim": latent_dim,
+        "kv_heads": kv_heads,
+        "head_dim": head_dim,
+        "projection_width": projection_width,
+        "latent_values_per_token": latent_dim,
+        "full_kv_values_per_token": 2 * kv_heads * head_dim,
+        "theoretical_cache_compression_ratio": (2 * kv_heads * head_dim) / latent_dim,
+        "cases": [
+            _latent_kv_reconstruction_case(
+                "balanced_projection", balanced_latent, balanced_k_proj, balanced_v_proj
+            ),
+            _latent_kv_reconstruction_case(
+                "signed_accumulation", signed_latent, signed_k_proj, signed_v_proj
+            ),
+        ],
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -358,6 +472,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "paged_kv_write_f32.json": paged_kv_write_fixture(),
         "gqa_decode_f32.json": gqa_decode_f32_fixture(),
         "paged_gqa_decode_f32.json": paged_gqa_decode_f32_fixture(),
+        "latent_kv_reconstruction_f32.json": latent_kv_reconstruction_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
