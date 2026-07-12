@@ -438,10 +438,32 @@ def paged_latent_kv_decode_attention_ref(
     group_size: int,
 ) -> np.ndarray:
     """Reference paged latent-KV decode attention."""
+    _, _, context = paged_latent_kv_decode_attention_intermediates_ref(
+        q, latent_blocks, block_table, seq_len, block_size, k_proj, v_proj,
+        q_heads=q_heads, kv_heads=kv_heads, head_dim=head_dim, group_size=group_size,
+    )
+    return context
+
+
+def paged_latent_kv_decode_attention_intermediates_ref(
+    q: np.ndarray,
+    latent_blocks: np.ndarray,
+    block_table: np.ndarray,
+    seq_len: int,
+    block_size: int,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Materialized paged latent correctness oracle."""
     logical_latent = paged_lookup_ref(latent_blocks, block_table, seq_len, block_size)
     batch = q.shape[0]
     latent_cache = np.broadcast_to(logical_latent[None, ...], (batch, *logical_latent.shape))
-    return latent_kv_decode_attention_ref(
+    return latent_kv_decode_attention_intermediates_ref(
         q,
         latent_cache,
         k_proj,
@@ -451,3 +473,63 @@ def paged_latent_kv_decode_attention_ref(
         head_dim=head_dim,
         group_size=group_size,
     )
+
+
+def direct_paged_latent_gqa_decode_attention_intermediates_ref(
+    q: np.ndarray, latent_blocks: np.ndarray, block_table: np.ndarray,
+    seq_len: int, block_size: int, k_proj: np.ndarray, v_proj: np.ndarray,
+    *, q_heads: int, kv_heads: int, head_dim: int, group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Direct paged latent-space GQA without logical latent or full K/V storage."""
+    if q.ndim != 3 or q.shape[0] <= 0 or q.shape[1:] != (q_heads, head_dim):
+        raise ValueError("q must have shape [batch, q_heads, head_dim]")
+    if latent_blocks.ndim != 3 or latent_blocks.shape[1] != block_size:
+        raise ValueError("latent_blocks must have shape [physical_blocks, block_size, latent_dim]")
+    if block_table.ndim != 1 or block_table.size * block_size < seq_len:
+        raise ValueError("block_table must cover seq_len and be 1D")
+    if seq_len <= 0 or block_size <= 0 or kv_heads <= 0 or head_dim <= 0:
+        raise ValueError("dimensions must be positive")
+    _validate_group_mapping(q_heads, kv_heads, group_size)
+    if k_proj.ndim != 2 or v_proj.shape != k_proj.shape:
+        raise ValueError("K/V projections must share a 2D shape")
+    latent_dim = latent_blocks.shape[2]
+    if k_proj.shape != (latent_dim, kv_heads * head_dim):
+        raise ValueError("projection shape does not match latent dimensions")
+    if np.any(block_table < 0) or np.any(block_table >= latent_blocks.shape[0]):
+        raise ValueError("block_table contains out-of-range physical block indices")
+    if not all(np.isfinite(x).all() for x in (q, latent_blocks, k_proj, v_proj)):
+        raise ValueError("inputs must be finite")
+
+    batch = q.shape[0]
+    scores = np.empty((batch, q_heads, seq_len), dtype=np.float32)
+    probs = np.empty_like(scores)
+    context = np.empty((batch, q_heads, head_dim), dtype=np.float32)
+    k_heads = k_proj.reshape(latent_dim, kv_heads, head_dim)
+    v_heads = v_proj.reshape(latent_dim, kv_heads, head_dim)
+    scale = np.float32(1.0 / np.sqrt(float(head_dim)))
+    for b in range(batch):
+        for q_head in range(q_heads):
+            kv_head = q_head // group_size
+            projected = k_heads[:, kv_head, :].T @ q[b, q_head]
+            for logical_block in range((seq_len + block_size - 1) // block_size):
+                physical = int(block_table[logical_block])
+                start = logical_block * block_size
+                stop = min(start + block_size, seq_len)
+                scores[b, q_head, start:stop] = (
+                    latent_blocks[physical, : stop - start] @ projected * scale
+                )
+            probs[b, q_head] = softmax_stable(scores[b, q_head])
+            latent_context = np.zeros(latent_dim, dtype=np.float32)
+            for logical_block in range((seq_len + block_size - 1) // block_size):
+                physical = int(block_table[logical_block])
+                start = logical_block * block_size
+                stop = min(start + block_size, seq_len)
+                latent_context += probs[b, q_head, start:stop] @ latent_blocks[
+                    physical, : stop - start
+                ]
+            context[b, q_head] = latent_context @ v_heads[:, kv_head, :]
+    if not all(np.isfinite(x).all() for x in (scores, probs, context)):
+        raise ValueError("outputs must be finite")
+    if not np.allclose(probs.sum(axis=-1), 1.0, atol=1e-6):
+        raise ValueError("probability rows must sum to one")
+    return scores, probs, context
