@@ -33,6 +33,13 @@ Run:
 bash scripts/run_gpu_fp16_paged_latent_attention.sh
 ```
 
+Final validation reports:
+
+```text
+reports/rtx4060_gpu_smoke/fp16_paged_latent_attention_20260712T200716Z.txt
+reports/rtx4060_gpu_smoke/fp16_paged_latent_attention_20260712T200722Z.txt
+```
+
 Observed GPU-vs-FP16-storage-oracle maximum errors were:
 
 ```text
