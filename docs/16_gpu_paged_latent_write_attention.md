@@ -40,6 +40,13 @@ Run the validation with:
 bash scripts/run_gpu_paged_latent_write_attention.sh
 ```
 
+Final validation reports:
+
+```text
+reports/rtx4060_gpu_smoke/paged_latent_write_attention_20260712T195012Z.txt
+reports/rtx4060_gpu_smoke/paged_latent_write_attention_20260712T195014Z.txt
+```
+
 The validated RTX 4060 runs produced post-write maximum errors of approximately
 `4.47e-8` scores and `2.98e-8` context for the balanced case, and `1.79e-6`
 scores and `1.19e-7` context for the stable case. The largest probability row
