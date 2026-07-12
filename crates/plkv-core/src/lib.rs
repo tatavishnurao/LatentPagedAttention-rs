@@ -291,6 +291,29 @@ pub fn paged_latent_write_f32(
     Ok(location)
 }
 
+pub fn quantize_f32_to_f16_storage(values: &[f32]) -> Result<Vec<half::f16>, PlkvError> {
+    let mut output = Vec::with_capacity(values.len());
+    for &value in values {
+        if !value.is_finite() {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "FP16 storage input must be finite",
+            });
+        }
+        let stored = half::f16::from_f32(value);
+        if !stored.is_finite() {
+            return Err(PlkvError::InvalidPagedLookup {
+                reason: "FP16 storage conversion overflowed",
+            });
+        }
+        output.push(stored);
+    }
+    Ok(output)
+}
+
+pub fn fp16_storage_to_f32(values: &[half::f16]) -> Vec<f32> {
+    values.iter().map(|value| value.to_f32()).collect()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct GqaDecodeResult {
     pub scores: Vec<f32>,
@@ -846,6 +869,207 @@ pub fn direct_paged_latent_gqa_decode_f32(
     {
         return Err(PlkvError::InvalidPagedLookup {
             reason: "outputs must be finite",
+        });
+    }
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context,
+    })
+}
+
+pub fn paged_latent_write_fp16_storage(
+    latent_cache: &mut [half::f16],
+    block_table: &[usize],
+    token_position: usize,
+    block_size: usize,
+    latent_dim: usize,
+    new_latent_f32: &[f32],
+) -> Result<PagedTokenLocation, PlkvError> {
+    require_positive("block_size", block_size)?;
+    require_positive("latent_dim", latent_dim)?;
+    let block_stride = block_size
+        .checked_mul(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if latent_cache.is_empty() || latent_cache.len() % block_stride != 0 {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 latent cache length is not divisible by block stride",
+        });
+    }
+    if new_latent_f32.len() != latent_dim {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "new latent vector does not match latent_dim",
+        });
+    }
+    let replacement = quantize_f32_to_f16_storage(new_latent_f32)?;
+    if latent_cache.iter().any(|value| !value.is_finite()) {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 latent cache must be finite",
+        });
+    }
+    let location = resolve_paged_token_location(
+        block_table,
+        token_position,
+        block_size,
+        latent_cache.len() / block_stride,
+    )?;
+    let start = location
+        .physical_block
+        .checked_mul(block_stride)
+        .and_then(|value| value.checked_add(location.block_offset.checked_mul(latent_dim)?))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let end = start
+        .checked_add(latent_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    latent_cache
+        .get_mut(start..end)
+        .ok_or(PlkvError::InvalidPagedLookup {
+            reason: "FP16 latent cache indexing exceeded storage length",
+        })?
+        .copy_from_slice(&replacement);
+    Ok(location)
+}
+
+pub fn direct_paged_latent_gqa_decode_fp16_storage_f32_accum(
+    q: &[f32],
+    latent_physical: &[half::f16],
+    block_table: &[usize],
+    k_projection: &[f32],
+    v_projection: &[f32],
+    q_heads: usize,
+    kv_heads: usize,
+    seq_len: usize,
+    latent_dim: usize,
+    head_dim: usize,
+    group_size: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("seq_len", seq_len)?;
+    require_positive("latent_dim", latent_dim)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    require_positive("block_size", block_size)?;
+    require_positive("num_physical_blocks", num_physical_blocks)?;
+    if q_heads
+        != kv_heads
+            .checked_mul(group_size)
+            .ok_or(PlkvError::ArithmeticOverflow)?
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "invalid GQA mapping",
+        });
+    }
+    let q_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let physical_len = num_physical_blocks
+        .checked_mul(block_size)
+        .and_then(|value| value.checked_mul(latent_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let projection_len = latent_dim
+        .checked_mul(kv_heads)
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if q.len() != q_len
+        || latent_physical.len() != physical_len
+        || k_projection.len() != projection_len
+        || v_projection.len() != projection_len
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 direct paged latent tensor length mismatch",
+        });
+    }
+    if block_table
+        .len()
+        .checked_mul(block_size)
+        .ok_or(PlkvError::ArithmeticOverflow)?
+        < seq_len
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover sequence",
+        });
+    }
+    if block_table
+        .iter()
+        .any(|&physical| physical >= num_physical_blocks)
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table index out of range",
+        });
+    }
+    if !q.iter().all(|value| value.is_finite())
+        || !latent_physical.iter().all(|value| value.is_finite())
+        || !k_projection.iter().all(|value| value.is_finite())
+        || !v_projection.iter().all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 direct paged latent inputs must be finite",
+        });
+    }
+    let mut scores = vec![0.0f32; q_heads * seq_len];
+    let mut probabilities = scores.clone();
+    let mut context = vec![0.0f32; q_heads * head_dim];
+    let scale = 1.0f32 / (head_dim as f32).sqrt();
+    for q_head in 0..q_heads {
+        let kv_head = q_head / group_size;
+        let mut projected = vec![0.0f32; latent_dim];
+        for latent_idx in 0..latent_dim {
+            for dim in 0..head_dim {
+                projected[latent_idx] += q[q_head * head_dim + dim]
+                    * k_projection[(latent_idx * kv_heads + kv_head) * head_dim + dim];
+            }
+        }
+        for token in 0..seq_len {
+            let base =
+                (block_table[token / block_size] * block_size + token % block_size) * latent_dim;
+            scores[q_head * seq_len + token] = (0..latent_dim)
+                .map(|latent_idx| {
+                    latent_physical[base + latent_idx].to_f32() * projected[latent_idx]
+                })
+                .sum::<f32>()
+                * scale;
+        }
+        let row_start = q_head * seq_len;
+        let row_max = scores[row_start..row_start + seq_len]
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let mut denominator = 0.0f32;
+        for token in 0..seq_len {
+            let value = (scores[row_start + token] - row_max).exp();
+            probabilities[row_start + token] = value;
+            denominator += value;
+        }
+        for token in 0..seq_len {
+            probabilities[row_start + token] /= denominator;
+        }
+        let mut latent_context = vec![0.0f32; latent_dim];
+        for token in 0..seq_len {
+            let base =
+                (block_table[token / block_size] * block_size + token % block_size) * latent_dim;
+            for latent_idx in 0..latent_dim {
+                latent_context[latent_idx] +=
+                    probabilities[row_start + token] * latent_physical[base + latent_idx].to_f32();
+            }
+        }
+        for dim in 0..head_dim {
+            for latent_idx in 0..latent_dim {
+                context[q_head * head_dim + dim] += latent_context[latent_idx]
+                    * v_projection[(latent_idx * kv_heads + kv_head) * head_dim + dim];
+            }
+        }
+    }
+    if !scores
+        .iter()
+        .chain(&probabilities)
+        .chain(&context)
+        .all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 direct paged latent outputs must be finite",
         });
     }
     Ok(GqaDecodeResult {

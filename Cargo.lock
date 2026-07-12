@@ -589,6 +589,7 @@ version = "0.1.0"
 name = "plkv-core"
 version = "0.1.0"
 dependencies = [
+ "half",
  "serde",
  "serde_json",
 ]
