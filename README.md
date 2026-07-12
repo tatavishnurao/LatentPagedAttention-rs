@@ -160,15 +160,16 @@ pass has completed the following:
 - GPU direct contiguous latent-KV GQA
 - GPU direct paged latent-KV GQA
 - GPU paged latent-cache write and write-to-attention round trip
+- FP16 latent storage with FP32 accumulation
 - Python/Rust/GPU parity
 
 Current milestone:
 
-- FP16 latent storage with f32 accumulation
+- BF16 latent storage with f32 accumulation
 
 Not implemented:
 
-- FP16/BF16
+- BF16
 - real model inference
 - performance benchmarking
 
@@ -183,6 +184,7 @@ bash scripts/run_gpu_latent_kv_reconstruction.sh
 bash scripts/run_gpu_direct_latent_gqa.sh
 bash scripts/run_gpu_direct_paged_latent_gqa.sh
 bash scripts/run_gpu_paged_latent_write_attention.sh
+bash scripts/run_gpu_fp16_paged_latent_attention.sh
 ```
 
 These commands validate compilation, JIT execution, synchronization, host
@@ -218,7 +220,7 @@ represent production inference.
 11. GPU direct contiguous latent-KV GQA — done
 12. GPU direct Paged Latent KV GQA — done
 13. GPU paged latent-cache write and attention round trip — done
-14. FP16 latent storage with f32 accumulation — next
-15. BF16 evaluation
+14. FP16 latent storage with FP32 accumulation — done
+15. BF16 latent storage with FP32 accumulation — next
 16. variable-shape and partial-block support
 17. RTX 4060 performance study
