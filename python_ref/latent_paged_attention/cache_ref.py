@@ -3,6 +3,22 @@
 import numpy as np
 
 
+def fp16_storage_roundtrip_f32(values: np.ndarray) -> np.ndarray:
+    """Return values after deterministic IEEE FP16 storage as FP32."""
+    if not np.isfinite(values).all():
+        raise ValueError("FP16 storage input must be finite")
+    with np.errstate(over="ignore"):
+        stored = values.astype(np.float16)
+    if not np.isfinite(stored).all():
+        raise ValueError("FP16 storage conversion overflowed")
+    return stored.astype(np.float32)
+
+
+def fp16_storage_bits(values: np.ndarray) -> np.ndarray:
+    """Return IEEE FP16 storage bit patterns as uint16."""
+    return fp16_storage_roundtrip_f32(values).astype(np.float16).view(np.uint16)
+
+
 def resolve_paged_token_location(
     block_table: np.ndarray,
     token_position: int,
@@ -82,3 +98,17 @@ def paged_latent_write_ref(
     updated = np.array(latent_cache, copy=True)
     updated[physical_block, block_offset, :] = new_latent
     return updated
+
+
+def paged_latent_write_fp16_storage_ref(
+    latent_cache_f32: np.ndarray,
+    block_table: np.ndarray,
+    token_position: int,
+    new_latent_f32: np.ndarray,
+) -> np.ndarray:
+    """Write one row into an FP16-stored latent cache, returned as FP32."""
+    stored_cache = fp16_storage_roundtrip_f32(latent_cache_f32)
+    stored_new_latent = fp16_storage_roundtrip_f32(new_latent_f32)
+    return paged_latent_write_ref(
+        stored_cache, block_table, token_position, stored_new_latent
+    )

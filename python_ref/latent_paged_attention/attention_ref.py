@@ -533,3 +533,36 @@ def direct_paged_latent_gqa_decode_attention_intermediates_ref(
     if not np.allclose(probs.sum(axis=-1), 1.0, atol=1e-6):
         raise ValueError("probability rows must sum to one")
     return scores, probs, context
+
+
+def direct_paged_latent_gqa_fp16_storage_intermediates_ref(
+    q: np.ndarray,
+    latent_blocks_f32: np.ndarray,
+    block_table: np.ndarray,
+    seq_len: int,
+    block_size: int,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Run direct paged attention from FP16-rounded storage using FP32 math."""
+    from .cache_ref import fp16_storage_roundtrip_f32
+
+    latent_blocks_f32 = fp16_storage_roundtrip_f32(latent_blocks_f32)
+    return direct_paged_latent_gqa_decode_attention_intermediates_ref(
+        q,
+        latent_blocks_f32,
+        block_table,
+        seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
