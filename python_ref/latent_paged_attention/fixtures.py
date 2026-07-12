@@ -9,6 +9,7 @@ import numpy as np
 from .attention_ref import (
     direct_latent_gqa_decode_attention_intermediates_ref,
     direct_paged_latent_gqa_decode_attention_intermediates_ref,
+    direct_paged_latent_gqa_fp16_storage_intermediates_ref,
     gqa_decode_attention_intermediates_ref,
     latent_kv_decode_attention_intermediates_ref,
     latent_kv_reconstruction_ref,
@@ -18,7 +19,10 @@ from .attention_ref import (
 )
 from .block_table import PagedBlockTable
 from .cache_ref import (
+    fp16_storage_bits,
+    fp16_storage_roundtrip_f32,
     paged_kv_write_ref,
+    paged_latent_write_fp16_storage_ref,
     paged_latent_write_ref,
     resolve_paged_token_location,
 )
@@ -682,6 +686,84 @@ def paged_latent_write_attention_f32_fixture() -> dict:
     }
 
 
+def paged_latent_write_attention_fp16_storage_fixture() -> dict:
+    """Return FP16-storage write-to-attention fixtures with FP32 arithmetic."""
+    base = paged_latent_write_attention_f32_fixture()
+    cases = []
+    for source in base["cases"]:
+        initial_source = np.asarray(
+            source["initial_latent_physical_blocks"], dtype=np.float32
+        )
+        new_source = np.asarray(source["new_latent"], dtype=np.float32)
+        initial_stored = fp16_storage_roundtrip_f32(initial_source)
+        new_stored = fp16_storage_roundtrip_f32(new_source)
+        updated_stored = paged_latent_write_fp16_storage_ref(
+            initial_source,
+            np.asarray(base["block_table"], dtype=np.int32),
+            source["token_position"],
+            new_source,
+        )
+        q = np.asarray(source["q"], dtype=np.float32)[None, ...]
+        kp = np.asarray(source["k_projection"], dtype=np.float32)
+        vp = np.asarray(source["v_projection"], dtype=np.float32)
+        fp32_pre = (
+            np.asarray(source["pre_write_scores"], dtype=np.float32),
+            np.asarray(source["pre_write_probabilities"], dtype=np.float32),
+            np.asarray(source["pre_write_context"], dtype=np.float32),
+        )
+        fp32_post = (
+            np.asarray(source["post_write_scores"], dtype=np.float32),
+            np.asarray(source["post_write_probabilities"], dtype=np.float32),
+            np.asarray(source["post_write_context"], dtype=np.float32),
+        )
+        fp16_pre = direct_paged_latent_gqa_fp16_storage_intermediates_ref(
+            q, initial_source, np.asarray(base["block_table"], dtype=np.int32), 8, 2,
+            kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2,
+        )
+        fp16_post = direct_paged_latent_gqa_fp16_storage_intermediates_ref(
+            q, updated_stored, np.asarray(base["block_table"], dtype=np.int32), 8, 2,
+            kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2,
+        )
+        cases.append({
+            "name": source["name"], "token_position": source["token_position"],
+            "logical_block": source["logical_block"], "physical_block": source["physical_block"],
+            "block_offset": source["block_offset"], "q": source["q"],
+            "initial_latent_source_f32": initial_source.tolist(),
+            "initial_latent_stored_fp16_as_f32": initial_stored.tolist(),
+            "initial_latent_fp16_bits": fp16_storage_bits(initial_source).tolist(),
+            "new_latent_source_f32": new_source.tolist(),
+            "new_latent_stored_fp16_as_f32": new_stored.tolist(),
+            "new_latent_fp16_bits": fp16_storage_bits(new_source).tolist(),
+            "expected_updated_latent_fp16_as_f32": updated_stored.tolist(),
+            "expected_updated_latent_fp16_bits": fp16_storage_bits(updated_stored).tolist(),
+            "k_projection": source["k_projection"], "v_projection": source["v_projection"],
+            "k_projection_gpu_head_major": source["k_projection_gpu_head_major"],
+            "v_projection_gpu_head_major": source["v_projection_gpu_head_major"],
+            "fp32_pre_write_scores": fp32_pre[0].tolist(),
+            "fp32_pre_write_probabilities": fp32_pre[1].tolist(),
+            "fp32_pre_write_context": fp32_pre[2].tolist(),
+            "fp32_post_write_scores": fp32_post[0].tolist(),
+            "fp32_post_write_probabilities": fp32_post[1].tolist(),
+            "fp32_post_write_context": fp32_post[2].tolist(),
+            "fp16_storage_pre_write_scores": fp16_pre[0][0].tolist(),
+            "fp16_storage_pre_write_probabilities": fp16_pre[1][0].tolist(),
+            "fp16_storage_pre_write_context": fp16_pre[2][0].tolist(),
+            "fp16_storage_post_write_scores": fp16_post[0][0].tolist(),
+            "fp16_storage_post_write_probabilities": fp16_post[1][0].tolist(),
+            "fp16_storage_post_write_context": fp16_post[2][0].tolist(),
+        })
+    return {
+        "storage_dtype": "f16", "compute_dtype": "f32", "write_input_dtype": "f32",
+        "batch": 1, "seq_len": 8, "q_heads": 4, "kv_heads": 2, "group_size": 2,
+        "head_dim": 8, "latent_dim": 8, "block_size": 2, "num_logical_blocks": 4,
+        "num_physical_blocks": 4, "block_table": [2, 0, 3, 1], "q_to_kv": [0, 0, 1, 1],
+        "latent_cache_values": 64, "latent_cache_bytes_fp16": 128,
+        "latent_cache_bytes_fp32": 256, "hypothetical_full_kv_cache_bytes_fp16": 512,
+        "stored_cache_ratio_vs_fp16_full_kv": 4.0, "latent_storage_ratio_fp32_to_fp16": 2.0,
+        "cases": cases,
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -698,6 +780,9 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "direct_latent_gqa_decode_f32.json": direct_latent_gqa_decode_f32_fixture(),
         "direct_paged_latent_gqa_decode_f32.json": direct_paged_latent_gqa_decode_f32_fixture(),
         "paged_latent_write_attention_f32.json": paged_latent_write_attention_f32_fixture(),
+        "paged_latent_write_attention_fp16_storage.json": (
+            paged_latent_write_attention_fp16_storage_fixture()
+        ),
     }
     paths = []
     for filename, value in fixtures.items():
