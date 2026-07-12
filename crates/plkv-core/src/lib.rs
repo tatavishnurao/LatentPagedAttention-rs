@@ -659,6 +659,149 @@ pub fn direct_latent_gqa_decode_f32(
     })
 }
 
+pub fn direct_paged_latent_gqa_decode_f32(
+    q: &[f32],
+    latent_physical: &[f32],
+    block_table: &[usize],
+    k_projection: &[f32],
+    v_projection: &[f32],
+    q_heads: usize,
+    kv_heads: usize,
+    seq_len: usize,
+    latent_dim: usize,
+    head_dim: usize,
+    group_size: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("seq_len", seq_len)?;
+    require_positive("latent_dim", latent_dim)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    require_positive("block_size", block_size)?;
+    require_positive("num_physical_blocks", num_physical_blocks)?;
+    if q_heads
+        != kv_heads
+            .checked_mul(group_size)
+            .ok_or(PlkvError::ArithmeticOverflow)?
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "invalid GQA mapping",
+        });
+    }
+    let q_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let physical_len = num_physical_blocks
+        .checked_mul(block_size)
+        .and_then(|v| v.checked_mul(latent_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let projection_len = latent_dim
+        .checked_mul(kv_heads)
+        .and_then(|v| v.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if q.len() != q_len
+        || latent_physical.len() != physical_len
+        || k_projection.len() != projection_len
+        || v_projection.len() != projection_len
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "direct paged latent tensor length mismatch",
+        });
+    }
+    if block_table
+        .len()
+        .checked_mul(block_size)
+        .ok_or(PlkvError::ArithmeticOverflow)?
+        < seq_len
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover sequence",
+        });
+    }
+    if block_table.iter().any(|&p| p >= num_physical_blocks) {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table index out of range",
+        });
+    }
+    if !q
+        .iter()
+        .chain(latent_physical)
+        .chain(k_projection)
+        .chain(v_projection)
+        .all(|x| x.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "inputs must be finite",
+        });
+    }
+    let mut scores = vec![0.0; q_heads * seq_len];
+    let mut probabilities = scores.clone();
+    let mut context = vec![0.0; q_heads * head_dim];
+    let scale = 1.0 / (head_dim as f32).sqrt();
+    for h in 0..q_heads {
+        let kv = h / group_size;
+        let mut projected = vec![0.0; latent_dim];
+        for l in 0..latent_dim {
+            for d in 0..head_dim {
+                projected[l] +=
+                    q[h * head_dim + d] * k_projection[(l * kv_heads + kv) * head_dim + d];
+            }
+        }
+        for t in 0..seq_len {
+            let logical = t / block_size;
+            let off = t % block_size;
+            let base = (block_table[logical] * block_size + off) * latent_dim;
+            scores[h * seq_len + t] = latent_physical[base..base + latent_dim]
+                .iter()
+                .zip(&projected)
+                .map(|(a, b)| a * b)
+                .sum::<f32>()
+                * scale;
+        }
+        let row = &scores[h * seq_len..(h + 1) * seq_len];
+        let max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let mut denom = 0.0;
+        for t in 0..seq_len {
+            probabilities[h * seq_len + t] = (scores[h * seq_len + t] - max).exp();
+            denom += probabilities[h * seq_len + t];
+        }
+        for t in 0..seq_len {
+            probabilities[h * seq_len + t] /= denom;
+        }
+        let mut latent_context = vec![0.0; latent_dim];
+        for t in 0..seq_len {
+            let base = (block_table[t / block_size] * block_size + t % block_size) * latent_dim;
+            for l in 0..latent_dim {
+                latent_context[l] += probabilities[h * seq_len + t] * latent_physical[base + l];
+            }
+        }
+        for d in 0..head_dim {
+            for l in 0..latent_dim {
+                context[h * head_dim + d] +=
+                    latent_context[l] * v_projection[(l * kv_heads + kv) * head_dim + d];
+            }
+        }
+    }
+    if !scores
+        .iter()
+        .chain(&probabilities)
+        .chain(&context)
+        .all(|x| x.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "outputs must be finite",
+        });
+    }
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
