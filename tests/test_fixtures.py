@@ -1,9 +1,14 @@
 import json
 
 import numpy as np
-from latent_paged_attention.attention_ref import latent_kv_reconstruction_ref
+from latent_paged_attention.attention_ref import (
+    direct_latent_gqa_decode_attention_intermediates_ref,
+    latent_kv_decode_attention_intermediates_ref,
+    latent_kv_reconstruction_ref,
+)
 from latent_paged_attention.fixtures import (
     block_table_fixture,
+    direct_latent_gqa_decode_f32_fixture,
     gqa_decode_f32_fixture,
     latent_kv_reconstruction_f32_fixture,
     memory_model_fixture,
@@ -57,6 +62,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "gqa_decode_f32.json",
         "paged_gqa_decode_f32.json",
         "latent_kv_reconstruction_f32.json",
+        "direct_latent_gqa_decode_f32.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -236,3 +242,81 @@ def test_latent_kv_reconstruction_fixture_layouts_are_valid() -> None:
     assert np.any(signed_products > 0)
     assert np.any(signed_products < 0)
     assert fixture == latent_kv_reconstruction_f32_fixture()
+
+
+def test_direct_latent_gqa_fixture_layouts_are_valid() -> None:
+    fixture = direct_latent_gqa_decode_f32_fixture()
+
+    assert fixture["batch"] == 1
+    assert fixture["seq_len"] == 8
+    assert fixture["q_heads"] == 4
+    assert fixture["kv_heads"] == 2
+    assert fixture["group_size"] == 2
+    assert fixture["head_dim"] == 8
+    assert fixture["latent_dim"] == 8
+    assert fixture["projection_width"] == 16
+    assert fixture["q_to_kv"] == [0, 0, 1, 1]
+    assert fixture["theoretical_cache_compression_ratio"] == 4.0
+
+    for case in fixture["cases"]:
+        q = np.asarray(case["q"], dtype=np.float32)[None, ...]
+        latent = np.asarray(case["latent_cache"], dtype=np.float32)[None, ...]
+        k_proj = np.asarray(case["k_projection"], dtype=np.float32)
+        v_proj = np.asarray(case["v_projection"], dtype=np.float32)
+        k_head = np.asarray(case["k_projection_gpu_head_major"], dtype=np.float32)
+        v_head = np.asarray(case["v_projection_gpu_head_major"], dtype=np.float32)
+        expected_scores = np.asarray(case["expected_scores"], dtype=np.float32)
+        expected_probabilities = np.asarray(case["expected_probabilities"], dtype=np.float32)
+        expected_context = np.asarray(case["expected_context"], dtype=np.float32)
+        materialized_scores = np.asarray(case["materialized_scores"], dtype=np.float32)
+        materialized_probabilities = np.asarray(case["materialized_probabilities"], dtype=np.float32)
+        materialized_context = np.asarray(case["materialized_context"], dtype=np.float32)
+
+        assert q.shape == (1, 4, 8)
+        assert latent.shape == (1, 8, 8)
+        assert k_proj.shape == (8, 16)
+        assert v_proj.shape == (8, 16)
+        assert k_head.shape == (2, 8, 8)
+        assert v_head.shape == (2, 8, 8)
+        assert not np.array_equal(k_proj, v_proj)
+        np.testing.assert_array_equal(k_head, np.transpose(k_proj.reshape(8, 2, 8), (1, 0, 2)))
+        np.testing.assert_array_equal(v_head, np.transpose(v_proj.reshape(8, 2, 8), (1, 0, 2)))
+        assert np.isfinite(expected_scores).all()
+        assert np.isfinite(expected_probabilities).all()
+        assert np.isfinite(expected_context).all()
+        assert np.isfinite(materialized_scores).all()
+        assert np.isfinite(materialized_probabilities).all()
+        assert np.isfinite(materialized_context).all()
+        np.testing.assert_allclose(expected_scores, materialized_scores, atol=1e-5)
+        np.testing.assert_allclose(expected_probabilities, materialized_probabilities, atol=1e-5)
+        np.testing.assert_allclose(expected_context, materialized_context, atol=1e-5)
+        np.testing.assert_allclose(expected_probabilities.sum(axis=-1), np.ones(4), atol=1e-6)
+        assert fixture == direct_latent_gqa_decode_f32_fixture()
+
+    balanced = fixture["cases"][0]
+    stable = fixture["cases"][1]
+    assert not np.array_equal(
+        np.asarray(balanced["expected_context"], dtype=np.float32),
+        np.asarray(stable["expected_context"], dtype=np.float32),
+    )
+    assert np.max(np.asarray(stable["expected_scores"], dtype=np.float32)) - np.min(
+        np.asarray(stable["expected_scores"], dtype=np.float32)
+    ) > 1.0
+
+
+def test_direct_latent_gqa_fixture_matches_oracles() -> None:
+    fixture = direct_latent_gqa_decode_f32_fixture()
+    for case in fixture["cases"]:
+        q = np.asarray(case["q"], dtype=np.float32)[None, ...]
+        latent = np.asarray(case["latent_cache"], dtype=np.float32)[None, ...]
+        k_proj = np.asarray(case["k_projection"], dtype=np.float32)
+        v_proj = np.asarray(case["v_projection"], dtype=np.float32)
+        direct = direct_latent_gqa_decode_attention_intermediates_ref(
+            q, latent, k_proj, v_proj, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        materialized = latent_kv_decode_attention_intermediates_ref(
+            q, latent, k_proj, v_proj, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        np.testing.assert_allclose(direct[0], materialized[0], atol=1e-5)
+        np.testing.assert_allclose(direct[1], materialized[1], atol=1e-5)
+        np.testing.assert_allclose(direct[2], materialized[2], atol=1e-5)

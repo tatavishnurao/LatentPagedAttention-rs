@@ -8,7 +8,9 @@ import numpy as np
 
 from .attention_ref import (
     gqa_decode_attention_intermediates_ref,
+    latent_kv_decode_attention_intermediates_ref,
     latent_kv_reconstruction_ref,
+    direct_latent_gqa_decode_attention_intermediates_ref,
     paged_gqa_decode_attention_intermediates_ref,
     paged_lookup_ref,
 )
@@ -407,6 +409,18 @@ def _head_major_from_batched_token_major(cache: np.ndarray) -> np.ndarray:
     return np.transpose(cache[0], (1, 0, 2)).copy()
 
 
+def _projection_to_gpu_head_major(
+    projection: np.ndarray, kv_heads: int, head_dim: int
+) -> np.ndarray:
+    """Convert [latent_dim, kv_heads * head_dim] into [kv_heads, latent_dim, head_dim]."""
+    if projection.ndim != 2:
+        raise ValueError("projection must be 2D")
+    if projection.shape[1] != kv_heads * head_dim:
+        raise ValueError("projection width must equal kv_heads * head_dim")
+    latent_dim = projection.shape[0]
+    return projection.reshape(latent_dim, kv_heads, head_dim).transpose(1, 0, 2).copy()
+
+
 def _latent_kv_reconstruction_case(
     name: str, latent: np.ndarray, k_proj: np.ndarray, v_proj: np.ndarray
 ) -> dict:
@@ -460,6 +474,96 @@ def latent_kv_reconstruction_f32_fixture() -> dict:
     }
 
 
+def _direct_latent_case(
+    name: str, q: np.ndarray, latent: np.ndarray, k_proj: np.ndarray, v_proj: np.ndarray
+) -> dict:
+    direct_scores, direct_probs, direct_context = direct_latent_gqa_decode_attention_intermediates_ref(
+        q,
+        latent,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+    materialized_scores, materialized_probs, materialized_context = (
+        latent_kv_decode_attention_intermediates_ref(
+            q,
+            latent,
+            k_proj,
+            v_proj,
+            q_heads=4,
+            kv_heads=2,
+            head_dim=8,
+            group_size=2,
+        )
+    )
+    return {
+        "name": name,
+        "q": q[0].tolist(),
+        "latent_cache": latent[0].tolist(),
+        "k_projection": k_proj.tolist(),
+        "v_projection": v_proj.tolist(),
+        "k_projection_gpu_head_major": _projection_to_gpu_head_major(k_proj, 2, 8).tolist(),
+        "v_projection_gpu_head_major": _projection_to_gpu_head_major(v_proj, 2, 8).tolist(),
+        "expected_scores": direct_scores[0].tolist(),
+        "expected_probabilities": direct_probs[0].tolist(),
+        "expected_context": direct_context[0].tolist(),
+        "materialized_scores": materialized_scores[0].tolist(),
+        "materialized_probabilities": materialized_probs[0].tolist(),
+        "materialized_context": materialized_context[0].tolist(),
+    }
+
+
+def direct_latent_gqa_decode_f32_fixture() -> dict:
+    """Return deterministic direct latent-space GQA fixtures."""
+    q_heads = 4
+    kv_heads = 2
+    group_size = 2
+    seq_len = 8
+    latent_dim = 8
+    head_dim = 8
+    projection_width = kv_heads * head_dim
+    balanced_q, _, _ = _balanced_gqa_case()
+    stable_q, _, _ = _stable_softmax_gqa_case()
+    balanced_latent, balanced_k_proj, balanced_v_proj = _latent_balanced_projection_case()
+    signed_latent, signed_k_proj, signed_v_proj = _latent_signed_accumulation_case()
+    stable_scale = np.float32(32.0)
+    return {
+        "dtype": "f32",
+        "batch": 1,
+        "seq_len": seq_len,
+        "q_heads": q_heads,
+        "kv_heads": kv_heads,
+        "group_size": group_size,
+        "head_dim": head_dim,
+        "latent_dim": latent_dim,
+        "projection_width": projection_width,
+        "q_to_kv": (np.arange(q_heads) // group_size).tolist(),
+        "scale": 1.0 / np.sqrt(float(head_dim)),
+        "latent_values_per_token": latent_dim,
+        "full_kv_values_per_token": 2 * kv_heads * head_dim,
+        "theoretical_cache_compression_ratio": (2 * kv_heads * head_dim) / latent_dim,
+        "cases": [
+            _direct_latent_case(
+                "balanced_attention",
+                balanced_q,
+                balanced_latent,
+                balanced_k_proj,
+                balanced_v_proj,
+            ),
+            _direct_latent_case(
+                "stable_softmax_attention",
+                stable_q * stable_scale,
+                signed_latent,
+                signed_k_proj,
+                signed_v_proj,
+            ),
+        ],
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -473,6 +577,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "gqa_decode_f32.json": gqa_decode_f32_fixture(),
         "paged_gqa_decode_f32.json": paged_gqa_decode_f32_fixture(),
         "latent_kv_reconstruction_f32.json": latent_kv_reconstruction_f32_fixture(),
+        "direct_latent_gqa_decode_f32.json": direct_latent_gqa_decode_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
