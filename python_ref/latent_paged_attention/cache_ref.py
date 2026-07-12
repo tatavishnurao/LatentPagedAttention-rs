@@ -55,3 +55,30 @@ def paged_kv_write_ref(
     updated_k[physical_block, block_offset, :] = new_k
     updated_v[physical_block, block_offset, :] = new_v
     return updated_k, updated_v
+
+
+def paged_latent_write_ref(
+    latent_cache: np.ndarray,
+    block_table: np.ndarray,
+    token_position: int,
+    new_latent: np.ndarray,
+) -> np.ndarray:
+    """Write one latent row into a copy of a physical paged latent cache."""
+    if latent_cache.ndim != 3:
+        raise ValueError("latent_cache must have shape [blocks, block_size, latent_dim]")
+    if block_table.ndim != 1:
+        raise ValueError("block_table must be 1D")
+    if new_latent.ndim != 1:
+        raise ValueError("new_latent must be 1D")
+    if new_latent.shape[0] != latent_cache.shape[2]:
+        raise ValueError("new_latent width must match latent_dim")
+    if not np.isfinite(latent_cache).all() or not np.isfinite(new_latent).all():
+        raise ValueError("latent cache and replacement must be finite")
+    _, physical_block, block_offset = resolve_paged_token_location(
+        block_table, token_position, latent_cache.shape[1]
+    )
+    if physical_block >= latent_cache.shape[0]:
+        raise IndexError("block_table contains an out-of-range physical block")
+    updated = np.array(latent_cache, copy=True)
+    updated[physical_block, block_offset, :] = new_latent
+    return updated
