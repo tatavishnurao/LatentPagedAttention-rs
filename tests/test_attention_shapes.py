@@ -3,6 +3,7 @@ from latent_paged_attention.attention_ref import (
     gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_ref,
     latent_kv_decode_attention_ref,
+    latent_kv_reconstruction_ref,
     paged_gqa_decode_attention_intermediates_ref,
     paged_gqa_decode_attention_ref,
     paged_latent_kv_decode_attention_ref,
@@ -251,6 +252,91 @@ def test_latent_kv_decode_attention_output_shape_is_correct() -> None:
 
     assert out.shape == q.shape
     assert np.isfinite(out).all()
+
+
+def test_latent_kv_reconstruction_shapes_and_manual_matmul() -> None:
+    latent = np.array(
+        [[[1.0, -2.0, 0.5], [0.25, 3.0, -1.5]]],
+        dtype=np.float32,
+    )
+    k_proj = np.arange(3 * 4, dtype=np.float32).reshape(3, 4) * 0.125 - 0.5
+    v_proj = np.arange(3 * 4, dtype=np.float32).reshape(3, 4) * -0.25 + 1.25
+
+    k_cache, v_cache = latent_kv_reconstruction_ref(
+        latent, k_proj, v_proj, kv_heads=2, head_dim=2
+    )
+
+    assert k_cache.shape == (1, 2, 2, 2)
+    assert v_cache.shape == (1, 2, 2, 2)
+    np.testing.assert_allclose(k_cache.reshape(1, 2, 4), latent @ k_proj, atol=1e-6)
+    np.testing.assert_allclose(v_cache.reshape(1, 2, 4), latent @ v_proj, atol=1e-6)
+    assert np.isfinite(k_cache).all()
+    assert np.isfinite(v_cache).all()
+    assert not np.array_equal(k_cache, v_cache)
+
+
+def test_latent_kv_reconstruction_is_deterministic_and_signed() -> None:
+    latent = np.linspace(-1.0, 1.0, 1 * 4 * 4, dtype=np.float32).reshape(1, 4, 4)
+    k_proj = np.linspace(0.75, -0.5, 4 * 8, dtype=np.float32).reshape(4, 8)
+    v_proj = np.linspace(-0.25, 0.875, 4 * 8, dtype=np.float32).reshape(4, 8)
+
+    first_k, first_v = latent_kv_reconstruction_ref(
+        latent, k_proj, v_proj, kv_heads=2, head_dim=4
+    )
+    second_k, second_v = latent_kv_reconstruction_ref(
+        latent, k_proj, v_proj, kv_heads=2, head_dim=4
+    )
+
+    np.testing.assert_array_equal(first_k, second_k)
+    np.testing.assert_array_equal(first_v, second_v)
+    assert np.any(first_k < 0)
+    assert np.any(first_v < 0)
+
+
+def test_latent_kv_reconstruction_rejects_invalid_inputs() -> None:
+    latent = np.zeros((1, 2, 3), dtype=np.float32)
+    k_proj = np.zeros((3, 4), dtype=np.float32)
+    v_proj = np.zeros((3, 4), dtype=np.float32)
+
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent[0], k_proj, v_proj, kv_heads=2, head_dim=2)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj[:, None], v_proj, kv_heads=2, head_dim=2)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj, v_proj[:, :3], kv_heads=2, head_dim=2)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj[:2], v_proj[:2], kv_heads=2, head_dim=2)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj, v_proj, kv_heads=2, head_dim=3)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj, v_proj, kv_heads=0, head_dim=2)
+    with np.testing.assert_raises(ValueError):
+        latent_kv_reconstruction_ref(latent, k_proj, v_proj, kv_heads=2, head_dim=0)
+
+
+def test_latent_kv_decode_attention_uses_reconstruction_helper() -> None:
+    q, _, _, latent_cache, k_proj, v_proj = _make_tiny_case()
+    k_cache, v_cache = latent_kv_reconstruction_ref(
+        latent_cache,
+        k_proj,
+        v_proj,
+        kv_heads=2,
+        head_dim=8,
+    )
+
+    from_reconstruction = gqa_decode_attention_ref(q, k_cache, v_cache, group_size=2)
+    from_latent = latent_kv_decode_attention_ref(
+        q,
+        latent_cache,
+        k_proj,
+        v_proj,
+        q_heads=4,
+        kv_heads=2,
+        head_dim=8,
+        group_size=2,
+    )
+
+    np.testing.assert_allclose(from_latent, from_reconstruction, atol=1e-6)
 
 
 def test_paged_latent_kv_matches_dense_latent_kv() -> None:
