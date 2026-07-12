@@ -7,11 +7,13 @@ from pathlib import Path
 import numpy as np
 
 from .attention_ref import (
+    direct_latent_gqa_decode_attention_intermediates_ref,
+    direct_paged_latent_gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_intermediates_ref,
     latent_kv_decode_attention_intermediates_ref,
     latent_kv_reconstruction_ref,
-    direct_latent_gqa_decode_attention_intermediates_ref,
     paged_gqa_decode_attention_intermediates_ref,
+    paged_latent_kv_decode_attention_intermediates_ref,
     paged_lookup_ref,
 )
 from .block_table import PagedBlockTable
@@ -477,7 +479,8 @@ def latent_kv_reconstruction_f32_fixture() -> dict:
 def _direct_latent_case(
     name: str, q: np.ndarray, latent: np.ndarray, k_proj: np.ndarray, v_proj: np.ndarray
 ) -> dict:
-    direct_scores, direct_probs, direct_context = direct_latent_gqa_decode_attention_intermediates_ref(
+    direct_scores, direct_probs, direct_context = (
+        direct_latent_gqa_decode_attention_intermediates_ref(
         q,
         latent,
         k_proj,
@@ -486,6 +489,7 @@ def _direct_latent_case(
         kv_heads=2,
         head_dim=8,
         group_size=2,
+        )
     )
     materialized_scores, materialized_probs, materialized_context = (
         latent_kv_decode_attention_intermediates_ref(
@@ -564,6 +568,52 @@ def direct_latent_gqa_decode_f32_fixture() -> dict:
     }
 
 
+def direct_paged_latent_gqa_decode_f32_fixture() -> dict:
+    """Return the fixed non-identity direct paged latent fixture."""
+    base = direct_latent_gqa_decode_f32_fixture()
+    table = np.asarray([2, 0, 3, 1], dtype=np.int32)
+    cases = []
+    for source in base["cases"]:
+        latent = np.asarray(source["latent_cache"], dtype=np.float32)
+        physical = np.empty((4, 2, 8), dtype=np.float32)
+        logical = latent.reshape(4, 2, 8)
+        for logical_block, physical_block in enumerate(table):
+            physical[physical_block] = logical[logical_block]
+        q = np.asarray(source["q"], dtype=np.float32)[None, ...]
+        kp = np.asarray(source["k_projection"], dtype=np.float32)
+        vp = np.asarray(source["v_projection"], dtype=np.float32)
+        direct = direct_paged_latent_gqa_decode_attention_intermediates_ref(
+            q, physical, table, 8, 2, kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        materialized = paged_latent_kv_decode_attention_intermediates_ref(
+            q, physical, table, 8, 2, kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        contiguous = direct_latent_gqa_decode_attention_intermediates_ref(
+            q, latent[None, ...], kp, vp, q_heads=4, kv_heads=2, head_dim=8, group_size=2
+        )
+        cases.append({
+            "name": source["name"], "q": source["q"],
+            "latent_physical_blocks": physical.tolist(), "k_projection": kp.tolist(),
+            "v_projection": vp.tolist(),
+            "k_projection_gpu_head_major": source["k_projection_gpu_head_major"],
+            "v_projection_gpu_head_major": source["v_projection_gpu_head_major"],
+            "expected_scores": direct[0][0].tolist(),
+            "expected_probabilities": direct[1][0].tolist(),
+            "expected_context": direct[2][0].tolist(),
+            "materialized_scores": materialized[0][0].tolist(),
+            "materialized_probabilities": materialized[1][0].tolist(),
+            "materialized_context": materialized[2][0].tolist(),
+            "contiguous_direct_scores": contiguous[0][0].tolist(),
+            "contiguous_direct_probabilities": contiguous[1][0].tolist(),
+            "contiguous_direct_context": contiguous[2][0].tolist(),
+        })
+    return {"dtype":"f32", "batch":1, "seq_len":8, "q_heads":4, "kv_heads":2, "group_size":2,
+            "head_dim":8, "latent_dim":8, "block_size":2, "num_logical_blocks":4,
+            "num_physical_blocks":4, "block_table":table.tolist(), "q_to_kv":[0,0,1,1],
+            "scale":1.0 / np.sqrt(8.0), "latent_values_per_token":8, "full_kv_values_per_token":32,
+            "theoretical_cache_compression_ratio":4.0, "cases":cases}
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -578,6 +628,7 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "paged_gqa_decode_f32.json": paged_gqa_decode_f32_fixture(),
         "latent_kv_reconstruction_f32.json": latent_kv_reconstruction_f32_fixture(),
         "direct_latent_gqa_decode_f32.json": direct_latent_gqa_decode_f32_fixture(),
+        "direct_paged_latent_gqa_decode_f32.json": direct_paged_latent_gqa_decode_f32_fixture(),
     }
     paths = []
     for filename, value in fixtures.items():
