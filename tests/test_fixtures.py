@@ -17,6 +17,7 @@ from latent_paged_attention.fixtures import (
     paged_latent_write_attention_f32_fixture,
     paged_latent_write_attention_fp16_storage_fixture,
     paged_lookup_f32_fixture,
+    runtime_sequence_tiny_fp16_storage_fixture,
     write_fixtures,
 )
 
@@ -68,6 +69,7 @@ def test_generated_fixture_files_are_valid_json(tmp_path) -> None:
         "direct_paged_latent_gqa_decode_f32.json",
         "paged_latent_write_attention_f32.json",
         "paged_latent_write_attention_fp16_storage.json",
+        "runtime_sequence_tiny_fp16_storage.json",
     }
     for path in paths:
         assert json.loads(path.read_text(encoding="utf-8"))
@@ -153,6 +155,34 @@ def test_fp16_storage_fixture_has_exact_storage_and_finite_attention() -> None:
             case["fp16_storage_post_write_context"], case["fp32_post_write_context"]
         )
     assert fixture == paged_latent_write_attention_fp16_storage_fixture()
+
+
+def test_runtime_sequence_tiny_fixture_masks_inactive_tokens() -> None:
+    fixture = runtime_sequence_tiny_fp16_storage_fixture()
+    assert fixture["profile"] == "tiny"
+    assert fixture["storage_dtype"] == "f16"
+    assert fixture["compute_dtype"] == "f32"
+    assert fixture["max_seq_len"] == 8
+    assert fixture["active_seq_lens"] == [1, 3, 4, 7, 8]
+    assert fixture["block_table"] == [2, 0, 3, 1]
+    assert fixture["block_table"] != [0, 1, 2, 3]
+    for case in fixture["cases"]:
+        assert len(case["runtime_cases"]) == len(fixture["active_seq_lens"])
+        for runtime_case in case["runtime_cases"]:
+            active = runtime_case["active_seq_len"]
+            scores = np.asarray(runtime_case["scores"], dtype=np.float32)
+            probabilities = np.asarray(runtime_case["probabilities"], dtype=np.float32)
+            context = np.asarray(runtime_case["context"], dtype=np.float32)
+            assert scores.shape == (4, 8)
+            assert probabilities.shape == (4, 8)
+            assert context.shape == (4, 8)
+            assert np.isfinite(context).all()
+            assert np.all(scores[:, active:] < -1.0e30)
+            assert np.all(probabilities[:, active:] == 0.0)
+            assert runtime_case["inactive_probabilities_zero"] is True
+            assert runtime_case["max_probability_row_sum_error"] <= 1e-6
+            np.testing.assert_allclose(probabilities.sum(axis=-1), np.ones(4), atol=1e-6)
+    assert fixture == runtime_sequence_tiny_fp16_storage_fixture()
 
 
 def test_gqa_decode_fixture_layouts_and_probabilities_are_valid() -> None:

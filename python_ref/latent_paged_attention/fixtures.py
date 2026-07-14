@@ -10,6 +10,7 @@ from .attention_ref import (
     direct_latent_gqa_decode_attention_intermediates_ref,
     direct_paged_latent_gqa_decode_attention_intermediates_ref,
     direct_paged_latent_gqa_fp16_storage_intermediates_ref,
+    direct_paged_latent_gqa_fp16_storage_runtime_intermediates_ref,
     gqa_decode_attention_intermediates_ref,
     latent_kv_decode_attention_intermediates_ref,
     latent_kv_reconstruction_ref,
@@ -764,6 +765,88 @@ def paged_latent_write_attention_fp16_storage_fixture() -> dict:
     }
 
 
+def runtime_sequence_tiny_fp16_storage_fixture() -> dict:
+    """Return complete tiny runtime active-length golden data."""
+    base = paged_latent_write_attention_fp16_storage_fixture()
+    active_lengths = [1, 3, 4, 7, 8]
+    cases = []
+    for base_case in base["cases"]:
+        runtime_cases = []
+        q = np.asarray(base_case["q"], dtype=np.float32)[None, ...]
+        latent = np.asarray(base_case["initial_latent_source_f32"], dtype=np.float32)
+        table = np.asarray(base["block_table"], dtype=np.int64)
+        k_projection = np.asarray(base_case["k_projection"], dtype=np.float32)
+        v_projection = np.asarray(base_case["v_projection"], dtype=np.float32)
+        for active_seq_len in active_lengths:
+            scores, probabilities, context = (
+                direct_paged_latent_gqa_fp16_storage_runtime_intermediates_ref(
+                    q,
+                    latent,
+                    table,
+                    base["seq_len"],
+                    active_seq_len,
+                    base["block_size"],
+                    k_projection,
+                    v_projection,
+                    q_heads=base["q_heads"],
+                    kv_heads=base["kv_heads"],
+                    head_dim=base["head_dim"],
+                    group_size=base["group_size"],
+                )
+            )
+            inactive = probabilities[:, :, active_seq_len:]
+            runtime_cases.append(
+                {
+                    "active_seq_len": active_seq_len,
+                    "active_logical_blocks": int(
+                        np.ceil(active_seq_len / float(base["block_size"]))
+                    ),
+                    "scores": scores[0].tolist(),
+                    "probabilities": probabilities[0].tolist(),
+                    "context": context[0].tolist(),
+                    "inactive_probabilities_zero": bool(np.all(inactive == 0.0)),
+                    "max_probability_row_sum_error": float(
+                        np.max(np.abs(probabilities.sum(axis=-1) - 1.0))
+                    ),
+                }
+            )
+        cases.append(
+            {
+                "name": base_case["name"],
+                "q": base_case["q"],
+                "initial_latent_source_f32": base_case["initial_latent_source_f32"],
+                "initial_latent_stored_fp16_as_f32": base_case[
+                    "initial_latent_stored_fp16_as_f32"
+                ],
+                "initial_latent_fp16_bits": base_case["initial_latent_fp16_bits"],
+                "k_projection": base_case["k_projection"],
+                "v_projection": base_case["v_projection"],
+                "k_projection_gpu_head_major": base_case["k_projection_gpu_head_major"],
+                "v_projection_gpu_head_major": base_case["v_projection_gpu_head_major"],
+                "runtime_cases": runtime_cases,
+            }
+        )
+    return {
+        "profile": "tiny",
+        "storage_dtype": "f16",
+        "compute_dtype": "f32",
+        "batch": base["batch"],
+        "max_seq_len": base["seq_len"],
+        "active_seq_lens": active_lengths,
+        "q_heads": base["q_heads"],
+        "kv_heads": base["kv_heads"],
+        "group_size": base["group_size"],
+        "head_dim": base["head_dim"],
+        "latent_dim": base["latent_dim"],
+        "block_size": base["block_size"],
+        "num_logical_blocks": base["num_logical_blocks"],
+        "num_physical_blocks": base["num_physical_blocks"],
+        "block_table": base["block_table"],
+        "q_to_kv": base["q_to_kv"],
+        "cases": cases,
+    }
+
+
 def write_fixtures(out_dir: str | Path) -> list[Path]:
     """Write all committed reference fixtures and return their paths."""
     destination = Path(out_dir)
@@ -782,6 +865,9 @@ def write_fixtures(out_dir: str | Path) -> list[Path]:
         "paged_latent_write_attention_f32.json": paged_latent_write_attention_f32_fixture(),
         "paged_latent_write_attention_fp16_storage.json": (
             paged_latent_write_attention_fp16_storage_fixture()
+        ),
+        "runtime_sequence_tiny_fp16_storage.json": (
+            runtime_sequence_tiny_fp16_storage_fixture()
         ),
     }
     paths = []
