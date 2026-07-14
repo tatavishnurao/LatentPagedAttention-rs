@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use LatentPagedAttention-rs, please cite this release."
+title: "LatentPagedAttention-rs: A paged latent-cache decode-attention prototype"
+version: "0.1.0"
+date-released: "2026-07-14"
+authors:
+  - family-names: "Rao"
+    given-names: "Vishnu"
+repository-code: "https://github.com/tatavishnurao/LatentPagedAttention-rs"
+license: "MIT"

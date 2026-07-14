@@ -1,0 +1,9 @@
+{
+  "git_commit": "611efca4b848e8db9a6e08e06a6fad1aef1ea708",
+  "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "cuda_toolkit_path": "/opt/cuda",
+  "cutile_version": "0.2.0",
+  "timing_method": "SYNCHRONIZED_HOST_END_TO_END_TIME",
+  "warmup_iterations": 1,
+  "measured_processes": 3
+}

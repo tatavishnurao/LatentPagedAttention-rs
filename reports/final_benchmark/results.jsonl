@@ -1,0 +1,9 @@
+{"operation":"latent_paged_attention_read","example":"model_profile_gpu","process":1,"elapsed_ms":1720.900,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"latent_paged_attention_read","example":"model_profile_gpu","process":2,"elapsed_ms":1864.154,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"latent_paged_attention_read","example":"model_profile_gpu","process":3,"elapsed_ms":1844.851,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"full_kv_paged_attention_read","example":"fp16_full_kv_baseline_gpu","process":1,"elapsed_ms":1417.207,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"full_kv_paged_attention_read","example":"fp16_full_kv_baseline_gpu","process":2,"elapsed_ms":1463.554,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"full_kv_paged_attention_read","example":"fp16_full_kv_baseline_gpu","process":3,"elapsed_ms":1493.987,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"latent_write_to_attention","example":"paged_latent_write_attention_fp16_gpu","process":1,"elapsed_ms":1546.910,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"latent_write_to_attention","example":"paged_latent_write_attention_fp16_gpu","process":2,"elapsed_ms":1451.654,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}
+{"operation":"latent_write_to_attention","example":"paged_latent_write_attention_fp16_gpu","process":3,"elapsed_ms":1394.896,"timing_method":"SYNCHRONIZED_HOST_END_TO_END_TIME"}

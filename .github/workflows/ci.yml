@@ -1,0 +1,29 @@
+name: CPU CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Sync Python environment
+        run: UV_PROJECT_ENVIRONMENT=attention99 uv sync
+      - name: Python tests
+        run: UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
+      - name: Ruff
+        run: UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
+      - name: Rust formatting
+        run: cargo fmt --all --check
+      - name: Rust tests
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Whitespace
+        run: git diff --check
