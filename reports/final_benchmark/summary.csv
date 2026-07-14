@@ -1,4 +1,4 @@
 operation,process_count,min_ms,mean_ms,max_ms
-full_kv_paged_attention_read,3,1417.207,1458.249,1493.987
-latent_paged_attention_read,3,1720.900,1809.968,1864.154
-latent_write_to_attention,3,1394.896,1464.487,1546.910
+full_kv_paged_attention_read,3,1366.969,1391.022,1405.751
+latent_paged_attention_read,3,1705.150,1844.891,2017.385
+latent_write_to_attention,3,1367.174,1487.776,1586.213

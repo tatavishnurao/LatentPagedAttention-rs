@@ -1,5 +1,5 @@
 {
-  "git_commit": "611efca4b848e8db9a6e08e06a6fad1aef1ea708",
+  "git_commit": "a647c9ddcbfb3fc20aeda8ea84def7aef3314e41",
   "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
   "cuda_toolkit_path": "/opt/cuda",
   "cutile_version": "0.2.0",
