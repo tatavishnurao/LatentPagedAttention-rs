@@ -1136,6 +1136,130 @@ pub fn direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum(
     })
 }
 
+pub fn paged_full_kv_gqa_decode_fp16_storage_runtime_f32_accum(
+    q: &[f32],
+    k_physical: &[half::f16],
+    v_physical: &[half::f16],
+    block_table: &[usize],
+    q_heads: usize,
+    kv_heads: usize,
+    max_seq_len: usize,
+    active_seq_len: usize,
+    head_dim: usize,
+    group_size: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("q_heads", q_heads)?;
+    require_positive("kv_heads", kv_heads)?;
+    require_positive("max_seq_len", max_seq_len)?;
+    require_positive("active_seq_len", active_seq_len)?;
+    require_positive("head_dim", head_dim)?;
+    require_positive("group_size", group_size)?;
+    require_positive("block_size", block_size)?;
+    require_positive("num_physical_blocks", num_physical_blocks)?;
+    if active_seq_len > max_seq_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "active sequence length exceeds max sequence length",
+        });
+    }
+    if q_heads
+        != kv_heads
+            .checked_mul(group_size)
+            .ok_or(PlkvError::ArithmeticOverflow)?
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "invalid GQA mapping",
+        });
+    }
+    let q_len = q_heads
+        .checked_mul(head_dim)
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    let physical_len = num_physical_blocks
+        .checked_mul(kv_heads)
+        .and_then(|value| value.checked_mul(block_size))
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or(PlkvError::ArithmeticOverflow)?;
+    if q.len() != q_len || k_physical.len() != physical_len || v_physical.len() != physical_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 full-KV tensor length mismatch",
+        });
+    }
+    if block_table
+        .len()
+        .checked_mul(block_size)
+        .ok_or(PlkvError::ArithmeticOverflow)?
+        < max_seq_len
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table does not cover max sequence",
+        });
+    }
+    if block_table
+        .iter()
+        .any(|&physical| physical >= num_physical_blocks)
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "block table index out of range",
+        });
+    }
+    if !q.iter().all(|value| value.is_finite())
+        || !k_physical.iter().all(|value| value.is_finite())
+        || !v_physical.iter().all(|value| value.is_finite())
+    {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "FP16 full-KV inputs must be finite",
+        });
+    }
+    let mut scores = vec![f32::MIN; q_heads * max_seq_len];
+    let mut probabilities = vec![0.0f32; q_heads * max_seq_len];
+    let mut context = vec![0.0f32; q_heads * head_dim];
+    let scale = 1.0f32 / (head_dim as f32).sqrt();
+    for q_head in 0..q_heads {
+        let kv_head = q_head / group_size;
+        let row_start = q_head * max_seq_len;
+        for token in 0..active_seq_len {
+            let logical_block = token / block_size;
+            let offset = token % block_size;
+            let base = (((block_table[logical_block] * kv_heads + kv_head) * block_size + offset)
+                * head_dim) as usize;
+            let mut dot = 0.0f32;
+            for dim in 0..head_dim {
+                dot += q[q_head * head_dim + dim] * k_physical[base + dim].to_f32();
+            }
+            scores[row_start + token] = dot * scale;
+        }
+        let row_max = scores[row_start..row_start + active_seq_len]
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let mut denominator = 0.0f32;
+        for token in 0..active_seq_len {
+            let numerator = (scores[row_start + token] - row_max).exp();
+            probabilities[row_start + token] = numerator;
+            denominator += numerator;
+        }
+        for token in 0..active_seq_len {
+            probabilities[row_start + token] /= denominator;
+        }
+        for token in 0..active_seq_len {
+            let logical_block = token / block_size;
+            let offset = token % block_size;
+            let base = (((block_table[logical_block] * kv_heads + kv_head) * block_size + offset)
+                * head_dim) as usize;
+            let probability = probabilities[row_start + token];
+            for dim in 0..head_dim {
+                context[q_head * head_dim + dim] += probability * v_physical[base + dim].to_f32();
+            }
+        }
+    }
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,

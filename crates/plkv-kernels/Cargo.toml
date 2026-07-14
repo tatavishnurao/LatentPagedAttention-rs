@@ -65,3 +65,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "model_profile_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "fp16_full_kv_baseline_gpu"
+required-features = ["gpu-cutile"]

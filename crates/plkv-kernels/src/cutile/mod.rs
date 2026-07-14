@@ -1,6 +1,7 @@
 pub mod direct_latent_gqa;
 pub mod direct_paged_latent_gqa;
 pub mod direct_paged_latent_gqa_fp16;
+pub mod full_kv_baseline;
 pub mod gqa_decode;
 pub mod latent_kv_reconstruction;
 pub mod model_profile;
