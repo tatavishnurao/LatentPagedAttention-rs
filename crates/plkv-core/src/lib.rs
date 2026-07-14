@@ -1079,6 +1079,63 @@ pub fn direct_paged_latent_gqa_decode_fp16_storage_f32_accum(
     })
 }
 
+pub fn direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum(
+    q: &[f32],
+    latent_physical: &[half::f16],
+    block_table: &[usize],
+    k_projection: &[f32],
+    v_projection: &[f32],
+    q_heads: usize,
+    kv_heads: usize,
+    max_seq_len: usize,
+    active_seq_len: usize,
+    latent_dim: usize,
+    head_dim: usize,
+    group_size: usize,
+    block_size: usize,
+    num_physical_blocks: usize,
+) -> Result<GqaDecodeResult, PlkvError> {
+    require_positive("active_seq_len", active_seq_len)?;
+    if active_seq_len > max_seq_len {
+        return Err(PlkvError::InvalidPagedLookup {
+            reason: "active sequence length exceeds max sequence length",
+        });
+    }
+    let active = direct_paged_latent_gqa_decode_fp16_storage_f32_accum(
+        q,
+        latent_physical,
+        block_table,
+        k_projection,
+        v_projection,
+        q_heads,
+        kv_heads,
+        active_seq_len,
+        latent_dim,
+        head_dim,
+        group_size,
+        block_size,
+        num_physical_blocks,
+    )?;
+    if active_seq_len == max_seq_len {
+        return Ok(active);
+    }
+    let mut scores = vec![f32::MIN; q_heads * max_seq_len];
+    let mut probabilities = vec![0.0f32; q_heads * max_seq_len];
+    for head in 0..q_heads {
+        let active_start = head * active_seq_len;
+        let runtime_start = head * max_seq_len;
+        scores[runtime_start..runtime_start + active_seq_len]
+            .copy_from_slice(&active.scores[active_start..active_start + active_seq_len]);
+        probabilities[runtime_start..runtime_start + active_seq_len]
+            .copy_from_slice(&active.probabilities[active_start..active_start + active_seq_len]);
+    }
+    Ok(GqaDecodeResult {
+        scores,
+        probabilities,
+        context: active.context,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     pub block_size: usize,
@@ -1231,10 +1288,11 @@ mod tests {
     use super::{
         BlockLocation, BlockTable, CacheConfig, PlkvError, compression_ratio,
         contiguous_gqa_decode_f32, direct_latent_gqa_decode_f32,
-        direct_paged_latent_gqa_decode_f32, estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa,
-        kv_bytes_per_token_latent, paged_gqa_decode_f32, paged_kv_write_f32,
-        paged_latent_write_f32, paged_lookup_f32, reconstruct_latent_kv_f32,
-        resolve_paged_token_location,
+        direct_paged_latent_gqa_decode_f32, direct_paged_latent_gqa_decode_fp16_storage_f32_accum,
+        direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum,
+        estimate_total_kv_cache_bytes, kv_bytes_per_token_gqa, kv_bytes_per_token_latent,
+        paged_gqa_decode_f32, paged_kv_write_f32, paged_latent_write_f32, paged_lookup_f32,
+        quantize_f32_to_f16_storage, reconstruct_latent_kv_f32, resolve_paged_token_location,
     };
 
     #[test]
@@ -2251,6 +2309,125 @@ mod tests {
         assert!(paged_latent_write_f32(&mut cache, &[2, 0, 3, 1], 8, 2, 8, &[0.0; 8]).is_err());
         assert!(paged_latent_write_f32(&mut cache, &[4, 0, 3, 1], 0, 2, 8, &[0.0; 8]).is_err());
         assert!(paged_latent_write_f32(&mut cache, &[2, 0, 3, 1], 0, 2, 8, &[0.0; 7]).is_err());
+    }
+
+    #[test]
+    fn fp16_runtime_active_lengths_mask_inactive_tokens() {
+        let q_heads = 4;
+        let kv_heads = 2;
+        let group_size = 2;
+        let head_dim = 8;
+        let latent_dim = 8;
+        let block_size = 2;
+        let max_seq_len = 8;
+        let num_physical_blocks = 4;
+        let block_table = vec![2, 0, 3, 1];
+        let q: Vec<f32> = (0..q_heads * head_dim)
+            .map(|value| value as f32 / 17.0)
+            .collect();
+        let mut logical = vec![0.0f32; max_seq_len * latent_dim];
+        for (index, value) in logical.iter_mut().enumerate() {
+            *value = index as f32 / 31.0;
+        }
+        let mut physical = vec![0.0f32; num_physical_blocks * block_size * latent_dim];
+        for (logical_block, &physical_block) in block_table.iter().enumerate() {
+            let logical_start = logical_block * block_size * latent_dim;
+            let physical_start = physical_block * block_size * latent_dim;
+            physical[physical_start..physical_start + block_size * latent_dim]
+                .copy_from_slice(&logical[logical_start..logical_start + block_size * latent_dim]);
+        }
+        let latent_fp16 = quantize_f32_to_f16_storage(&physical).unwrap();
+        let k_projection: Vec<f32> = (0..latent_dim * kv_heads * head_dim)
+            .map(|value| value as f32 / 101.0)
+            .collect();
+        let v_projection: Vec<f32> = (0..latent_dim * kv_heads * head_dim)
+            .map(|value| (value as f32 + 3.0) / 89.0)
+            .collect();
+
+        for active_seq_len in [1, 3, 4, 7, 8] {
+            let runtime = direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum(
+                &q,
+                &latent_fp16,
+                &block_table,
+                &k_projection,
+                &v_projection,
+                q_heads,
+                kv_heads,
+                max_seq_len,
+                active_seq_len,
+                latent_dim,
+                head_dim,
+                group_size,
+                block_size,
+                num_physical_blocks,
+            )
+            .unwrap();
+            let active = direct_paged_latent_gqa_decode_fp16_storage_f32_accum(
+                &q,
+                &latent_fp16,
+                &block_table,
+                &k_projection,
+                &v_projection,
+                q_heads,
+                kv_heads,
+                active_seq_len,
+                latent_dim,
+                head_dim,
+                group_size,
+                block_size,
+                num_physical_blocks,
+            )
+            .unwrap();
+            assert_eq!(runtime.scores.len(), q_heads * max_seq_len);
+            assert_eq!(runtime.probabilities.len(), q_heads * max_seq_len);
+            assert_eq!(runtime.context, active.context);
+            for head in 0..q_heads {
+                let active_start = head * active_seq_len;
+                let runtime_start = head * max_seq_len;
+                assert_close(
+                    &runtime.scores[runtime_start..runtime_start + active_seq_len],
+                    &active.scores[active_start..active_start + active_seq_len],
+                    0.0,
+                    0.0,
+                );
+                assert_close(
+                    &runtime.probabilities[runtime_start..runtime_start + active_seq_len],
+                    &active.probabilities[active_start..active_start + active_seq_len],
+                    0.0,
+                    0.0,
+                );
+                assert!(
+                    runtime.probabilities
+                        [runtime_start + active_seq_len..runtime_start + max_seq_len]
+                        .iter()
+                        .all(|&value| value == 0.0)
+                );
+                let row_sum: f32 = runtime.probabilities
+                    [runtime_start..runtime_start + max_seq_len]
+                    .iter()
+                    .sum();
+                assert!((row_sum - 1.0).abs() <= 1e-6);
+            }
+        }
+        assert!(
+            direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum(
+                &q,
+                &latent_fp16,
+                &block_table,
+                &k_projection,
+                &v_projection,
+                q_heads,
+                kv_heads,
+                max_seq_len,
+                0,
+                latent_dim,
+                head_dim,
+                group_size,
+                block_size,
+                num_physical_blocks,
+            )
+            .is_err()
+        );
     }
 
     fn flatten_2d(values: &[Vec<f32>]) -> Vec<f32> {

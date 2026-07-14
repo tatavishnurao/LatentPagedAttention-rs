@@ -1,6 +1,9 @@
 import numpy as np
 from latent_paged_attention.attention_ref import (
     direct_latent_gqa_decode_attention_intermediates_ref,
+    direct_paged_latent_gqa_decode_attention_intermediates_ref,
+    direct_paged_latent_gqa_decode_attention_runtime_intermediates_ref,
+    direct_paged_latent_gqa_fp16_storage_runtime_intermediates_ref,
     gqa_decode_attention_intermediates_ref,
     gqa_decode_attention_ref,
     latent_kv_decode_attention_intermediates_ref,
@@ -119,6 +122,115 @@ def test_fp16_storage_write_rounds_cache_and_replacement() -> None:
         fp16_storage_roundtrip_f32(np.array([70000.0], dtype=np.float32))
     with np.testing.assert_raises(ValueError):
         fp16_storage_roundtrip_f32(np.array([np.inf], dtype=np.float32))
+
+
+def test_direct_paged_runtime_active_lengths_mask_inactive_tokens() -> None:
+    q_heads, kv_heads, head_dim, latent_dim, block_size = 4, 2, 8, 8, 2
+    group_size, max_seq_len = 2, 8
+    q = np.arange(q_heads * head_dim, dtype=np.float32).reshape(1, q_heads, head_dim) / 17.0
+    logical = np.arange(max_seq_len * latent_dim, dtype=np.float32).reshape(
+        max_seq_len, latent_dim
+    ) / 31.0
+    table = np.array([2, 0, 3, 1], dtype=np.int32)
+    physical = np.empty((4, block_size, latent_dim), dtype=np.float32)
+    for logical_block, physical_block in enumerate(table):
+        physical[physical_block] = logical[
+            logical_block * block_size : (logical_block + 1) * block_size
+        ]
+    k_proj = np.arange(latent_dim * kv_heads * head_dim, dtype=np.float32).reshape(
+        latent_dim, kv_heads * head_dim
+    ) / 101.0
+    v_proj = (
+        np.arange(latent_dim * kv_heads * head_dim, dtype=np.float32) + 3
+    ).reshape(latent_dim, kv_heads * head_dim) / 89.0
+
+    for active_seq_len in (1, 3, 4, 7, 8):
+        scores, probabilities, context = (
+            direct_paged_latent_gqa_decode_attention_runtime_intermediates_ref(
+                q,
+                physical,
+                table,
+                max_seq_len,
+                active_seq_len,
+                block_size,
+                k_proj,
+                v_proj,
+                q_heads=q_heads,
+                kv_heads=kv_heads,
+                head_dim=head_dim,
+                group_size=group_size,
+            )
+        )
+        active_scores, active_probabilities, active_context = (
+            direct_paged_latent_gqa_decode_attention_intermediates_ref(
+                q,
+                physical,
+                table,
+                active_seq_len,
+                block_size,
+                k_proj,
+                v_proj,
+                q_heads=q_heads,
+                kv_heads=kv_heads,
+                head_dim=head_dim,
+                group_size=group_size,
+            )
+        )
+        np.testing.assert_allclose(scores[:, :, :active_seq_len], active_scores)
+        np.testing.assert_allclose(probabilities[:, :, :active_seq_len], active_probabilities)
+        np.testing.assert_allclose(context, active_context)
+        assert np.all(scores[:, :, active_seq_len:] < -1.0e30)
+        assert np.all(probabilities[:, :, active_seq_len:] == 0.0)
+        np.testing.assert_allclose(probabilities.sum(axis=-1), 1.0, atol=1e-6)
+
+
+def test_fp16_runtime_active_length_keeps_mask_and_differs_from_fp32() -> None:
+    q_heads, kv_heads, head_dim, latent_dim, block_size = 4, 2, 8, 8, 2
+    group_size, max_seq_len, active_seq_len = 2, 8, 7
+    q = np.linspace(-0.3, 0.7, q_heads * head_dim, dtype=np.float32).reshape(
+        1, q_heads, head_dim
+    )
+    physical = np.linspace(
+        -1.7, 2.1, 4 * block_size * latent_dim, dtype=np.float32
+    ).reshape(4, block_size, latent_dim)
+    table = np.array([2, 0, 3, 1], dtype=np.int32)
+    k_proj = np.linspace(
+        -0.8, 0.9, latent_dim * kv_heads * head_dim, dtype=np.float32
+    ).reshape(latent_dim, kv_heads * head_dim)
+    v_proj = np.linspace(
+        0.6, -0.5, latent_dim * kv_heads * head_dim, dtype=np.float32
+    ).reshape(latent_dim, kv_heads * head_dim)
+    fp32 = direct_paged_latent_gqa_decode_attention_runtime_intermediates_ref(
+        q,
+        physical,
+        table,
+        max_seq_len,
+        active_seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
+    fp16 = direct_paged_latent_gqa_fp16_storage_runtime_intermediates_ref(
+        q,
+        physical,
+        table,
+        max_seq_len,
+        active_seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
+    assert max(float(np.max(np.abs(a - b))) for a, b in zip(fp32, fp16)) > 0.0
+    assert np.all(fp16[1][:, :, active_seq_len:] == 0.0)
+    np.testing.assert_allclose(fp16[1].sum(axis=-1), 1.0, atol=1e-6)
 
 
 def test_gqa_decode_attention_output_shape_is_correct() -> None:

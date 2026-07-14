@@ -566,3 +566,83 @@ def direct_paged_latent_gqa_fp16_storage_intermediates_ref(
         head_dim=head_dim,
         group_size=group_size,
     )
+
+
+def direct_paged_latent_gqa_decode_attention_runtime_intermediates_ref(
+    q: np.ndarray,
+    latent_blocks: np.ndarray,
+    block_table: np.ndarray,
+    max_seq_len: int,
+    active_seq_len: int,
+    block_size: int,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Direct paged latent-space GQA with runtime active sequence masking."""
+    if active_seq_len <= 0 or active_seq_len > max_seq_len:
+        raise ValueError("active_seq_len must satisfy 1 <= active_seq_len <= max_seq_len")
+    scores, active_probs, context = direct_paged_latent_gqa_decode_attention_intermediates_ref(
+        q,
+        latent_blocks,
+        block_table,
+        active_seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
+    if max_seq_len == active_seq_len:
+        return scores, active_probs, context
+    masked_scores = np.full(
+        (q.shape[0], q_heads, max_seq_len), np.float32(-3.4028234663852886e38)
+    )
+    probabilities = np.zeros((q.shape[0], q_heads, max_seq_len), dtype=np.float32)
+    masked_scores[:, :, :active_seq_len] = scores
+    probabilities[:, :, :active_seq_len] = active_probs
+    if not np.all(probabilities[:, :, active_seq_len:] == 0.0):
+        raise ValueError("inactive probabilities must be zero")
+    if not np.allclose(probabilities.sum(axis=-1), 1.0, atol=1e-6):
+        raise ValueError("active probability rows must sum to one")
+    return masked_scores, probabilities, context
+
+
+def direct_paged_latent_gqa_fp16_storage_runtime_intermediates_ref(
+    q: np.ndarray,
+    latent_blocks_f32: np.ndarray,
+    block_table: np.ndarray,
+    max_seq_len: int,
+    active_seq_len: int,
+    block_size: int,
+    k_proj: np.ndarray,
+    v_proj: np.ndarray,
+    *,
+    q_heads: int,
+    kv_heads: int,
+    head_dim: int,
+    group_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Runtime active-length direct paged attention from FP16 latent storage."""
+    from .cache_ref import fp16_storage_roundtrip_f32
+
+    return direct_paged_latent_gqa_decode_attention_runtime_intermediates_ref(
+        q,
+        fp16_storage_roundtrip_f32(latent_blocks_f32),
+        block_table,
+        max_seq_len,
+        active_seq_len,
+        block_size,
+        k_proj,
+        v_proj,
+        q_heads=q_heads,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        group_size=group_size,
+    )
