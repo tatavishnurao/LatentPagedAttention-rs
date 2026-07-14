@@ -228,7 +228,7 @@ def test_fp16_runtime_active_length_keeps_mask_and_differs_from_fp32() -> None:
         head_dim=head_dim,
         group_size=group_size,
     )
-    assert max(float(np.max(np.abs(a - b))) for a, b in zip(fp32, fp16)) > 0.0
+    assert max(float(np.max(np.abs(a - b))) for a, b in zip(fp32, fp16, strict=True)) > 0.0
     assert np.all(fp16[1][:, :, active_seq_len:] == 0.0)
     np.testing.assert_allclose(fp16[1].sum(axis=-1), 1.0, atol=1e-6)
 

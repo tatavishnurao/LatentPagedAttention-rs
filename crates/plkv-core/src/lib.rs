@@ -1,3 +1,11 @@
+#![allow(
+    dead_code,
+    clippy::manual_is_multiple_of,
+    clippy::needless_range_loop,
+    clippy::too_many_arguments,
+    clippy::unnecessary_cast
+)]
+
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
