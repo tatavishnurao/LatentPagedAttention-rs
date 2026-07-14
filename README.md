@@ -1,6 +1,6 @@
 # LatentPagedAttention-rs
 
-LatentPagedAttention-rs v0.1.0 is a Rust + Python research prototype for paged
+LatentPagedAttention-rs v0.1 is a Rust + Python research prototype for paged
 latent-cache decode attention on an RTX 4060.
 
 It demonstrates a physical paged latent cache, runtime block tables, runtime
@@ -64,9 +64,14 @@ not kernel-only latency.
 
 | operation | process_count | min_ms | mean_ms | max_ms |
 |---|---:|---:|---:|---:|
-| full_kv_paged_attention_read | 3 | 1417.207 | 1458.249 | 1493.987 |
-| latent_paged_attention_read | 3 | 1720.900 | 1809.968 | 1864.154 |
-| latent_write_to_attention | 3 | 1394.896 | 1464.487 | 1546.910 |
+| full_kv_paged_attention_read | 3 | 1366.969 | 1391.022 | 1405.751 |
+| latent_paged_attention_read | 3 | 1705.150 | 1844.891 | 2017.385 |
+| latent_write_to_attention | 3 | 1367.174 | 1487.776 | 1586.213 |
+
+The README table reflects the final committed three-process benchmark in
+`reports/final_benchmark/summary.csv`. Based on the committed mean values, the
+latent read path is approximately `32.6%` slower than the FP16 full-KV paged
+baseline under synchronized host end-to-end timing.
 
 ## Cache-Byte Comparison
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.1 - 2026-07-14
+
+- Corrected the README benchmark table to match the committed final benchmark artifacts.
+- No kernels, benchmarks, fixtures, or technical validation results changed.
+
 ## v0.1.0 - 2026-07-14
 
 - Added NumPy, Rust, and cuTile validation for paged latent-cache decode attention.

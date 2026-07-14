@@ -68,7 +68,20 @@ synchronization and are not kernel-only latency.
 
 ## Results
 
-Detailed generated summaries are written under `reports/final_benchmark/`.
+The canonical final benchmark summary is committed in
+`reports/final_benchmark/summary.csv` and `reports/final_benchmark/summary.md`.
+The timing method is synchronized host end-to-end timing with three measured
+processes; it is not kernel-only latency.
+
+| operation | process_count | min_ms | mean_ms | max_ms |
+|---|---:|---:|---:|---:|
+| full_kv_paged_attention_read | 3 | 1366.969 | 1391.022 | 1405.751 |
+| latent_paged_attention_read | 3 | 1705.150 | 1844.891 | 2017.385 |
+| latent_write_to_attention | 3 | 1367.174 | 1487.776 | 1586.213 |
+
+The latent read path is approximately `32.6%` slower than the FP16 full-KV read
+baseline by mean synchronized host end-to-end time. The result is therefore a
+memory-versus-compute trade-off, not an unconditional speedup.
 
 ## Numerical Error
 
