@@ -57,3 +57,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "paged_latent_write_attention_fp16_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "runtime_sequence_gpu"
+required-features = ["gpu-cutile"]

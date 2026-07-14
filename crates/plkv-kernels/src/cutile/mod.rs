@@ -8,3 +8,4 @@ pub mod paged_kv_write;
 pub mod paged_latent_write;
 pub mod paged_latent_write_fp16;
 pub mod paged_lookup;
+pub mod runtime_sequence;
