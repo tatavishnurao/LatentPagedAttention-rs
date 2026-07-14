@@ -16,7 +16,7 @@ pub mod paged_latent_write_kernel {
         let block_offset = token_scalar % 2i32;
         let table_tile: Tile<i32, { [4] }> = block_table.load_tile(const_shape![4], [0]);
         let target_tile: Tile<i32, { [1] }> = extract(table_tile, [scalar_to_tile(logical_block)]);
-        let target_physical_block = tile_to_scalar(target_tile.reshape(const_shape![]));
+        let target_physical_block: i32 = tile_to_scalar(target_tile.reshape(const_shape![]));
 
         let mut latent_tile: Tile<f32, { [2, 8] }> = load_tile_mut(latent_cache);
         if physical_block_id == target_physical_block {

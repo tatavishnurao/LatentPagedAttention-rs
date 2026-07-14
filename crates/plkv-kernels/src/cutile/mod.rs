@@ -3,6 +3,7 @@ pub mod direct_paged_latent_gqa;
 pub mod direct_paged_latent_gqa_fp16;
 pub mod gqa_decode;
 pub mod latent_kv_reconstruction;
+pub mod model_profile;
 pub mod paged_gqa_decode;
 pub mod paged_kv_write;
 pub mod paged_latent_write;

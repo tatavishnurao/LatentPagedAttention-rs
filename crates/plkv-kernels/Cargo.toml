@@ -61,3 +61,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "runtime_sequence_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "model_profile_gpu"
+required-features = ["gpu-cutile"]
