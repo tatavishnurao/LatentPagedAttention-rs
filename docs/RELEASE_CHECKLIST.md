@@ -9,5 +9,5 @@
 - [x] Model profile validation passes twice
 - [x] FP16 full-KV baseline passes twice
 - [x] Final benchmark report generated
-- [ ] Worktree is clean
-- [ ] `v0.1.0` tag created and pushed
+- [x] Worktree is clean
+- [x] `v0.1.0` tag created and pushed
