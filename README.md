@@ -1,160 +1,112 @@
 # LatentPagedAttention-rs
 
-LatentPagedAttention-rs v0.1 is a Rust + Python research prototype for paged
-latent-cache decode attention on an RTX 4060.
+LatentPagedAttention-rs is a correctness-first Rust, Python, and cuTile experiment measuring the memory-compute trade-off of paged latent-cache decode attention on an RTX 4060.
 
-It demonstrates a physical paged latent cache, runtime block tables, runtime
-active sequence lengths, partial-final-block masking, FP16 latent storage with
-FP32 attention arithmetic, a synthetic model-shaped profile, and an FP16 full-KV
-paged baseline.
+## Research question
 
-It is not a production inference runtime, not full DeepSeek MLA, not a real model
-checkpoint integration, and not a claim of beating vLLM, FlashAttention, or any
-serving system.
+Can a paged latent cache be mutated and consumed directly on GPU without storing persistent full K/V tensors?
 
-## What Was Built
+This repository answers that question for a controlled synthetic linear formulation. The primary path stores physical FP16 latent blocks, resolves runtime block tables, optionally writes a latent row on GPU, computes attention in latent space with FP32 arithmetic, and never persists reconstructed K/V tensors.
+
+## Result summary
+
+The synthetic `model_small` profile uses 16 query heads, 4 KV heads, head dimension 64, latent dimension 32, block size 16, and a maximum sequence length of 1,024.
+
+| persistent cache | bytes |
+|---|---:|
+| FP16 latent cache | 65,536 |
+| FP16 full-KV cache | 1,048,576 |
+| full-KV to latent cache-byte ratio | 16x |
+
+The latent read path is approximately 32.6% slower than the FP16 full-KV read baseline under synchronized host end-to-end timing. This is a measured compute-for-memory trade-off, not a speedup claim and not a total GPU-memory reduction claim.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    token[logical token position] --> table[runtime block table]
+    token[logical token] --> table[runtime block table]
     table --> phys[physical latent block]
-    write[optional FP32 latent write] --> phys
-    phys --> f16[FP16 latent storage]
-    f16 --> f32[FP16 to FP32 load]
-    q[FP32 Q] --> scores[paged latent scores]
-    f32 --> scores
+    write[optional GPU latent write] --> phys
+    phys --> storage[FP16 latent cache]
+    storage --> cast[FP16 to FP32 load]
+    q[FP32 query] --> scores[latent-space scores]
+    cast --> scores
     scores --> mask[active-length mask]
     mask --> softmax[FP32 stable softmax]
-    softmax --> ctx[paged latent context]
-    f32 --> ctx
-    ctx --> out[FP32 V projection context]
+    softmax --> context[FP32 latent context]
+    cast --> context
+    context --> output[FP32 output projection]
 ```
 
-## Validated Hardware
+## What is validated
 
-- GPU: NVIDIA GeForce RTX 4060 Laptop GPU
-- Compute capability: 8.9
-- VRAM: 8188 MiB
-- CUDA toolkit path: `/opt/cuda`
-- cuTile: `0.2.0`
+- Runtime non-identity block tables and physical block addressing.
+- Runtime active sequence lengths and partial-final-block masking.
+- FP16 latent storage with FP32 writes, loads, scores, softmax, and context arithmetic.
+- GPU latent-cache write-to-attention handoff without a host cache round trip.
+- Tiny exhaustive correctness profile and synthetic model-shaped profile.
+- FP16 full-KV paged attention baseline using the same persistent storage width.
+- Python oracle, Rust CPU reference, cuTile GPU execution, parity checks, and negative controls.
 
-## Supported Profiles
-
-| profile | q_heads | kv_heads | group | head_dim | latent_dim | block | max_seq | storage |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| tiny | 4 | 2 | 2 | 8 | 8 | 2 | 8 | f32/f16 |
-| model_small | 16 | 4 | 4 | 64 | 32 | 16 | 1024 | f16 |
-
-`model_small` is synthetic and model-shaped. It is not claimed to match a
-production checkpoint.
-
-## Precision Contract
-
-- Persistent latent cache: FP16
-- Incoming latent write vector: FP32, converted to FP16 on GPU
-- Q and projection weights: FP32
-- Latent loads: FP16 to FP32 before arithmetic
-- Scores, softmax, context accumulation, and output context: FP32
-- Full-KV baseline persistent K/V cache: FP16 with FP32 arithmetic
-
-## Final Benchmark Summary
-
-The committed final benchmark uses synchronized host end-to-end timing. It is
-not kernel-only latency.
-
-| operation | process_count | min_ms | mean_ms | max_ms |
-|---|---:|---:|---:|---:|
-| full_kv_paged_attention_read | 3 | 1366.969 | 1391.022 | 1405.751 |
-| latent_paged_attention_read | 3 | 1705.150 | 1844.891 | 2017.385 |
-| latent_write_to_attention | 3 | 1367.174 | 1487.776 | 1586.213 |
-
-The README table reflects the final committed three-process benchmark in
-`reports/final_benchmark/summary.csv`. Based on the committed mean values, the
-latent read path is approximately `32.6%` slower than the FP16 full-KV paged
-baseline under synchronized host end-to-end timing.
-
-## Cache-Byte Comparison
-
-For `model_small`:
-
-- FP16 latent cache bytes: `65,536`
-- FP16 full-KV cache bytes: `1,048,576`
-- Persistent cache-byte ratio, full-KV to latent: `16x`
-
-This ratio counts persistent cache bytes only. It is not a total GPU-memory
-reduction claim.
+The validated hardware is an NVIDIA GeForce RTX 4060 Laptop GPU with compute capability 8.9, 8,188 MiB VRAM, CUDA toolkit 13.3, and cuTile 0.2.0. `model_small` is synthetic and model-shaped; it is not a production checkpoint or model integration.
 
 ## Reproduce
 
+For the public CPU and repository checks:
+
 ```bash
-UV_PROJECT_ENVIRONMENT=attention99 uv sync
-UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
-UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
-cargo fmt --all --check
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+bash scripts/validate_release.sh
 ```
 
-GPU validation:
+For the committed benchmark:
 
 ```bash
-source scripts/cutile_env.sh
-cargo check -p plkv-kernels --features gpu-cutile --examples
-bash scripts/run_cutile_smoke.sh
-bash scripts/run_gpu_paged_lookup.sh
-bash scripts/run_gpu_paged_kv_write.sh
-bash scripts/run_gpu_gqa_decode.sh
-bash scripts/run_gpu_paged_gqa_decode.sh
-bash scripts/run_gpu_latent_kv_reconstruction.sh
-bash scripts/run_gpu_direct_latent_gqa.sh
-bash scripts/run_gpu_direct_paged_latent_gqa.sh
-bash scripts/run_gpu_paged_latent_write_attention.sh
-bash scripts/run_gpu_fp16_paged_latent_attention.sh
-bash scripts/run_gpu_runtime_sequence_validation.sh
-bash scripts/run_gpu_model_profile_validation.sh
-bash scripts/run_gpu_fp16_full_kv_baseline.sh
 bash scripts/run_final_benchmark.sh
 ```
 
-## Repository Layout
+Maintainers can run the full manual RTX 4060 validation suite with:
 
-```text
-python_ref/      NumPy references and fixture generation
-tests/           Python reference and fixture tests
-crates/plkv-core Rust CPU references
-crates/plkv-kernels cuTile kernels and GPU validation examples
-scripts/         Reproduction and validation scripts
-docs/            Architecture, reproducibility, limitations, final report
-fixtures/        Deterministic tiny-profile JSON fixtures
-reports/         Small committed benchmark summary artifacts
+```bash
+bash scripts/validate_release.sh --gpu
 ```
+
+The exact environment setup and individual regression commands are documented in [Reproducibility](docs/REPRODUCIBILITY.md).
+
+## Final benchmark
+
+The canonical three-process summary is committed in [`reports/final_benchmark/summary.csv`](reports/final_benchmark/summary.csv). Timing is synchronized host end-to-end timing, not kernel-only latency; compilation and cuTile JIT are excluded.
+
+| operation | min ms | mean ms | max ms |
+|---|---:|---:|---:|
+| full-KV paged attention read | 1366.969 | 1391.022 | 1405.751 |
+| latent paged attention read | 1705.150 | 1844.891 | 2017.385 |
+| latent write to attention | 1367.174 | 1487.776 | 1586.213 |
+
+## Limitations
+
+- The algebra is a synthetic linear latent formulation, not complete DeepSeek MLA.
+- No real model checkpoint or model-quality evaluation is included.
+- This is not a production PagedAttention runtime, serving system, allocator, or continuous-batching implementation.
+- Dynamic allocation, eviction, prefix sharing, distributed inference, CUDA graphs, and automatic tuning are out of scope.
+- No claim is made about Tensor Core use or performance versus vLLM, FlashAttention, or TensorRT-LLM.
+- Cache-byte ratios count persistent cache storage only, not total runtime GPU memory.
+- Timing results describe this implementation and measurement method; they are not general latency guarantees.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Reproducibility](docs/REPRODUCIBILITY.md)
-- [Final report](docs/FINAL_REPORT.md)
-- [Limitations](docs/LIMITATIONS.md)
-- [Release checklist](docs/RELEASE_CHECKLIST.md)
+- [Architecture](docs/ARCHITECTURE.md): data layouts, algebra, precision, and GPU stages.
+- [Reproducibility](docs/REPRODUCIBILITY.md): environment setup and granular commands.
+- [Final report](docs/FINAL_REPORT.md): formal methodology, evidence, and results.
+- [Limitations](docs/LIMITATIONS.md): explicit boundaries and deferred work.
+- [Technical article](docs/TECHNICAL_ARTICLE.md): narrative explanation for external readers.
 
-## Release Status
+Source layout: Python references and tests live in `python_ref/` and `tests/`; Rust CPU references live in `crates/plkv-core`; cuTile kernels and GPU examples live in `crates/plkv-kernels`; deterministic fixtures are in `fixtures/`; committed benchmark summaries are in `reports/`.
 
-v0.1.0 completion status:
+## Release status
 
-1. Python reference correctness - done
-2. Rust parity and golden fixtures - done
-3. RTX 4060 cuTile execution - done
-4. Direct paged latent-space GQA - done
-5. Paged latent write-to-attention round trip - done
-6. FP16 latent storage with FP32 accumulation - done
-7. Runtime active sequence length and partial blocks - done
-8. Synthetic model-shaped profile - done
-9. FP16 full-KV paged baseline - done
-10. Final synchronized host benchmark - done
+Latest release: `v0.1.1`.
 
-Deferred to v0.2 or later: BF16, FP8/FP4, real checkpoints, dynamic allocation,
-prefix sharing, eviction, continuous batching, production scheduling, CUDA graphs,
-distributed inference, automatic tuning, and full DeepSeek MLA reproduction.
+The `v0.1.x` line is frozen except for factual, documentation, packaging, or reproducibility fixes. Development milestone details remain available in [Development history](docs/DEVELOPMENT_HISTORY.md).
 
 ## Citation
 
