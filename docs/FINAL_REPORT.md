@@ -2,7 +2,7 @@
 
 ## Abstract
 
-LatentPagedAttention-rs v0.1.0 validates a paged latent-cache decode-attention
+LatentPagedAttention-rs v0.1.x validates a paged latent-cache decode-attention
 prototype on an RTX 4060. It covers direct paged latent attention, FP16 latent
 storage with FP32 arithmetic, runtime active sequence lengths, partial-final-block
 masking, a synthetic model-shaped profile, and an FP16 full-KV paged baseline.
@@ -111,5 +111,5 @@ eviction, production scheduling, CUDA graphs, and distributed inference.
 
 ## Conclusion
 
-v0.1.0 provides a finite, evidence-backed paged latent-cache attention prototype
+The frozen v0.1.x line provides a finite, evidence-backed paged latent-cache prototype
 with narrow claims and reproducible validation commands.

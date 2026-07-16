@@ -273,7 +273,7 @@ bash scripts/run_final_benchmark.sh
 
 ## 15. Conclusion
 
-LatentPagedAttention-rs v0.1 is a completed correctness-first research prototype.
+LatentPagedAttention-rs v0.1.1 is a completed correctness-first research prototype.
 It exposes a concrete memory-versus-compute trade-off: 16x fewer persistent cache
 bytes for the synthetic model-shaped profile, with approximately 32.6% higher
 measured latent-read time in the current implementation. That is a useful

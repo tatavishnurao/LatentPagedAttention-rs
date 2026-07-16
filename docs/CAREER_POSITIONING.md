@@ -1,37 +1,54 @@
 # Career Positioning
 
-## Resume Entry
+## Project summary
+
+Built and released a correctness-first paged latent-cache attention prototype
+on an RTX 4060, demonstrating a 16x persistent-cache-byte reduction with a
+measured 32.6% latent-read overhead against an FP16 full-KV baseline.
+
+## Resume entry
 
 **LatentPagedAttention-rs - Rust, Python, cuTile, CUDA**
 
-- Implemented a correctness-first paged latent-cache decode-attention prototype with runtime block tables, partial-final-block masking, FP16 cache writes, and FP32 grouped-query attention arithmetic.
-- Built Python and Rust reference oracles plus cuTile GPU validation, covering deterministic fixtures, bit-exact FP16 cache checks, runtime sequence lengths up to 1,024 tokens, and RTX 4060 readback parity.
-- Measured a 16x persistent-cache-byte reduction against an FP16 full-KV paged baseline for a synthetic model-shaped profile, with approximately 32.6% higher synchronized host end-to-end read time in the current prototype.
+- Built a correctness-first paged latent-cache decode-attention prototype with runtime block tables, partial-final-block masking, FP16 storage, and FP32 arithmetic.
+- Chained Python oracle, Rust CPU reference, deterministic fixtures, and cuTile GPU execution for parity, negative controls, and bit-exact FP16 validation.
+- Measured the 16x persistent-cache-byte reduction and 32.6% synchronized host end-to-end latent-read overhead for the synthetic model-shaped profile.
 
-## One-Line Portfolio Description
+## One-line descriptions
 
-Correctness-first Rust/cuTile prototype for paged latent-cache LLM decode attention on an RTX 4060.
+Portfolio:
 
-## GitHub Pinned-Repository Description
+> Correctness-first paged latent-cache attention experiment in Rust, Python, and cuTile on an RTX 4060.
 
-Paged latent-cache attention prototype in Rust + cuTile, validated on RTX 4060.
+Pinned repository:
 
-## LinkedIn Project Description
+> Paged latent-cache attention experiment with Python/Rust/GPU parity on an RTX 4060.
 
-LatentPagedAttention-rs is a Rust and Python research prototype for paged latent-cache decode attention on an RTX 4060. It validates runtime block tables, partial-final-block masking, FP16 cache writes, GPU write-to-attention handoff, FP16 latent storage, and FP32 attention arithmetic through Python, Rust CPU, and cuTile GPU parity. The synthetic model-shaped profile shows a 16x persistent-cache-byte reduction versus an FP16 full-KV baseline, with approximately 32.6% higher synchronized host end-to-end latent-read time in the current implementation.
+## 30-second explanation
 
-## 30-Second Interview Version
+I built LatentPagedAttention-rs to answer one systems question: can a paged
+latent cache be mutated and consumed directly on GPU without persistent full K/V
+tensors? The project uses a synthetic linear formulation, validates the path
+from Python to Rust CPU to cuTile GPU, and compares it with an FP16 full-KV paged
+baseline. The result is 16x fewer persistent cache bytes for the model-shaped
+profile, with a measured 32.6% latent-read overhead under synchronized host
+end-to-end timing. It demonstrates a memory-compute trade-off, not production
+readiness or a serving-system speedup.
 
-I built LatentPagedAttention-rs to study whether a paged latent cache can be mutated and consumed directly on GPU for decode attention. It is a Rust, Python, and cuTile prototype validated on an RTX 4060. The model-shaped synthetic profile stores 16x fewer persistent FP16 cache bytes than a full-KV baseline, but the current latent read path is about 32.6% slower under synchronized host end-to-end timing. The point was to validate the memory-versus-compute trade-off honestly, not to claim a production speedup.
+## Technical explanation
 
-## 90-Second Interview Version
+The direct path stores physical FP16 latent rows, resolves runtime non-identity
+block tables, optionally writes a new latent row on GPU, converts loads to FP32,
+computes latent-space scores, applies masked stable softmax, aggregates latent
+context, and projects the output. The baseline stores projected K and V in FP16
+with the same paging controls. Validation covers partial final blocks, active
+sequence lengths, GPU write-to-attention handoff, unchanged regions, and
+bit-exact FP16 storage. The algebra is synthetic and linear; there is no real
+checkpoint or claim of complete MLA support.
 
-LatentPagedAttention-rs investigates a narrow inference-systems question: can we combine paged cache addressing with latent KV compression without materializing persistent full K/V tensors? I implemented Python oracles, Rust CPU references, deterministic fixtures, and cuTile GPU kernels for an RTX 4060. The GPU path supports runtime non-identity block tables, active sequence lengths, partial final blocks, FP16 latent storage, FP32 score/softmax/context arithmetic, and a GPU write-to-attention handoff where the updated cache stays on device. I also implemented an FP16 full-KV paged baseline using the same storage width. The final synthetic `model_small` profile showed 16x fewer persistent cache bytes for the latent path, while the current latent read path was about 32.6% slower than the full-KV read path. I framed it as a memory-versus-compute trade-off and documented what it does not prove: no real model, no production allocator, no vLLM or FlashAttention comparison, and no total GPU-memory reduction claim.
+## Claims to retain
 
-## Deep Technical Version
-
-The project starts from the observation that paged attention solves allocation and fragmentation, but still stores full K/V rows. I tested a synthetic linear latent-cache formulation where `K_t = L_t W_k` and `V_t = L_t W_v`. Scores can be reassociated as `q (L_t W_k)^T = L_t (W_k q)`, so the kernel projects the query into latent space and dots it with paged latent rows. Context can be reassociated as `sum p_t (L_t W_v) = (sum p_t L_t) W_v`, so the kernel aggregates latent context first and applies the V projection after.
-
-The implementation uses physical latent blocks, runtime block tables, FP16 persistent cache storage, and FP32 arithmetic. I validated runtime sequence masking so inactive tokens have zero probability and do not contribute to context. I also validated GPU cache mutation: an FP32 latent row is converted to FP16 on GPU, stored into one physical block row, and consumed by attention without a host cache round trip. Correctness is chained from Python references to Rust CPU references to cuTile GPU readback. Negative controls cover identity block tables, projection changes, changed-element counts, unchanged regions, and bit-exact FP16 storage.
-
-The final `model_small` profile has 16 query heads, 4 KV heads, head dimension 64, latent dimension 32, block size 16, and max sequence length 1024. Compared with an FP16 full-KV paged baseline, the latent cache stores 65,536 persistent bytes instead of 1,048,576, a 16x persistent cache-byte reduction. The current latent read path is slower by about 32.6% under synchronized host end-to-end timing, so the result is an honest memory-versus-compute trade-off rather than a speedup claim.
+- The cache-byte result counts persistent cache storage only, not total GPU memory.
+- Timing is synchronized host end-to-end timing for this implementation and profile.
+- The project does not claim production readiness or speedup against vLLM, FlashAttention, TensorRT-LLM, or another serving system.
+- No real model quality, dynamic allocation, continuous batching, or additional precision format is evaluated.

@@ -2,7 +2,7 @@
 
 ## LinkedIn Launch Post
 
-I’ve released LatentPagedAttention-rs v0.1, a correctness-first GPU research
+I’ve released LatentPagedAttention-rs v0.1.1, a correctness-first GPU research
 prototype exploring what happens when paged cache addressing is combined with
 latent KV compression.
 
@@ -27,7 +27,7 @@ systems, Rust GPU tooling, or low-VRAM inference.
 
 ## X / Twitter Post
 
-Released LatentPagedAttention-rs v0.1: Rust+Python+cuTile paged latent-cache decode attention on RTX 4060. Synthetic profile: 16x fewer persistent FP16 cache bytes vs full-KV, with ~32.6% slower latent read time. Memory-compute trade-off, not a speedup claim.
+Released LatentPagedAttention-rs v0.1.1: Rust+Python+cuTile paged latent-cache decode attention on RTX 4060. Synthetic profile: 16x fewer persistent FP16 cache bytes vs full-KV, with ~32.6% slower latent read time. Memory-compute trade-off, not a speedup claim.
 
 ## Hacker News
 
@@ -65,7 +65,7 @@ and what profiling or kernel restructuring would be most useful next.
 
 ## r/rust Variant
 
-I released LatentPagedAttention-rs v0.1, a Rust + Python + cuTile research
+I released LatentPagedAttention-rs v0.1.1, a Rust + Python + cuTile research
 prototype for paged latent-cache decode attention on an RTX 4060.
 
 The Rust side is used for CPU references, validation harnesses, cache/block-table
@@ -97,11 +97,11 @@ than an FP16 full-KV paged baseline.
 The current read path is slower by about 32.6%, so this is not a “faster
 inference” post. It is a correctness-first memory-versus-compute experiment. It
 also does not load a real model checkpoint or preserve model quality; those are
-explicitly out of scope for v0.1.
+explicitly out of scope for v0.1.x.
 
 ## CUDA / GPU Programming Variant
 
-I released LatentPagedAttention-rs v0.1, a cuTile-based RTX 4060 prototype for
+I released LatentPagedAttention-rs v0.1.1, a cuTile-based RTX 4060 prototype for
 direct paged latent-cache decode attention.
 
 The GPU path reads physical FP16 latent blocks through runtime block tables,

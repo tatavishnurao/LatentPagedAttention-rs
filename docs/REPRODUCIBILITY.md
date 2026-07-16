@@ -1,18 +1,21 @@
 # Reproducibility
 
-This document is the command reference for the frozen `v0.1.x` release. Most
+This is the exact command reference for the frozen `v0.1.x` release. Most
 users should start with:
 
 ```bash
 bash scripts/validate_release.sh
 ```
 
-That runs the CPU and repository checks. On the validated RTX 4060 environment,
-the full manual GPU suite is available with:
+That runs CPU and repository checks. On the validated RTX 4060 environment, the
+full GPU validation suite is available with:
 
 ```bash
 bash scripts/validate_release.sh --gpu
 ```
+
+Maintainers can use the individual scripts below to isolate a regression. The
+unified entry point calls existing scripts and does not replace their reports.
 
 ## Environment
 
@@ -34,6 +37,17 @@ cargo clippy --workspace --all-targets -- -D warnings
 source scripts/cutile_env.sh
 cargo check -p plkv-kernels --features gpu-cutile --examples
 bash scripts/run_cutile_smoke.sh
+```
+
+Supporting environment and reference commands:
+
+```bash
+bash scripts/env_check.sh
+bash scripts/rtx4060_env_snapshot.sh
+bash scripts/rtx4060_memory_sanity.sh
+bash scripts/run_memory_model.sh
+bash scripts/run_reference_benchmarks.sh
+bash scripts/generate_golden_fixtures.sh
 ```
 
 ## Paging primitives
@@ -73,14 +87,14 @@ bash scripts/run_gpu_runtime_sequence_validation.sh
 bash scripts/run_gpu_model_profile_validation.sh
 ```
 
-## Benchmark and environment reports
+## Final benchmark
 
 ```bash
 bash scripts/run_final_benchmark.sh
-bash scripts/env_check.sh
 ```
 
-The canonical benchmark summary is committed in
-`reports/final_benchmark/summary.csv` and `summary.md`. Benchmark timing is
-synchronized host end-to-end timing, not kernel-only latency. GPU validation is
-manual because standard CI has no GPU runner.
+The canonical benchmark artifacts are committed in
+`reports/final_benchmark/summary.csv` and `summary.md`. Timing is synchronized
+host end-to-end timing, not kernel-only latency. The benchmark script writes
+fresh report files, so it is intentionally separate from release validation.
+GPU validation is manual because standard CI has no GPU runner.
