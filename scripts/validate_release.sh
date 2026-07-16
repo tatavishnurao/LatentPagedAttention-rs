@@ -31,13 +31,18 @@ run_gpu_validation() {
   echo "GPU_RELEASE_VALIDATION_OK=1"
 }
 
-run_cpu_validation
-
-if [[ "${1:-}" == "--gpu" ]]; then
-  run_gpu_validation
-elif [[ $# -ne 0 ]]; then
-  printf 'usage: %s [--gpu]\n' "$0" >&2
-  exit 2
-fi
+case "${1:-}" in
+  "")
+    run_cpu_validation
+    ;;
+  --gpu)
+    run_cpu_validation
+    run_gpu_validation
+    ;;
+  *)
+    printf 'usage: %s [--gpu]\n' "$0" >&2
+    exit 2
+    ;;
+esac
 
 echo "RELEASE_VALIDATION_OK=1"
