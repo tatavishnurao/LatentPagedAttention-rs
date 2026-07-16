@@ -3,27 +3,31 @@ name: CPU CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   cpu:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      - name: Sync Python environment
-        run: UV_PROJECT_ENVIRONMENT=attention99 uv sync
-      - name: Python tests
-        run: UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
-      - name: Ruff
-        run: UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
-      - name: Rust formatting
-        run: cargo fmt --all --check
-      - name: Rust tests
-        run: cargo test --workspace
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Whitespace
-        run: git diff --check
+      - name: Validate release script syntax
+        run: bash -n scripts/validate_release.sh
+      - name: Release validation
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/validate_release.sh | tee release-validation.log
+          grep -Fx 'CPU_RELEASE_VALIDATION_OK=1' release-validation.log
+          grep -Fx 'RELEASE_VALIDATION_OK=1' release-validation.log
