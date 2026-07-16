@@ -98,3 +98,22 @@ The canonical benchmark artifacts are committed in
 host end-to-end timing, not kernel-only latency. The benchmark script writes
 fresh report files, so it is intentionally separate from release validation.
 GPU validation is manual because standard CI has no GPU runner.
+
+## CI troubleshooting
+
+CI is CPU-only and invokes the same unified command used locally:
+
+```bash
+gh run list \
+  --repo tatavishnurao/LatentPagedAttention-rs \
+  --limit 20
+
+gh run view <RUN_ID> \
+  --repo tatavishnurao/LatentPagedAttention-rs \
+  --log-failed
+
+bash scripts/validate_release.sh
+```
+
+Use the granular scripts above to isolate a failure. Normal CI does not run GPU
+validation or recreate generated GPU benchmark reports.
