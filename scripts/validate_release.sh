@@ -6,7 +6,7 @@ run_step() {
 }
 
 run_cpu_validation() {
-  run_step env UV_PROJECT_ENVIRONMENT=attention99 uv sync
+  run_step env UV_PROJECT_ENVIRONMENT=attention99 uv sync --frozen
   run_step env UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
   run_step env UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
   run_step cargo fmt --all --check
