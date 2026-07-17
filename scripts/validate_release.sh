@@ -2,17 +2,11 @@
 set -euo pipefail
 
 run_step() {
-  if [[ "${VALIDATE_RELEASE_TEST_MODE:-0}" == "1" ]]; then
-    printf 'VALIDATION_TEST_COMMAND='
-    printf '%q ' "$@"
-    printf '\n'
-  else
-    "$@"
-  fi
+  "$@"
 }
 
 run_cpu_validation() {
-  run_step env UV_PROJECT_ENVIRONMENT=attention99 uv sync
+  run_step env UV_PROJECT_ENVIRONMENT=attention99 uv sync --frozen
   run_step env UV_PROJECT_ENVIRONMENT=attention99 uv run pytest -q
   run_step env UV_PROJECT_ENVIRONMENT=attention99 uv run ruff check .
   run_step cargo fmt --all --check
@@ -23,11 +17,7 @@ run_cpu_validation() {
 }
 
 run_gpu_validation() {
-  if [[ "${VALIDATE_RELEASE_TEST_MODE:-0}" == "1" ]]; then
-    echo "GPU_VALIDATION_START=1"
-  else
-    source scripts/cutile_env.sh
-  fi
+  source scripts/cutile_env.sh
   run_step cargo check -p plkv-kernels --features gpu-cutile --examples
   run_step bash scripts/run_cutile_smoke.sh
   run_step bash scripts/run_gpu_paged_lookup.sh
@@ -45,18 +35,24 @@ run_gpu_validation() {
   echo "GPU_RELEASE_VALIDATION_OK=1"
 }
 
-case "${1:-}" in
-  "")
-    run_cpu_validation
-    ;;
-  --gpu)
-    run_cpu_validation
-    run_gpu_validation
-    ;;
-  *)
-    printf 'usage: %s [--gpu]\n' "$0" >&2
-    exit 2
-    ;;
-esac
+main() {
+  case "${1:-}" in
+    "")
+      run_cpu_validation
+      ;;
+    --gpu)
+      run_cpu_validation
+      run_gpu_validation
+      ;;
+    *)
+      printf 'usage: %s [--gpu]\n' "${BASH_SOURCE[0]}" >&2
+      return 2
+      ;;
+  esac
 
-echo "RELEASE_VALIDATION_OK=1"
+  echo "RELEASE_VALIDATION_OK=1"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
