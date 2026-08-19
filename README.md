@@ -132,7 +132,6 @@ model-quality result, or general performance ranking.
 
 Latest release: `v0.1.1`
 
-`v0.1.x` is frozen except for factual, documentation, packaging, or reproducibility fixes. Development milestone documents remain available in the repository for maintainers and readers who need implementation history.
 
 ## Citation
 
