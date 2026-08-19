@@ -8,7 +8,7 @@ Can a paged latent cache be mutated and consumed directly on GPU without storing
 
 The repository answers this question for a controlled synthetic linear formulation. It is a GPU systems experiment, not a serving runtime or a model integration. The primary result is the measured trade-off between persistent cache bytes and decode compute.
 
-## Result summary
+## Result summary 
 
 The model-shaped synthetic profile compares a paged latent cache with an FP16 full-KV paged baseline:
 
