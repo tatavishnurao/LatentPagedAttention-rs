@@ -136,3 +136,9 @@ Latest release: `v0.1.1`
 ## Citation
 
 Use [CITATION.cff](CITATION.cff) for citation metadata.
+
+## Architecture diagrams
+
+- [System overview](docs/architecture/system-overview.svg)
+- [Critical path](docs/architecture/critical-path.svg)
+- [Evidence notes](docs/architecture/README.md)
