@@ -1,5 +1,7 @@
 .venv/
 attention99/
+attention99-test/
+pagedatt/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
@@ -8,3 +10,18 @@ target/
 reports/rtx4060_baseline/*.txt
 reports/rtx4060_baseline/*.csv
 reports/rtx4060_gpu_smoke/*.txt
+reports/rtx4060_gpu_smoke/*.log
+
+# Regenerated local experiment outputs (keep the narrative notes above).
+reports/p0_gpu_baseline/
+reports/p05_clean_display_replications/
+reports/p05_hardware_attribution/
+reports/p05_hardware_attribution_pilot/
+reports/p1_sequence_crossover/
+reports/RESEARCH_RUN_FILES_2026-09-04.txt
+reports/reference_benchmarks/*.csv
+
+notes/LATENT_PAGED_ATTENTION_RESEARCH_PAPER_READINESS.md
+notes/LPA_P0_GPU_BASELINE_EXPERIMENT.md
+notes/LPA_P05_HARDWARE_ATTRIBUTION.md
+notes/LPA_P1_SEQUENCE_CROSSOVER.md
