@@ -1,0 +1,60 @@
+{
+  "phase": "P1.5A",
+  "question": "Which kernel prevents the current matched A/B control implementation from reaching the long-context memory-hierarchy regime?",
+  "answer": "MULTIPLE_KERNELS: score and context kernels both scale superlinearly (observed exponents ~2.5 and ~2.1 over 1K->16K). Full-width softmax is NEGLIGIBLE (flat 0.006-0.069 ms across all lengths, 0.01% of 16K total) and is NOT a barrier.",
+  "evidence_basis": {
+    "lengths_with_complete_per_kernel_data": [1024, 2048, 4096, 8192, 16384],
+    "lengths_thermal_aborted": [32768],
+    "note_16k": "16K run completed all timed phases and wrote its summary before the driver killed the process at the 86 C policy limit; its data is retained with that caveat.",
+    "note_32k": "No per-kernel 32K data. Only external reference: P1 single-iteration probe medians A 644.398 ms / B 724.988 ms.",
+    "observed_scaling_exponents_1k_to_16k": {
+      "A_score": 2.53,
+      "B_score": 2.52,
+      "A_context": 2.08,
+      "B_context": 2.09,
+      "A_softmax": "flat/no trend",
+      "B_softmax": "flat/no trend",
+      "linear_expectation": 1.0
+    },
+    "candidate_mechanism_from_source_inspection": "physical_block() loads the ENTIRE block table (N/16 i32 entries) as a tile on every call, then extracts one entry. It is called once per score tile (N tiles -> O(N^2) aggregate table traffic) and once per serial context iteration (16 heads x N/16 iterations -> O(N^2), all on the serial critical path). Softmax never touches the table, consistent with its measured flatness. This mechanism is source-derived and timing-consistent but not yet counter-verified.",
+    "softmax_classification": "NEGLIGIBLE",
+    "context_classification": "MAJOR (dominant share ~63-65% at 2K-4K; ~N^2.08; 16-block serial topology)",
+    "score_classification": "DOMINANT at longest safe length (70-71% share at 16K; steepest scaling ~N^2.5)"
+  },
+  "recommended_repairs": [
+    {
+      "rank": 1,
+      "id": "R-TABLE",
+      "name": "Single-entry block-table lookup",
+      "applies_to": ["A score", "A context", "B score", "B context"],
+      "description": "Replace the per-call full-table tile load in physical_block() (load_tile of all N/16 entries + extract) with a single-entry lookup (1-element tile or scalar gather of table[logical]). Applied symmetrically to the A (full_kv_baseline) and B (model_profile) kernel pairs.",
+      "semantics": "Preserved exactly. Same table values, same indirection results; expected bitwise-identical outputs relative to A0/B0.",
+      "evidence": "Removes the only N-dependent per-work-unit cost identified in score and context sources; consistent with measured superlinear exponents and with softmax's flatness (softmax has no table access).",
+      "expected_research_value": "HIGH: restores approximately O(N) scaling for both dominant kernels; 16K pipeline expected to fall from ~90 ms toward low single-digit ms, making the cache-residency crossover region safely measurable.",
+      "engineering_risk": "LOW: one helper function per module; launch grids, tile shapes and arithmetic unchanged."
+    },
+    {
+      "rank": 2,
+      "id": "R-CTX-PAR",
+      "name": "Parallel context reduction (Candidate B)",
+      "applies_to": ["A context", "B context"],
+      "description": "Two-stage context: stage 1 grid (query_head, sequence_chunk) accumulates partial weighted sums over contiguous logical-block chunks; stage 2 reduces chunk partials per query head. For B, the latent partial sums ([32]) are reduced first, then the unchanged output projection is applied once.",
+      "semantics": "Preserved within normal floating-point ordering differences (FP32 accumulation associativity changes only).",
+      "evidence": "Context still launches only 16 blocks (8.33% occupancy at 1K, P0.5) and serializes N/16 iterations; after R-TABLE this serial O(N) chain becomes the residual long-context barrier.",
+      "expected_research_value": "MEDIUM-HIGH: unlocks lengths beyond ~16K-32K for the crossover study; limited value at <=16K if R-TABLE already restores near-linear timing.",
+      "engineering_risk": "MEDIUM: extra transient partial buffers, second kernel launch, correctness revalidation for both paths."
+    },
+    {
+      "rank": 3,
+      "id": "NO-SOFTMAX-REPAIR",
+      "name": "Hierarchical exact softmax (Candidate A) - NOT RECOMMENDED",
+      "applies_to": [],
+      "description": "Deliberately not recommended. Measurement shows full-width compile-time softmax is NEGLIGIBLE at every tested length (0.01% of 16K total). Implementing Candidate A would add complexity and thermal cost without removing any measured barrier.",
+      "evidence": "Softmax medians: 0.0082/0.0086 ms (1K) -> 0.0102/0.0112 ms (16K).",
+      "expected_research_value": "NONE",
+      "engineering_risk": "Would risk disturbing the validated control for no measurable gain."
+    }
+  ],
+  "symmetry_requirement": "A0 (original full KV) and B0 (original latent) must remain runnable and unmodified. Repairs produce A1/B1 variants only. Never optimize only the latent path.",
+  "primary_scalability_barrier": "MULTIPLE_KERNELS"
+}
