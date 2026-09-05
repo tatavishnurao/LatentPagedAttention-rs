@@ -1,0 +1,93 @@
+{
+  "tolerances": {
+    "max_absolute_error": 0.005,
+    "max_probability_row_sum_error": 0.0001
+  },
+  "by_seq": {
+    "1024": {
+      "full_kv": {
+        "max_absolute_error": 1.430511474609375e-05,
+        "mean_absolute_error": 3.894888055311249e-07,
+        "rmse": 1.092248146974628e-06,
+        "max_relative_error": 0.004352126607319486,
+        "max_probability_row_sum_error": 8.344650268554688e-07
+      },
+      "latent_original": {
+        "max_absolute_error": 7.62939453125e-06,
+        "mean_absolute_error": 3.08896467650223e-07,
+        "rmse": 8.309624904411288e-07,
+        "max_relative_error": 0.0012626262626262627,
+        "max_probability_row_sum_error": 1.1324882507324219e-06
+      },
+      "pass": true
+    },
+    "2048": {
+      "full_kv": {
+        "max_absolute_error": 2.574920654296875e-05,
+        "mean_absolute_error": 3.676727922963983e-07,
+        "rmse": 1.157703355541532e-06,
+        "max_relative_error": 0.004352126607319486,
+        "max_probability_row_sum_error": 1.1920928955078125e-06
+      },
+      "latent_original": {
+        "max_absolute_error": 1.2874603271484375e-05,
+        "mean_absolute_error": 3.1050937272911383e-07,
+        "rmse": 9.260488937626224e-07,
+        "max_relative_error": 0.0012626262626262627,
+        "max_probability_row_sum_error": 1.1920928955078125e-06
+      },
+      "pass": true
+    },
+    "4096": {
+      "full_kv": {
+        "max_absolute_error": 3.62396240234375e-05,
+        "mean_absolute_error": 3.561834569339009e-07,
+        "rmse": 1.1748805272565112e-06,
+        "max_relative_error": 0.0096964586846543,
+        "max_probability_row_sum_error": 2.2649765014648438e-06
+      },
+      "latent_original": {
+        "max_absolute_error": 2.384185791015625e-05,
+        "mean_absolute_error": 3.108070822479722e-07,
+        "rmse": 1.0650167942397505e-06,
+        "max_relative_error": 0.0012626262626262627,
+        "max_probability_row_sum_error": 2.0265579223632812e-06
+      },
+      "pass": true
+    },
+    "8192": {
+      "full_kv": {
+        "max_absolute_error": 6.151199340820312e-05,
+        "mean_absolute_error": 3.465363260398017e-07,
+        "rmse": 1.2694026212542775e-06,
+        "max_relative_error": 0.0096964586846543,
+        "max_probability_row_sum_error": 4.470348358154297e-06
+      },
+      "latent_original": {
+        "max_absolute_error": 4.2438507080078125e-05,
+        "mean_absolute_error": 2.907869062124038e-07,
+        "rmse": 1.0473558818280707e-06,
+        "max_relative_error": 0.0012626262626262627,
+        "max_probability_row_sum_error": 4.351139068603516e-06
+      },
+      "pass": true
+    },
+    "16384": {
+      "full_kv": {
+        "max_absolute_error": 0.00010156631469726562,
+        "mean_absolute_error": 3.400442596782262e-07,
+        "rmse": 1.351823202730578e-06,
+        "max_relative_error": 0.0096964586846543,
+        "max_probability_row_sum_error": 6.735324859619141e-06
+      },
+      "latent_original": {
+        "max_absolute_error": 7.677078247070312e-05,
+        "mean_absolute_error": 2.8827703521244563e-07,
+        "rmse": 1.190034771084527e-06,
+        "max_relative_error": 0.0012626262626262627,
+        "max_probability_row_sum_error": 7.271766662597656e-06
+      },
+      "pass": true
+    }
+  }
+}
