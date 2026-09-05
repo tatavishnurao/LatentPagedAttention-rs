@@ -1,0 +1,85 @@
+{
+  "note": "fraction of isolated-kernel median sum per variant",
+  "by_seq": {
+    "1024": {
+      "A": {
+        "score_fraction": 0.38374001598312724,
+        "softmax_fraction": 0.05602363606865207,
+        "context_fraction": 0.5602363479482206,
+        "isolated_sum_ms": 0.14622399676591158,
+        "pipeline_median_ms": 0.13516800105571747
+      },
+      "B": {
+        "score_fraction": 0.4055657359664061,
+        "softmax_fraction": 0.05824614393322846,
+        "context_fraction": 0.5361881201003654,
+        "isolated_sum_ms": 0.14833600213751197,
+        "pipeline_median_ms": 0.13859199732542038
+      }
+    },
+    "2048": {
+      "A": {
+        "score_fraction": 0.33429103419156764,
+        "softmax_fraction": 0.011164012681190204,
+        "context_fraction": 0.6545449531272421,
+        "isolated_sum_ms": 0.5847359995823354,
+        "pipeline_median_ms": 0.5775359869003296
+      },
+      "B": {
+        "score_fraction": 0.36618360438283326,
+        "softmax_fraction": 0.011131888049824214,
+        "context_fraction": 0.6226845075673425,
+        "isolated_sum_ms": 0.5476160070393234,
+        "pipeline_median_ms": 0.5355520248413086
+      }
+    },
+    "4096": {
+      "A": {
+        "score_fraction": 0.336487673360617,
+        "softmax_fraction": 0.02970950563343095,
+        "context_fraction": 0.6338028210059521,
+        "isolated_sum_ms": 2.3265280202031136,
+        "pipeline_median_ms": 2.438655972480774
+      },
+      "B": {
+        "score_fraction": 0.3625241555110797,
+        "softmax_fraction": 0.004137960875639833,
+        "context_fraction": 0.6333378836132805,
+        "isolated_sum_ms": 2.227184017188847,
+        "pipeline_median_ms": 1.7269759774208069
+      }
+    },
+    "8192": {
+      "A": {
+        "score_fraction": 0.5535238374166419,
+        "softmax_fraction": 0.0033340947224103964,
+        "context_fraction": 0.4431420678609477,
+        "isolated_sum_ms": 15.970751833170652,
+        "pipeline_median_ms": 13.827968120574951
+      },
+      "B": {
+        "score_fraction": 0.5162005343272494,
+        "softmax_fraction": 0.004299467879003968,
+        "context_fraction": 0.4794999977937466,
+        "isolated_sum_ms": 14.342239990830421,
+        "pipeline_median_ms": 13.335760116577148
+      }
+    },
+    "16384": {
+      "A": {
+        "score_fraction": 0.7041019813021975,
+        "softmax_fraction": 0.00011464471180962835,
+        "context_fraction": 0.2957833739859929,
+        "isolated_sum_ms": 89.31942502781749,
+        "pipeline_median_ms": 92.96790313720703
+      },
+      "B": {
+        "score_fraction": 0.7123455859830945,
+        "softmax_fraction": 0.0001221049479247915,
+        "context_fraction": 0.2875323090689807,
+        "isolated_sum_ms": 91.46230745036155,
+        "pipeline_median_ms": 89.76163482666016
+      }
+    }
+  }
+}
