@@ -1,0 +1,32 @@
+=== seq=1024 ===
+  seq=1024: launching warmup=10 iterations=50
+  seq=1024: status=OK
+  [cooldown 1024] temp=75 C target<=78 C
+=== seq=2048 ===
+  seq=2048: launching warmup=10 iterations=30
+  seq=2048: status=OK
+  [cooldown 2048] temp=77 C target<=78 C
+=== seq=4096 ===
+  seq=4096: launching warmup=5 iterations=20
+  seq=4096: status=OK
+  [cooldown 4096] temp=76 C target<=78 C
+=== seq=8192 ===
+  seq=8192: launching warmup=3 iterations=10
+  seq=8192: status=OK
+  [cooldown 8192] temp=77 C target<=78 C
+=== seq=16384 ===
+  seq=16384: launching warmup=1 iterations=5
+  seq=16384: THERMAL_ABORT at 86 C, killing process
+  seq=16384: status=THERMAL_ABORT
+  THERMAL_ABORT recorded; attempting cooldown before continuing.
+  [post-abort cooldown 16384] temp=79 C target<=78 C
+  [post-abort cooldown 16384] temp=78 C target<=78 C
+=== seq=32768 ===
+  seq=32768: launching warmup=1 iterations=1
+  seq=32768: THERMAL_ABORT at 86 C, killing process
+  seq=32768: status=THERMAL_ABORT
+  THERMAL_ABORT recorded; attempting cooldown before continuing.
+  [post-abort cooldown 32768] temp=80 C target<=78 C
+  [post-abort cooldown 32768] temp=79 C target<=78 C
+  [post-abort cooldown 32768] temp=78 C target<=78 C
+Thermal manifest: /mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/thermal_manifest.json
