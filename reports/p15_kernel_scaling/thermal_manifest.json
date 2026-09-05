@@ -1,0 +1,713 @@
+{
+  "policy": {
+    "pre_abort_c": 84.0,
+    "during_abort_c": 86.0,
+    "cooldown_target_c": 78.0,
+    "clocks_or_power_modified": false,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "plan": [
+    {
+      "seq": 1024,
+      "warmup": 10,
+      "iterations": 50
+    },
+    {
+      "seq": 2048,
+      "warmup": 10,
+      "iterations": 30
+    },
+    {
+      "seq": 4096,
+      "warmup": 5,
+      "iterations": 20
+    },
+    {
+      "seq": 8192,
+      "warmup": 3,
+      "iterations": 10
+    },
+    {
+      "seq": 16384,
+      "warmup": 1,
+      "iterations": 5
+    },
+    {
+      "seq": 32768,
+      "warmup": 1,
+      "iterations": 1
+    }
+  ],
+  "runs": [
+    {
+      "seq": 1024,
+      "warmup": 10,
+      "iterations": 50,
+      "status": "OK",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556788018,
+          "gpu_util_pct": 32,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1410,
+          "power_draw_w": "14.98",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556789184,
+          "gpu_util_pct": 30,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1650,
+          "power_draw_w": "14.86",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556790320,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1650,
+          "power_draw_w": "16.23",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556792928,
+          "gpu_util_pct": 24,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.81",
+          "compute_processes": "2095, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556794631,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1125,
+          "power_draw_w": "15.48",
+          "compute_processes": "none"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556794783,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1125,
+          "power_draw_w": "13.35",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556795946,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 75.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 630,
+          "power_draw_w": "6.66",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556797229,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 75.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 390,
+          "power_draw_w": "4.67",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "P15_KERNEL=A_score SEQ=1024 MEDIAN_MS=0.05611199885606766\nP15_KERNEL=B_score SEQ=1024 MEDIAN_MS=0.06015999987721443\nP15_KERNEL=A_softmax SEQ=1024 MEDIAN_MS=0.008191999979317188\nP15_KERNEL=B_softmax SEQ=1024 MEDIAN_MS=0.008640000130981207\nP15_KERNEL=A_context SEQ=1024 MEDIAN_MS=0.08191999793052673\nP15_KERNEL=B_context SEQ=1024 MEDIAN_MS=0.07953600212931633\nP15_KERNEL=A_pipeline SEQ=1024 MEDIAN_MS=0.13516800105571747\nP15_KERNEL=B_pipeline SEQ=1024 MEDIAN_MS=0.13859199732542038\nP15_SUMMARY_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq1024_1788556793.json\nP15_SAMPLES_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_samples_seq1024_1788556793.jsonl\nP15_KERNEL_SCALING_OK=1\n",
+      "summary_path": "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq1024_1788556793.json",
+      "peak_temperature_c": 76.0
+    },
+    {
+      "seq": 2048,
+      "warmup": 10,
+      "iterations": 30,
+      "status": "OK",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556798593,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 31,
+          "temperature_c": 75.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "3.62",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556799826,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 75.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "2.84",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556801113,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 75.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "2.71",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556803769,
+          "gpu_util_pct": 17,
+          "mem_util_pct": 0,
+          "temperature_c": 76.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.56",
+          "compute_processes": "2148, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556805430,
+          "gpu_util_pct": 33,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2685,
+          "power_draw_w": "24.74",
+          "compute_processes": "none"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556807932,
+          "gpu_util_pct": 33,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2685,
+          "power_draw_w": "25.59",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "P15_KERNEL=A_score SEQ=2048 MEDIAN_MS=0.19547200202941895\nP15_KERNEL=B_score SEQ=2048 MEDIAN_MS=0.20052800327539444\nP15_KERNEL=A_softmax SEQ=2048 MEDIAN_MS=0.0065280001144856215\nP15_KERNEL=B_softmax SEQ=2048 MEDIAN_MS=0.006096000084653497\nP15_KERNEL=A_context SEQ=2048 MEDIAN_MS=0.3827359974384308\nP15_KERNEL=B_context SEQ=2048 MEDIAN_MS=0.3409920036792755\nP15_KERNEL=A_pipeline SEQ=2048 MEDIAN_MS=0.5775359869003296\nP15_KERNEL=B_pipeline SEQ=2048 MEDIAN_MS=0.5355520248413086\nP15_SUMMARY_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq2048_1788556804.json\nP15_SAMPLES_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_samples_seq2048_1788556804.jsonl\nP15_KERNEL_SCALING_OK=1\n",
+      "summary_path": "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq2048_1788556804.json",
+      "peak_temperature_c": 78.0
+    },
+    {
+      "seq": 4096,
+      "warmup": 5,
+      "iterations": 20,
+      "status": "OK",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556809252,
+          "gpu_util_pct": 38,
+          "mem_util_pct": 8,
+          "temperature_c": 77.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1185,
+          "power_draw_w": "20.60",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556810400,
+          "gpu_util_pct": 19,
+          "mem_util_pct": 1,
+          "temperature_c": 76.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "10.84",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556811563,
+          "gpu_util_pct": 18,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "18.53",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556814193,
+          "gpu_util_pct": 16,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.89",
+          "compute_processes": "2193, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556815844,
+          "gpu_util_pct": 29,
+          "mem_util_pct": 1,
+          "temperature_c": 79.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2685,
+          "power_draw_w": "25.06",
+          "compute_processes": "none"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556815989,
+          "gpu_util_pct": 29,
+          "mem_util_pct": 1,
+          "temperature_c": 79.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2685,
+          "power_draw_w": "26.99",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556817126,
+          "gpu_util_pct": 3,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1545,
+          "power_draw_w": "26.37",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556818257,
+          "gpu_util_pct": 10,
+          "mem_util_pct": 1,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1020,
+          "power_draw_w": "11.49",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "P15_KERNEL=A_score SEQ=4096 MEDIAN_MS=0.7828480005264282\nP15_KERNEL=B_score SEQ=4096 MEDIAN_MS=0.8074080049991608\nP15_KERNEL=A_softmax SEQ=4096 MEDIAN_MS=0.06911999732255936\nP15_KERNEL=B_softmax SEQ=4096 MEDIAN_MS=0.009216000325977802\nP15_KERNEL=A_context SEQ=4096 MEDIAN_MS=1.474560022354126\nP15_KERNEL=B_context SEQ=4096 MEDIAN_MS=1.4105600118637085\nP15_KERNEL=A_pipeline SEQ=4096 MEDIAN_MS=2.438655972480774\nP15_KERNEL=B_pipeline SEQ=4096 MEDIAN_MS=1.7269759774208069\nP15_SUMMARY_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq4096_1788556815.json\nP15_SAMPLES_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_samples_seq4096_1788556815.jsonl\nP15_KERNEL_SCALING_OK=1\n",
+      "summary_path": "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq4096_1788556815.json",
+      "peak_temperature_c": 79.0
+    },
+    {
+      "seq": 8192,
+      "warmup": 3,
+      "iterations": 10,
+      "status": "OK",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556819543,
+          "gpu_util_pct": 10,
+          "mem_util_pct": 1,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 585,
+          "power_draw_w": "6.60",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556820694,
+          "gpu_util_pct": 10,
+          "mem_util_pct": 1,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 615,
+          "power_draw_w": "6.97",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556821836,
+          "gpu_util_pct": 10,
+          "mem_util_pct": 1,
+          "temperature_c": 76.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 615,
+          "power_draw_w": "5.91",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556824458,
+          "gpu_util_pct": 3,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.27",
+          "compute_processes": "2246, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556826065,
+          "gpu_util_pct": 15,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.11",
+          "compute_processes": "2246, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556827754,
+          "gpu_util_pct": 13,
+          "mem_util_pct": 0,
+          "temperature_c": 80.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "33.44",
+          "compute_processes": "none"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556827913,
+          "gpu_util_pct": 5,
+          "mem_util_pct": 0,
+          "temperature_c": 80.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "28.88",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556829091,
+          "gpu_util_pct": 4,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P4",
+          "sm_clock_mhz": 945,
+          "power_draw_w": "19.63",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556830272,
+          "gpu_util_pct": 4,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P4",
+          "sm_clock_mhz": 1035,
+          "power_draw_w": "11.56",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "P15_KERNEL=A_score SEQ=8192 MEDIAN_MS=8.840191841125488\nP15_KERNEL=B_score SEQ=8192 MEDIAN_MS=7.403471946716309\nP15_KERNEL=A_softmax SEQ=8192 MEDIAN_MS=0.053247999399900436\nP15_KERNEL=B_softmax SEQ=8192 MEDIAN_MS=0.061664000153541565\nP15_KERNEL=A_context SEQ=8192 MEDIAN_MS=7.077311992645264\nP15_KERNEL=B_context SEQ=8192 MEDIAN_MS=6.877104043960571\nP15_KERNEL=A_pipeline SEQ=8192 MEDIAN_MS=13.827968120574951\nP15_KERNEL=B_pipeline SEQ=8192 MEDIAN_MS=13.335760116577148\nP15_SUMMARY_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq8192_1788556826.json\nP15_SAMPLES_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_samples_seq8192_1788556826.jsonl\nP15_KERNEL_SCALING_OK=1\n",
+      "summary_path": "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq8192_1788556826.json",
+      "peak_temperature_c": 80.0
+    },
+    {
+      "seq": 16384,
+      "warmup": 1,
+      "iterations": 5,
+      "status": "THERMAL_ABORT",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556831643,
+          "gpu_util_pct": 4,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P4",
+          "sm_clock_mhz": 300,
+          "power_draw_w": "11.33",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556832881,
+          "gpu_util_pct": 71,
+          "mem_util_pct": 4,
+          "temperature_c": 76.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "8.10",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556834164,
+          "gpu_util_pct": 22,
+          "mem_util_pct": 0,
+          "temperature_c": 77.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1500,
+          "power_draw_w": "13.02",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556836798,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "18.14",
+          "compute_processes": "2305, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556838445,
+          "gpu_util_pct": 1,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.90",
+          "compute_processes": "2305, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556840074,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "18.92",
+          "compute_processes": "2305, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556844089,
+          "gpu_util_pct": 99,
+          "mem_util_pct": 100,
+          "temperature_c": 84.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "50.06",
+          "compute_processes": "2305, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556845741,
+          "gpu_util_pct": 100,
+          "mem_util_pct": 93,
+          "temperature_c": 86.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "69.37",
+          "compute_processes": "none"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556845922,
+          "gpu_util_pct": 30,
+          "mem_util_pct": 22,
+          "temperature_c": 86.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "65.69",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556847117,
+          "gpu_util_pct": 31,
+          "mem_util_pct": 0,
+          "temperature_c": 81.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "29.54",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556848280,
+          "gpu_util_pct": 31,
+          "mem_util_pct": 0,
+          "temperature_c": 80.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2115,
+          "power_draw_w": "23.90",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "P15_KERNEL=A_score SEQ=16384 MEDIAN_MS=62.889984130859375\nP15_KERNEL=B_score SEQ=16384 MEDIAN_MS=65.15277099609375\nP15_KERNEL=A_softmax SEQ=16384 MEDIAN_MS=0.010239999741315842\nP15_KERNEL=B_softmax SEQ=16384 MEDIAN_MS=0.011168000288307667\nP15_KERNEL=A_context SEQ=16384 MEDIAN_MS=26.419200897216797\nP15_KERNEL=B_context SEQ=16384 MEDIAN_MS=26.298368453979492\nP15_KERNEL=A_pipeline SEQ=16384 MEDIAN_MS=92.96790313720703\nP15_KERNEL=B_pipeline SEQ=16384 MEDIAN_MS=89.76163482666016\nP15_SUMMARY_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq16384_1788556845.json\nP15_SAMPLES_PATH=/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_samples_seq16384_1788556845.jsonl\nP15_KERNEL_SCALING_OK=1\n",
+      "summary_path": "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/p15_kernel_scaling/p15_summary_seq16384_1788556845.json",
+      "peak_temperature_c": 86.0
+    },
+    {
+      "seq": 32768,
+      "warmup": 1,
+      "iterations": 1,
+      "status": "THERMAL_ABORT",
+      "pre_thermal": [
+        {
+          "unix_ms": 1788556859834,
+          "gpu_util_pct": 25,
+          "mem_util_pct": 1,
+          "temperature_c": 78.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 1710,
+          "power_draw_w": "13.14",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556861159,
+          "gpu_util_pct": 27,
+          "mem_util_pct": 0,
+          "temperature_c": 78.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 1710,
+          "power_draw_w": "16.46",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556862360,
+          "gpu_util_pct": 39,
+          "mem_util_pct": 23,
+          "temperature_c": 78.0,
+          "pstate": "P5",
+          "sm_clock_mhz": 1125,
+          "power_draw_w": "13.78",
+          "compute_processes": "none"
+        }
+      ],
+      "during_thermal": [
+        {
+          "unix_ms": 1788556864970,
+          "gpu_util_pct": 10,
+          "mem_util_pct": 2,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "17.49",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556866595,
+          "gpu_util_pct": 4,
+          "mem_util_pct": 1,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "18.66",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556868214,
+          "gpu_util_pct": 24,
+          "mem_util_pct": 0,
+          "temperature_c": 81.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "29.34",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556869820,
+          "gpu_util_pct": 84,
+          "mem_util_pct": 13,
+          "temperature_c": 78.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1020,
+          "power_draw_w": "13.85",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556871464,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 79.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1890,
+          "power_draw_w": "18.43",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556873064,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 81.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "30.60",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556874706,
+          "gpu_util_pct": 32,
+          "mem_util_pct": 26,
+          "temperature_c": 79.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 555,
+          "power_draw_w": "26.40",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556878631,
+          "gpu_util_pct": 0,
+          "mem_util_pct": 0,
+          "temperature_c": 81.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "28.17",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556880235,
+          "gpu_util_pct": 99,
+          "mem_util_pct": 100,
+          "temperature_c": 81.0,
+          "pstate": "P3",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "31.67",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        },
+        {
+          "unix_ms": 1788556881840,
+          "gpu_util_pct": 99,
+          "mem_util_pct": 100,
+          "temperature_c": 86.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "70.93",
+          "compute_processes": "2374, [Not Found], [N/A]"
+        }
+      ],
+      "post_thermal": [
+        {
+          "unix_ms": 1788556882061,
+          "gpu_util_pct": 100,
+          "mem_util_pct": 100,
+          "temperature_c": 86.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "67.93",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556883256,
+          "gpu_util_pct": 22,
+          "mem_util_pct": 1,
+          "temperature_c": 82.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 2670,
+          "power_draw_w": "30.60",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1788556884455,
+          "gpu_util_pct": 31,
+          "mem_util_pct": 1,
+          "temperature_c": 81.0,
+          "pstate": "P0",
+          "sm_clock_mhz": 1980,
+          "power_draw_w": "24.35",
+          "compute_processes": "none"
+        }
+      ],
+      "stdout_tail": "",
+      "summary_path": null,
+      "peak_temperature_c": 86.0
+    }
+  ]
+}
