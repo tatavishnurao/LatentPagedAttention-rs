@@ -325,6 +325,17 @@ mod gpu_impl {
             .as_secs();
         let p = a.output_dir.join(format!("summary_seq{n}_{stamp}.json"));
         serde_json::to_writer_pretty(File::create(&p).unwrap(), &summary).unwrap();
+        let raw = p.with_extension("jsonl");
+        let mut writer = BufWriter::new(File::create(&raw).unwrap());
+        for (name, timing) in &summary.kernels {
+            for (iteration, &latency_ms) in timing.samples_ms.iter().enumerate() {
+                serde_json::to_writer(
+                    &mut writer,
+                    &serde_json::json!({"kernel": name, "iteration": iteration, "latency_ms": latency_ms}),
+                ).unwrap();
+                writer.write_all(b"\n").unwrap();
+            }
+        }
         println!("P15B_SUMMARY_PATH={}", p.display());
         println!("P15B_SAMPLES_PATH={}", raw.display());
         println!("P15B_OK=1");
