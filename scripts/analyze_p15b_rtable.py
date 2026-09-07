@@ -8,7 +8,7 @@ S = {}
 for p in glob.glob(str(OUT / "summary_seq*.json")):
     d=json.loads(Path(p).read_text()); S[d["seq"]]=d
 S=dict(sorted(S.items()))
-per={"measured_lengths":list(S),"by_seq":{}}
+per={"measured_lengths":list(S),"note":"medians are bounded CUDA-event diagnostics; raw samples are retained in per-length summaries and JSONL files","by_seq":{}}
 for n,d in S.items():
     per["by_seq"][str(n)]={"kernels":{k:{x:v[x] for x in ("warmup","iterations","median_ms","mean_ms","min_ms","max_ms","samples_ms")} for k,v in d["kernels"].items()},"correctness":d["correctness"]}
 base=S[min(S)]
