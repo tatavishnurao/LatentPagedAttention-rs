@@ -203,6 +203,7 @@ def run_length(seq: int, warmup: int, iterations: int) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--only", type=int, default=0, help="run only this sequence length")
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -224,6 +225,8 @@ def main() -> None:
     }
 
     for seq, warmup, iterations in PLAN:
+        if args.only and seq != args.only:
+            continue
         print(f"=== seq={seq} ===", flush=True)
         record = run_length(seq, warmup, iterations)
         manifest["runs"].append(record)
