@@ -30,6 +30,44 @@ def specialize_kernel(source: str, length: int, blocks: int, kind: str) -> str:
     return source
 
 
+def specialize_rtable(source: str, length: int, blocks: int, kind: str) -> str:
+    suffix = str(length)
+    if kind == "full":
+        source = source.replace(
+            "pub mod p15b_full_kv_baseline_kernel",
+            f"pub mod p15b_full_kv_baseline_kernel_{suffix}",
+        )
+        source = source.replace(
+            "model_small_full_kv_scores_fp16_storage",
+            f"model_small_full_kv_scores_fp16_storage_rtable_{suffix}",
+        )
+        source = source.replace(
+            "model_small_full_kv_context_fp16_storage",
+            f"model_small_full_kv_context_fp16_storage_rtable_{suffix}",
+        )
+    else:
+        source = source.replace(
+            "pub mod p15b_model_profile_kernel",
+            f"pub mod p15b_model_profile_kernel_{suffix}",
+        )
+        source = source.replace(
+            "model_small_scores_fp16_storage",
+            f"model_small_scores_fp16_storage_rtable_{suffix}",
+        )
+        source = source.replace(
+            "model_small_softmax_1024_runtime",
+            f"model_small_softmax_{suffix}_runtime",  # shared unchanged softmax
+        )
+        source = source.replace(
+            "model_small_context_fp16_storage",
+            f"model_small_context_fp16_storage_rtable_{suffix}",
+        )
+    source = source.replace("1024", str(length))
+    source = source.replace("Tensor<i32, { [64] }>", f"Tensor<i32, {{ [{blocks}] }}>")
+    source = source.replace("0i32..64i32", f"0i32..{blocks}i32")
+    return source
+
+
 def main() -> None:
     full = (ROOT / "crates/plkv-kernels/src/cutile/full_kv_baseline.rs").read_text()
     latent = (ROOT / "crates/plkv-kernels/src/cutile/model_profile.rs").read_text()
@@ -46,6 +84,21 @@ def main() -> None:
         )
     out = ROOT / "crates/plkv-kernels/src/cutile/p1_sequence_kernels.rs"
     out.write_text("\n".join(chunks), encoding="utf-8")
+
+    rtable_full = (ROOT / "crates/plkv-kernels/src/cutile/p15b_full_kv_baseline.rs").read_text()
+    rtable_latent = (ROOT / "crates/plkv-kernels/src/cutile/p15b_model_profile.rs").read_text()
+    rtable_chunks = ["// GENERATED R-TABLE kernels; A0/B0 sources remain unchanged.\n"]
+    for length in LENGTHS:
+        blocks = length // 16
+        rtable_chunks.extend(
+            [
+                specialize_rtable(rtable_full, length, blocks, "full"),
+                specialize_rtable(rtable_latent, length, blocks, "latent"),
+            ]
+        )
+    (ROOT / "crates/plkv-kernels/src/cutile/p15b_rtable_kernels.rs").write_text(
+        "\n".join(rtable_chunks), encoding="utf-8"
+    )
 
     template = (ROOT / "crates/plkv-kernels/examples/p0_gpu_baseline.rs").read_text()
     for length in LENGTHS:
