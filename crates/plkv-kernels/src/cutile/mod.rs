@@ -6,6 +6,7 @@ pub mod gqa_decode;
 pub mod latent_kv_reconstruction;
 pub mod model_profile;
 pub mod model_profile_preprojected;
+pub mod p15b_rtable_kernels;
 pub mod p1_sequence_kernels;
 pub mod paged_gqa_decode;
 pub mod paged_kv_write;
