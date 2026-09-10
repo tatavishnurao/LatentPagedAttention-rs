@@ -2,17 +2,16 @@
 mod gpu_impl {
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
-    use cutile::cuda_core::{sys, Stream};
+    use cutile::cuda_core::{Stream, sys};
     use cutile::half::f16;
     use cutile::tensor::{IntoPartition, Reshape, Tensor, ToHostVec};
     use cutile::tile_kernel::DeviceOp;
     use plkv_core::{
-        direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum,
+        GqaDecodeResult, direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum,
         paged_full_kv_gqa_decode_fp16_storage_runtime_f32_accum, quantize_f32_to_f16_storage,
-        GqaDecodeResult,
     };
-    use plkv_kernels::cutile::p15b_rtable_kernels::*;
     use plkv_kernels::cutile::p1_sequence_kernels::*;
+    use plkv_kernels::cutile::p15b_rtable_kernels::*;
     use serde::Serialize;
     use std::collections::BTreeMap;
     use std::fs::{self, File};
@@ -36,6 +35,10 @@ mod gpu_impl {
         B1Score,
         B0Context,
         B1Context,
+        A0Softmax,
+        A1Softmax,
+        B0Softmax,
+        B1Softmax,
         A0Pipeline,
         A1Pipeline,
         B0Pipeline,
@@ -52,6 +55,10 @@ mod gpu_impl {
                 K::B1Score => "B1_score",
                 K::B0Context => "B0_context",
                 K::B1Context => "B1_context",
+                K::A0Softmax => "A0_softmax",
+                K::A1Softmax => "A1_softmax",
+                K::B0Softmax => "B0_softmax",
+                K::B1Softmax => "B1_softmax",
                 K::A0Pipeline => "A0_pipeline",
                 K::A1Pipeline => "A1_pipeline",
                 K::B0Pipeline => "B0_pipeline",
@@ -68,6 +75,10 @@ mod gpu_impl {
         K::B1Score,
         K::B0Context,
         K::B1Context,
+        K::A0Softmax,
+        K::A1Softmax,
+        K::B0Softmax,
+        K::B1Softmax,
         K::A0Pipeline,
         K::A1Pipeline,
         K::B0Pipeline,
@@ -78,6 +89,7 @@ mod gpu_impl {
     #[derive(Debug)]
     struct Args {
         seq: usize,
+        active_seq_len: usize,
         warmup: usize,
         iterations: usize,
         output_dir: PathBuf,
@@ -87,6 +99,7 @@ mod gpu_impl {
             let mut a = std::env::args().skip(1);
             let mut x = Self {
                 seq: 1024,
+                active_seq_len: 0,
                 warmup: 10,
                 iterations: 50,
                 output_dir: PathBuf::from("reports/p15b_rtable"),
@@ -94,6 +107,7 @@ mod gpu_impl {
             while let Some(v) = a.next() {
                 match v.as_str() {
                     "--seq" => x.seq = a.next().unwrap().parse().unwrap(),
+                    "--active-seq-len" => x.active_seq_len = a.next().unwrap().parse().unwrap(),
                     "--warmup" => x.warmup = a.next().unwrap().parse().unwrap(),
                     "--iterations" => x.iterations = a.next().unwrap().parse().unwrap(),
                     "--output-dir" => x.output_dir = PathBuf::from(a.next().unwrap()),
@@ -101,6 +115,10 @@ mod gpu_impl {
                 }
             }
             assert!([1024, 2048, 4096, 8192, 16384, 32768].contains(&x.seq));
+            if x.active_seq_len == 0 {
+                x.active_seq_len = x.seq;
+            }
+            assert!(x.active_seq_len > 0 && x.active_seq_len <= x.seq);
             assert!(x.iterations > 0);
             x
         }
@@ -129,6 +147,21 @@ mod gpu_impl {
         max_probability_row_sum_error: f64,
     }
     #[derive(Debug, Serialize)]
+    struct ComparisonMetrics {
+        element_count: usize,
+        finite_left_count: usize,
+        finite_right_count: usize,
+        nan_count: usize,
+        positive_infinity_count: usize,
+        negative_infinity_count: usize,
+        exact_mismatch_count: usize,
+        max_absolute_error: f64,
+        max_relative_error: f64,
+        mean_absolute_error: f64,
+        left_checksum: String,
+        right_checksum: String,
+    }
+    #[derive(Debug, Serialize)]
     struct Correctness {
         a0_cpu: ErrorMetrics,
         a1_cpu: ErrorMetrics,
@@ -136,6 +169,8 @@ mod gpu_impl {
         b1_cpu: ErrorMetrics,
         a1_a0: ErrorMetrics,
         b1_b0: ErrorMetrics,
+        a1_a0_elementwise: ComparisonMetrics,
+        b1_b0_elementwise: ComparisonMetrics,
         pass: bool,
     }
     #[derive(Debug, Serialize)]
@@ -151,6 +186,10 @@ mod gpu_impl {
     #[derive(Debug, Serialize)]
     struct Summary {
         seq: usize,
+        active_seq_len: usize,
+        block_size: usize,
+        block_table: Vec<usize>,
+        block_table_is_identity: bool,
         correctness: Correctness,
         kernels: BTreeMap<&'static str, Timing>,
     }
@@ -211,7 +250,7 @@ mod gpu_impl {
     fn run(a: &Args, launch: Launch, st: &Arc<Stream>) {
         let n = a.seq;
         let blocks = n / BLOCK_SIZE;
-        let (inp, cf, cb) = make_inputs(n, blocks, st);
+        let (inp, cf, cb) = make_inputs(n, a.active_seq_len, blocks, st);
         let (mut a0, mut a1, mut b0, mut b1) = (
             make_buffers(n, st),
             make_buffers(n, st),
@@ -272,13 +311,23 @@ mod gpu_impl {
             b1_cpu: error_metrics(n, &o3, &cb),
             a1_a0: error_metrics(n, &o1, &o0),
             b1_b0: error_metrics(n, &o3, &o2),
+            a1_a0_elementwise: comparison_metrics(&o1, &o0),
+            b1_b0_elementwise: comparison_metrics(&o3, &o2),
             pass: false,
         };
         c.pass = [&c.a0_cpu, &c.a1_cpu, &c.b0_cpu, &c.b1_cpu]
             .iter()
             .all(|m| m.max_absolute_error <= 5e-3 && m.max_probability_row_sum_error <= 1e-4)
-            && c.a1_a0.max_absolute_error <= 1e-6
-            && c.b1_b0.max_absolute_error <= 1e-6;
+            && c.a1_a0_elementwise.element_count > 0
+            && c.b1_b0_elementwise.element_count > 0
+            && c.a1_a0_elementwise.nan_count == 0
+            && c.b1_b0_elementwise.nan_count == 0
+            && c.a1_a0_elementwise.positive_infinity_count == 0
+            && c.b1_b0_elementwise.positive_infinity_count == 0
+            && c.a1_a0_elementwise.negative_infinity_count == 0
+            && c.b1_b0_elementwise.negative_infinity_count == 0
+            && c.a1_a0_elementwise.exact_mismatch_count == 0
+            && c.b1_b0_elementwise.exact_mismatch_count == 0;
         assert!(c.pass, "correctness failure at {n}: {c:?}");
         let ev = Events::new();
         let mut out = BTreeMap::new();
@@ -313,8 +362,13 @@ mod gpu_impl {
                 },
             );
         }
+        let block_table = model_block_table(blocks);
         let summary = Summary {
             seq: n,
+            active_seq_len: a.active_seq_len,
+            block_size: BLOCK_SIZE,
+            block_table_is_identity: block_table.iter().enumerate().all(|(i, &p)| i == p),
+            block_table,
             correctness: c,
             kernels: out,
         };
@@ -439,6 +493,16 @@ mod gpu_impl {
                             b.context = Some(c.unpartition());
                         }
                         b.probabilities = Some(p);
+                    }
+                    K::A0Softmax | K::A1Softmax | K::B0Softmax | K::B1Softmax => {
+                        let b = match k {
+                            K::A0Softmax => a0,
+                            K::A1Softmax => a1,
+                            K::B0Softmax => b0,
+                            K::B1Softmax => b1,
+                            _ => unreachable!(),
+                        };
+                        soft_launch!(b, i, st, $sm, n);
                     }
                     K::B0Context | K::B1Context => {
                         let b = if matches!(k, K::B0Context) { b0 } else { b1 };
@@ -584,6 +648,7 @@ mod gpu_impl {
     );
     fn make_inputs(
         seq: usize,
+        active_seq_len: usize,
         blocks: usize,
         stream: &Arc<Stream>,
     ) -> (Inputs, GqaDecodeResult, GqaDecodeResult) {
@@ -612,7 +677,7 @@ mod gpu_impl {
             Q_HEADS,
             KV_HEADS,
             seq,
-            seq,
+            active_seq_len,
             HEAD_DIM,
             GROUP_SIZE,
             BLOCK_SIZE,
@@ -628,7 +693,7 @@ mod gpu_impl {
             Q_HEADS,
             KV_HEADS,
             seq,
-            seq,
+            active_seq_len,
             LATENT_DIM,
             HEAD_DIM,
             GROUP_SIZE,
@@ -657,7 +722,7 @@ mod gpu_impl {
                 &[blocks],
                 stream,
             ),
-            active: upload_i32(vec![seq as i32], &[1], stream),
+            active: upload_i32(vec![active_seq_len as i32], &[1], stream),
         };
         (inputs, cpu_full, cpu_latent)
     }
@@ -752,6 +817,66 @@ mod gpu_impl {
                 seq,
                 &actual.probabilities,
             ),
+        }
+    }
+
+    fn comparison_metrics(left: &GqaDecodeResult, right: &GqaDecodeResult) -> ComparisonMetrics {
+        let mut l =
+            Vec::with_capacity(left.scores.len() + left.probabilities.len() + left.context.len());
+        l.extend_from_slice(&left.scores);
+        l.extend_from_slice(&left.probabilities);
+        l.extend_from_slice(&left.context);
+        let mut r = Vec::with_capacity(l.len());
+        r.extend_from_slice(&right.scores);
+        r.extend_from_slice(&right.probabilities);
+        r.extend_from_slice(&right.context);
+        assert_eq!(l.len(), r.len());
+        let finite_left_count = l.iter().filter(|x| x.is_finite()).count();
+        let finite_right_count = r.iter().filter(|x| x.is_finite()).count();
+        let nan_count = l.iter().chain(&r).filter(|x| x.is_nan()).count();
+        let positive_infinity_count = l.iter().chain(&r).filter(|x| **x == f32::INFINITY).count();
+        let negative_infinity_count = l
+            .iter()
+            .chain(&r)
+            .filter(|x| **x == f32::NEG_INFINITY)
+            .count();
+        let exact_mismatch_count = l
+            .iter()
+            .zip(&r)
+            .filter(|(a, b)| a.to_bits() != b.to_bits())
+            .count();
+        let absolute: Vec<f64> = l
+            .iter()
+            .zip(&r)
+            .map(|(a, b)| f64::from((a - b).abs()))
+            .collect();
+        let checksum = |values: &[f32]| {
+            let mut h = 0xcbf29ce484222325u64;
+            for value in values {
+                for byte in value.to_bits().to_le_bytes() {
+                    h ^= u64::from(byte);
+                    h = h.wrapping_mul(0x100000001b3);
+                }
+            }
+            format!("fnv1a64:{h:016x}")
+        };
+        ComparisonMetrics {
+            element_count: l.len(),
+            finite_left_count,
+            finite_right_count,
+            nan_count,
+            positive_infinity_count,
+            negative_infinity_count,
+            exact_mismatch_count,
+            max_absolute_error: absolute.iter().copied().fold(0.0, f64::max),
+            max_relative_error: l
+                .iter()
+                .zip(&r)
+                .map(|(a, b)| f64::from((a - b).abs()) / f64::from(b.abs()).max(1e-12))
+                .fold(0.0, f64::max),
+            mean_absolute_error: absolute.iter().sum::<f64>() / absolute.len() as f64,
+            left_checksum: checksum(&l),
+            right_checksum: checksum(&r),
         }
     }
 

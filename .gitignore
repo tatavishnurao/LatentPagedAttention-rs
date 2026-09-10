@@ -27,3 +27,17 @@ notes/LPA_P05_HARDWARE_ATTRIBUTION.md
 notes/LPA_P1_SEQUENCE_CROSSOVER.md
 notes/LPA_P15_KERNEL_SCALING_DIAGNOSIS.md
 reports/p15_kernel_scaling/
+notes/LPA_P15B_RTABLE_REPAIR.md
+
+# Local agent configuration, credentials, and generated evidence packages.
+.pi/
+.env
+.env.*
+*.pem
+*.key
+paper_sprint_revised_*/
+reports/evidence_reconciliation_*/
+reports/p15b_rtable/
+reports/paper_readiness_*/
+reports/repair_correctness_*/
+reports/source_identified_campaign_*/
