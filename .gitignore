@@ -35,6 +35,7 @@ notes/LPA_P15B_RTABLE_REPAIR.md
 .env.*
 *.pem
 *.key
+*.zip
 paper_sprint_revised_*/
 reports/evidence_reconciliation_*/
 reports/p15b_rtable/
