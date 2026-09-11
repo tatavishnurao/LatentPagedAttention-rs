@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate a generated paper-readiness handoff without executing GPU work."""
 from __future__ import annotations
-import argparse, csv, hashlib, sys
+import argparse, csv, hashlib
 from pathlib import Path
 
 REQUIRED = {"EXECUTIVE_STATUS.md","CODEBASE_CHANGES.md","VALIDATION_RESULTS.md","EVIDENCE_LEDGER.csv","CLAIM_LEDGER.csv","CONTRADICTIONS.md","METRIC_SPECIFICATION.md","CORRECTNESS_MATRIX.csv","BENCHMARK_SUMMARY.csv","PROFILER_SUMMARY.csv","RTABLE_MECHANISM.md","FIGURE_DATA_INDEX.csv","SOURCE_MAP.md","SUBMISSION_BLOCKERS.md","RESEARCH_HANDOFF.md","REPRODUCTION_COMMANDS.md","artifact_checksums.sha256"}
@@ -27,12 +27,25 @@ def main() -> int:
  sums={}
  p=d/"artifact_checksums.sha256"
  if p.exists():
-  for line in p.read_text(encoding="utf-8").splitlines():
-   if line.strip():
-    digest,name=line.split("  ",1); sums[name]=digest
+  for line_number, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+   if not line.strip():
+    continue
+   try:
+    digest, name = line.split("  ", 1)
+   except ValueError:
+    errors.append(f"checksum manifest: malformed line {line_number}")
+    continue
+   if name in sums:
+    errors.append(f"checksum manifest: duplicate entry {name}")
+   sums[name] = digest
+  actual = {q.name for q in d.iterdir() if q.is_file() and q.name != p.name}
+  missing_entries = actual - sums.keys()
+  unexpected_entries = sums.keys() - actual
+  if missing_entries: errors.append("checksum manifest: missing " + ", ".join(sorted(missing_entries)))
+  if unexpected_entries: errors.append("checksum manifest: unexpected " + ", ".join(sorted(unexpected_entries)))
   for name,digest in sums.items():
    q=d/name
-   if not q.exists() or sha(q)!=digest: errors.append(f"checksum mismatch: {name}")
+   if not q.is_file() or sha(q)!=digest: errors.append(f"checksum mismatch: {name}")
  if errors:
   print("PAPER_READINESS_VALIDATION_FAIL"); print("\n".join("- "+x for x in errors)); return 1
  print(f"PAPER_READINESS_VALIDATION_OK files={len(sums)}")
