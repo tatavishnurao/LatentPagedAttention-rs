@@ -30,9 +30,32 @@ def main():
    if not c or c.get('element_count',0)<=0 or any(c.get(x,-1)!=0 for x in ['nan_count','positive_infinity_count','negative_infinity_count']):errors.append(f'{d}: nonfinite/incomplete {pair}')
   for name, value in correctness.items():
    if isinstance(value, dict) and any(not math.isfinite(float(value[k])) for k in ['max_absolute_error','max_relative_error','mean_absolute_error'] if k in value):errors.append(f'{d}: non-finite correctness metric {name}')
-  for line in (d/'artifact_checksums.sha256').read_text().splitlines():
-   digest,name=line.split('  ',1);p=d/name
-   if not p.exists() or sha(p)!=digest:errors.append(f'{d}: checksum {name}')
+  checksum_path = d/'artifact_checksums.sha256'
+  checksums = {}
+  for line_number, line in enumerate(checksum_path.read_text().splitlines(), 1):
+   if not line.strip():
+    continue
+   try:
+    digest, name = line.split('  ', 1)
+   except ValueError:
+    errors.append(f'{d}: malformed checksum line {line_number}'); continue
+   relative_name = Path(name)
+   if relative_name.is_absolute() or '..' in relative_name.parts:
+    errors.append(f'{d}: unsafe checksum path {name}'); continue
+   if name in checksums:
+    errors.append(f'{d}: duplicate checksum {name}')
+   checksums[name] = digest
+  actual = {
+   p.relative_to(d).as_posix() for p in d.rglob('*')
+   if p.is_file() and p != checksum_path
+  }
+  for name in sorted(actual - checksums.keys()):
+   errors.append(f'{d}: missing checksum {name}')
+  for name in sorted(checksums.keys() - actual):
+   errors.append(f'{d}: unexpected checksum {name}')
+  for name,digest in checksums.items():
+   p=d/name
+   if not p.is_file() or sha(p)!=digest:errors.append(f'{d}: checksum {name}')
  if errors:print('PAPER_RUN_VALIDATION_FAIL');print('\n'.join('- '+x for x in errors));return 1
  print('PAPER_RUN_VALIDATION_OK');return 0
 if __name__=='__main__':raise SystemExit(main())
