@@ -1,0 +1,76 @@
+{
+  "mode": "pilot",
+  "base_commit": "213d45aa8d78069afa806add66a01c4d7328507b",
+  "policy": "docs/C1_PROTOCOL.md",
+  "runs": [
+    {
+      "seq": 1024,
+      "process": 0,
+      "command": [
+        "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/target/release/examples/c1_rtable",
+        "--seq",
+        "1024",
+        "--process",
+        "0",
+        "--warmup",
+        "1",
+        "--iterations",
+        "3",
+        "--output-dir",
+        "/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/reports/c1_pilot_20260920T082449_625698Z/seq1024_p0"
+      ],
+      "status": "OK",
+      "telemetry": [
+        {
+          "unix_ms": 1789892717475,
+          "gpu_util_pct": 13,
+          "mem_util_pct": 45,
+          "temperature_c": 80.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "7.31",
+          "compute_processes": "none"
+        },
+        {
+          "unix_ms": 1789892773207,
+          "gpu_util_pct": 3,
+          "mem_util_pct": 43,
+          "temperature_c": 80.0,
+          "pstate": "P8",
+          "sm_clock_mhz": 210,
+          "power_draw_w": "7.26",
+          "compute_processes": "none"
+        }
+      ],
+      "returncode": 0
+    }
+  ],
+  "environment_overrides": {
+    "CUDA_TOOLKIT_PATH": "/usr/local/cuda-13.3",
+    "LIBCLANG_PATH": "/usr/lib/llvm-18/lib",
+    "CUTILE_TILEIRAS_PATH": "/usr/local/cuda-13.3/bin/tileiras",
+    "LD_LIBRARY_PATH": "/usr/lib/wsl/drivers/nvlti.inf_amd64_7566d6b2a7331e4e:/usr/lib/wsl/lib:"
+  },
+  "build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "-p",
+    "plkv-kernels",
+    "--features",
+    "gpu-cutile",
+    "--example",
+    "c1_rtable"
+  ],
+  "build_returncode": 0,
+  "executable_sha256": "4db9560986ad1def1152fae68815669c1aa78c0ed2ed0f09a16505f616f8289c",
+  "warmup": 1,
+  "samples_per_phase": 3,
+  "plan": [
+    [
+      1024,
+      0
+    ]
+  ],
+  "complete": true
+}

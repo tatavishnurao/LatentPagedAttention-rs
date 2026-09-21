@@ -1,0 +1,17 @@
+   Compiling plkv-kernels v0.1.0 (/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/crates/plkv-kernels)
+warning: struct `ErrorMetrics` is never constructed
+  --> crates/plkv-kernels/examples/c1_rtable.rs:43:12
+   |
+43 |     struct ErrorMetrics {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `error_metrics` is never used
+   --> crates/plkv-kernels/examples/c1_rtable.rs:391:8
+    |
+391 |     fn error_metrics(
+    |        ^^^^^^^^^^^^^
+
+warning: `plkv-kernels` (example "c1_rtable") generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 15.76s

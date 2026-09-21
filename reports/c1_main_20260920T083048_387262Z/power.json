@@ -1,0 +1,11 @@
+{
+  "command_returncode": 0,
+  "raw": "{\"BatteryStatus\":2,\"EstimatedChargeRemaining\":100}\nPower Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+  "battery": {
+    "BatteryStatus": 2,
+    "EstimatedChargeRemaining": 100
+  },
+  "ac_online": true,
+  "active_scheme": "Balanced",
+  "accepted": false
+}

@@ -1,0 +1,39 @@
+name: CPU CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          components: clippy, rustfmt
+      - name: Validate release script syntax
+        run: bash -n scripts/validate_release.sh
+      - name: Test release validation script
+        run: bash tests/test_validate_release_script.sh
+      - name: Release validation
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/validate_release.sh | tee release-validation.log
+          grep -Fx 'CPU_RELEASE_VALIDATION_OK=1' release-validation.log
+          grep -Fx 'RELEASE_VALIDATION_OK=1' release-validation.log
+      - name: Evidence tooling validation
+        run: |
+          uv run python -m py_compile scripts/*.py
+          uv run python scripts/validate_rtable_structure.py

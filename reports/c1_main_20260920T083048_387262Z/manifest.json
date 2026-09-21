@@ -1,0 +1,98 @@
+{
+  "mode": "main",
+  "base_commit": "213d45aa8d78069afa806add66a01c4d7328507b",
+  "policy": "docs/C1_PROTOCOL.md",
+  "runs": [],
+  "environment_overrides": {
+    "CUDA_TOOLKIT_PATH": "/usr/local/cuda-13.3",
+    "LIBCLANG_PATH": "/usr/lib/llvm-18/lib",
+    "CUTILE_TILEIRAS_PATH": "/usr/local/cuda-13.3/bin/tileiras",
+    "LD_LIBRARY_PATH": "/usr/lib/wsl/drivers/nvlti.inf_amd64_7566d6b2a7331e4e:/usr/lib/wsl/lib:"
+  },
+  "build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "-p",
+    "plkv-kernels",
+    "--features",
+    "gpu-cutile",
+    "--example",
+    "c1_rtable"
+  ],
+  "build_returncode": 0,
+  "executable_sha256": "9cf17f5ce5c0e7c8a7a13fb57b7b8f05e364dcb124fd5fd930ae1f184e461447",
+  "warmup": 3,
+  "samples_per_phase": 12,
+  "plan": [
+    [
+      1024,
+      0
+    ],
+    [
+      1024,
+      1
+    ],
+    [
+      1024,
+      2
+    ],
+    [
+      2048,
+      0
+    ],
+    [
+      2048,
+      1
+    ],
+    [
+      2048,
+      2
+    ],
+    [
+      4096,
+      0
+    ],
+    [
+      4096,
+      1
+    ],
+    [
+      4096,
+      2
+    ],
+    [
+      8192,
+      0
+    ],
+    [
+      8192,
+      1
+    ],
+    [
+      8192,
+      2
+    ]
+  ],
+  "thermal_policy": {
+    "predeclared_before_timing": true,
+    "no_active_thermal_throttling": true,
+    "idle_samples": 10,
+    "idle_interval_seconds": 1.0,
+    "idle_max_temperature_range_c": 3.0,
+    "idle_max_final_temperature_c": 73.0,
+    "idle_temperature_rationale": "73 C ceiling predeclared before timing after a retained 40-minute idle cooldown established a stable 70-72 C platform equilibrium; this is below the prior 75-77 C correctness range",
+    "idle_max_gpu_utilization_pct": 5.0,
+    "run_max_temperature_c": 82.0,
+    "active_clock_min_samples": 2,
+    "active_clock_max_cv": 0.1,
+    "active_clock_max_range_mhz": 450.0,
+    "unrelated_compute_processes": "none before/after; during only benchmark PID is allowed",
+    "power": "Windows reports AC online and active scheme name contains High performance",
+    "outlier": "retain every run; investigate >5% process-median deviation; never accept by result direction",
+    "canonical_target": "at least five accepted independent processes",
+    "fixed_order_limitation": "A0,A1,B0,B1 by component, then pipeline; order is fixed"
+  },
+  "blocker": "AC/high-performance power configuration not confirmed",
+  "complete": false
+}

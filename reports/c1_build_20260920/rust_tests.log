@@ -1,0 +1,62 @@
+   Compiling plkv-kernels v0.1.0 (/mnt/c/Users/VishnuRao/OneDrive/Desktop/Vishnu/projects/LatentPagedAttention-rs/crates/plkv-kernels)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.58s
+     Running unittests src/lib.rs (target/debug/deps/plkv_bench-274ccf42260913c1)
+
+running 1 test
+test tests::benchmark_matrix_has_expected_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/plkv_core-560380dd78657228)
+
+running 23 tests
+test tests::cache_config_rejects_zero_values ... ok
+test tests::direct_latent_gqa_rejects_invalid_inputs ... ok
+test tests::memory_model_matches_small_reference_values ... ok
+test tests::latent_kv_reconstruction_rejects_invalid_inputs ... ok
+test tests::memory_model_rejects_zero_values ... ok
+test tests::allocated_table_preserves_existing_behavior ... ok
+test tests::contiguous_gqa_decode_rejects_invalid_inputs ... ok
+test tests::contiguous_table_rejects_invalid_values_and_range ... ok
+test tests::paged_gqa_decode_rejects_invalid_inputs ... ok
+test tests::contiguous_table_covers_exact_boundary ... ok
+test tests::paged_kv_write_rejects_invalid_inputs ... ok
+test tests::paged_lookup_rejects_invalid_storage_and_dimensions ... ok
+test tests::fp16_runtime_active_lengths_mask_inactive_tokens ... ok
+test tests::memory_model_matches_python_golden_fixture ... ok
+test tests::block_table_matches_seq5_python_golden_fixture ... ok
+test tests::paged_lookup_matches_python_golden_fixture ... ok
+test tests::block_table_matches_seq128_python_golden_fixture ... ok
+test tests::paged_kv_write_matches_python_fixture_and_preserves_other_rows ... ok
+test tests::paged_gqa_decode_matches_python_fixture ... ok
+test tests::direct_latent_gqa_matches_python_and_materialized_fixtures ... ok
+test tests::contiguous_gqa_decode_matches_python_fixture ... ok
+test tests::latent_kv_reconstruction_matches_python_fixture ... ok
+test tests::paged_latent_write_matches_python_and_post_write_attention_fixture ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/plkv_kernels-3920891ed71c8ead)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests plkv_bench
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests plkv_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests plkv_kernels
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

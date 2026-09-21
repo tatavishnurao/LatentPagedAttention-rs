@@ -1,0 +1,7 @@
+{
+  "mode": "main",
+  "complete": false,
+  "status": "PROCEDURAL_ABORT",
+  "reason": "Stopped during build before GPU execution: newer stricter thermal policy discovered; see docs/C1_THERMAL_CORRECTION.md",
+  "runs": []
+}

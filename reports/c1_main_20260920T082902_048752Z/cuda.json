@@ -1,0 +1,8 @@
+{
+  "command": [
+    "/usr/local/cuda-13.3/bin/nvcc",
+    "--version"
+  ],
+  "returncode": 0,
+  "output": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Tue_Jun_09_02:43:40_PM_PDT_2026\nCuda compilation tools, release 13.3, V13.3.73\nBuild cuda_13.3.r13.3/compiler.38244171_0\n"
+}

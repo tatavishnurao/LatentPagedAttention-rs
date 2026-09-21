@@ -1,0 +1,26 @@
+[
+  {
+    "seq": 1024,
+    "process_pipeline_medians_ms": {
+      "A1": [
+        0.3829759955406189
+      ],
+      "B1": [
+        0.4567039906978607
+      ],
+      "C1": [
+        0.28672000765800476
+      ]
+    },
+    "paired_ratios": {
+      "A1": [
+        0.7486631303177718
+      ],
+      "B1": [
+        0.6278027201380174
+      ]
+    },
+    "projected_query_bytes": 2048,
+    "common_workspace_bytes_per_variant": 135168
+  }
+]

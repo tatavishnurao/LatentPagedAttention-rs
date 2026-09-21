@@ -1,0 +1,161 @@
+warning: in the working copy of 'README.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'RELEASE_NOTES.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/CAREER_POSITIONING.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/FINAL_REPORT.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/LAUNCH_COPY.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/OUTREACH_MESSAGES.md', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/TECHNICAL_ARTICLE.md', CRLF will be replaced by LF the next time Git touches it
+diff --git a/README.md b/README.md
+index 2e56513..4d71fd3 100644
+--- a/README.md
++++ b/README.md
+@@ -18,7 +18,9 @@ The model-shaped synthetic profile compares a paged latent cache with an FP16 fu
+ | FP16 full-KV cache | 1,048,576 |
+ | persistent cache-byte ratio | 16x |
+ 
+-The latent read path is approximately 32.6% slower under synchronized host end-to-end timing. This is a measurable compute-for-memory trade-off, not a speedup claim. The 16x ratio counts persistent cache bytes only; it is not a claim about total GPU-memory reduction.
++Historical **process-level** execution was approximately 32.6% longer for the latent example; this does **not** establish steady-state kernel slowdown. The timer surrounds `cargo run`, including process initialization, allocations, reference validation and readback. The 16x analytical ratio counts persistent cache bytes only, excluding projections, metadata, intermediates and allocator overhead.
++
++The bounded hoisted-projection + R-TABLE milestone is documented in [C1 report](docs/C1_REPORT.md), [protocol](docs/C1_PROTOCOL.md) and [claim ledger](docs/C1_EVIDENCE_LEDGER.md).
+ 
+ ## Architecture
+ 
+@@ -90,7 +92,7 @@ The granular command catalog, environment details, and script groupings are in [
+ 
+ ## Final benchmark
+ 
+-The canonical three-process artifact is [`reports/final_benchmark/summary.csv`](reports/final_benchmark/summary.csv). Timings are synchronized host end-to-end measurements; compilation and cuTile JIT are excluded.
++The canonical three-process artifact is [`reports/final_benchmark/summary.csv`](reports/final_benchmark/summary.csv). Timings surround whole `cargo run` processes, not resident kernel pipelines. A prior process warms build/JIT caches but does not prove all compilation/JIT work is excluded from subsequent processes.
+ 
+ | operation | min ms | mean ms | max ms |
+ |---|---:|---:|---:|
+@@ -98,14 +100,13 @@ The canonical three-process artifact is [`reports/final_benchmark/summary.csv`](
+ | latent paged attention read | 1705.150 | 1844.891 | 2017.385 |
+ | latent write to attention | 1367.174 | 1487.776 | 1586.213 |
+ 
+-The latent read mean is approximately 32.6% above the full-KV read mean. The benchmark is specific to this implementation, profile, hardware, and timing method.
++The latent process mean is approximately 32.6% above the full-KV process mean. These whole-process results cannot attribute the difference to GPU kernels.
+ 
+ ## Interpretation
+ 
+ The cache result is the primary result: reducing persistent latent state changes
+-the amount of cache storage required for this fixed profile. The timing result
+-shows the cost observed in the current implementation when attention works in
+-latent space. Together they answer the research question as a controlled
++the amount of cache storage required for this fixed profile. The historical timing result
++shows whole-example process cost, not isolated attention cost. Together they answer the research question as a controlled
+ memory-compute experiment. They do not establish a production serving design,
+ model-quality result, or general performance ranking.
+ 
+diff --git a/RELEASE_NOTES.md b/RELEASE_NOTES.md
+index bd52713..57fc51b 100644
+--- a/RELEASE_NOTES.md
++++ b/RELEASE_NOTES.md
+@@ -1,5 +1,7 @@
+ # LatentPagedAttention-rs v0.1 - Paged Latent-Cache Attention on an RTX 4060
+ 
++> Timing correction: the historical 32.6% figure below describes whole-process `cargo run` execution, not steady-state GPU kernel latency. Claims of JIT exclusion apply only to prior cache warming, not a verified resident timing boundary. See [C1 evidence ledger](docs/C1_EVIDENCE_LEDGER.md). Historical release values are retained with this qualification.
++
+ ## Summary
+ 
+ LatentPagedAttention-rs is a Rust and Python research prototype that combines
+@@ -37,7 +39,7 @@ The current latent read path is also slower:
+ 
+ - FP16 full-KV read mean: `1391.022 ms`.
+ - FP16 latent read mean: `1844.891 ms`.
+-- Latent read overhead: approximately `32.6%`.
++- Historical whole-process execution overhead: approximately `32.6%`; not a kernel-slowdown measurement.
+ 
+ This is a measured memory-versus-compute trade-off, not an unconditional speedup.
+ 
+diff --git a/crates/plkv-kernels/src/cutile/mod.rs b/crates/plkv-kernels/src/cutile/mod.rs
+index 132f095..61da08b 100644
+--- a/crates/plkv-kernels/src/cutile/mod.rs
++++ b/crates/plkv-kernels/src/cutile/mod.rs
+@@ -1,3 +1,4 @@
++pub mod c1;
+ pub mod direct_latent_gqa;
+ pub mod direct_paged_latent_gqa;
+ pub mod direct_paged_latent_gqa_fp16;
+diff --git a/docs/CAREER_POSITIONING.md b/docs/CAREER_POSITIONING.md
+index 406dac3..4398143 100644
+--- a/docs/CAREER_POSITIONING.md
++++ b/docs/CAREER_POSITIONING.md
+@@ -1,4 +1,6 @@
+-# Career Positioning
++# Career Positioning — timing correction
++
++**The historical copy below is superseded:** 32.6% describes whole-process execution around `cargo run`, not latent GPU kernel overhead. Do not promote it as a kernel result. Use the 16x analytical persistent-state ratio with exclusions (projections, metadata, intermediates, allocator overhead), and cite the [C1 report](C1_REPORT.md) for separately measured pipelines. Not a production serving or trained-model result.
+ 
+ ## Project summary
+ 
+diff --git a/docs/FINAL_REPORT.md b/docs/FINAL_REPORT.md
+index 3d41e87..2237e98 100644
+--- a/docs/FINAL_REPORT.md
++++ b/docs/FINAL_REPORT.md
+@@ -1,5 +1,7 @@
+ # Final Report
+ 
++> Historical report context: the 32.6% value below comes from process-level `cargo run` timing, not isolated or steady-state kernel latency. The original kernel-cost interpretation is withdrawn. Prior-process warming does not establish complete JIT exclusion. Measurements are preserved; see [C1 evidence ledger](C1_EVIDENCE_LEDGER.md) for provenance and [C1 report](C1_REPORT.md) for the bounded follow-up.
++
+ ## Abstract
+ 
+ LatentPagedAttention-rs v0.1.x validates a paged latent-cache decode-attention
+diff --git a/docs/LAUNCH_COPY.md b/docs/LAUNCH_COPY.md
+index 8a824f7..d27ef5c 100644
+--- a/docs/LAUNCH_COPY.md
++++ b/docs/LAUNCH_COPY.md
+@@ -1,4 +1,10 @@
+-# Launch Copy
++# Launch Copy — historical drafts, superseded
++
++**Do not reuse the timing claims in these drafts.** The 32.6% figure measures whole-process execution around `cargo run`, not steady-state GPU kernel slowdown. Prior-process cache warming does not verify JIT exclusion.
++
++Current approved summary: “Synthetic latent-KV GQA decode with a 16x analytical persistent-state ratio (1024 vs 64 bytes/token), excluding projections, metadata, intermediates and allocator overhead. Kernel latency is evaluated separately using resident CUDA-event pipelines; see [C1 report](C1_REPORT.md). Not complete DeepSeek MLA, trained-model evaluation or a production serving engine.”
++
++Historical draft text follows for context only.
+ 
+ ## LinkedIn Launch Post
+ 
+diff --git a/docs/OUTREACH_MESSAGES.md b/docs/OUTREACH_MESSAGES.md
+index cced907..4632098 100644
+--- a/docs/OUTREACH_MESSAGES.md
++++ b/docs/OUTREACH_MESSAGES.md
+@@ -1,4 +1,6 @@
+-# Outreach Messages
++# Outreach Messages — historical drafts, do not send unchanged
++
++The 32.6% timing claims below are superseded: they measure whole-process `cargo run` execution and do not establish steady-state kernel slowdown. Replace those clauses with: “The analytical persistent-state ratio is 16x, excluding projections, metadata, intermediates and allocator overhead; resident kernel pipelines are evaluated separately in the [C1 milestone](C1_REPORT.md).” No trained-model or production-serving claim is supported.
+ 
+ Personalize these messages using the recipient's public work. Do not send them
+ as bulk messages.
+diff --git a/docs/TECHNICAL_ARTICLE.md b/docs/TECHNICAL_ARTICLE.md
+index 5438ec5..3b57802 100644
+--- a/docs/TECHNICAL_ARTICLE.md
++++ b/docs/TECHNICAL_ARTICLE.md
+@@ -1,5 +1,7 @@
+ # Building Paged Latent-Cache Attention on an RTX 4060: A 16x Cache Reduction with a Measured Compute Trade-Off
+ 
++> Historical timing correction: every 32.6% comparison in this article refers to whole-process execution timed around `cargo run`, including initialization, allocation, CPU reference work and readback. It is not a steady-state kernel slowdown or an isolated compute-for-memory penalty. Cache warming in a prior process does not establish complete JIT exclusion. See [C1 report](C1_REPORT.md) and [evidence ledger](C1_EVIDENCE_LEDGER.md). These qualifications supersede the original timing interpretation below.
++
+ ## 1. The Inference-Memory Problem
+ 
+ Autoregressive inference has a simple but expensive habit: every generated token
+diff --git a/docs/architecture/README.md b/docs/architecture/README.md
+index d1b12f2..8192ead 100644
+--- a/docs/architecture/README.md
++++ b/docs/architecture/README.md
+@@ -16,5 +16,5 @@ It studies whether persistent full K/V rows can be replaced by smaller physical
+ README.md; docs/ARCHITECTURE.md; docs/02_memory_model.md; docs/04_benchmark_methodology.md; docs/06_reference_benchmark_report.md; reports/final_benchmark/summary.csv and summary.md; tests/test_memory_model.py, test_cache_ref.py, test_block_table.py, test_attention_shapes.py; scripts/run_gpu_fp16_paged_latent_storage.sh, run_gpu_paged_latent_write_attention.sh, run_final_benchmark.sh.
+ 
+ ## Limitations and uncertainty
+-The 16× figure is persistent cache-byte ratio for the stated synthetic profile. The approximately 32.6% slower latent read path is synchronized host end-to-end timing for this implementation/profile/hardware. No claim is made about total GPU memory, production serving, DeepSeek MLA reproduction, model quality, or general performance ranking.
++The 16× figure is persistent cache-byte ratio for the stated synthetic profile. The historical approximately 32.6% longer execution measures whole `cargo run` processes, not resident GPU kernel latency; it does not establish kernel slowdown. No claim is made about total GPU memory, production serving, DeepSeek MLA reproduction, model quality, or general performance ranking.
+ 
+diff --git a/docs/architecture/critical-path.svg b/docs/architecture/critical-path.svg
+index 411857e..d51d35b 100644
+--- a/docs/architecture/critical-path.svg
++++ b/docs/architecture/critical-path.svg
+@@ -1 +1 @@
+-<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 800 360"><title>LatentPagedAttention memory versus compute</title><desc>Persistent full K/V rows are compared with persistent FP16 latent rows and decode-time latent arithmetic. A small validation lane shows Python, Rust CPU, and cuTile parity.</desc><style>.b{fill:#F5F3ED;stroke:#666861}.a{stroke:#9A6136;stroke-width:2;fill:none;marker-end:url(#m)}.t{font:16px sans-serif;fill:#1A1B18}.m{font:11px monospace;fill:#666861}.s{font:12px sans-serif;fill:#666861}</style><defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="#9A6136"/></marker></defs><rect width="800" height="360" fill="#F5F3ED"/><text class="m" x="35" y="28">MEMORY ↔ COMPUTE / SYNTHETIC PROFILE</text><g transform="translate(35 55)"><rect class="b" width="215" height="72" rx="4"/><text class="m" x="12" y="20">PERSISTENT STATE</text><text class="t" x="12" y="46">full K/V rows</text><text class="s" x="12" y="64">FP16</text></g><text class="s" x="270" y="94">vs</text><g transform="translate(330 55)"><rect class="b" width="215" height="72" rx="4"/><text class="m" x="12" y="20">PERSISTENT STATE</text><text class="t" x="12" y="46">latent rows</text><text class="s" x="12" y="64">FP16 • 16× cache-byte ratio</text></g><g transform="translate(590 55)"><rect class="b" width="175" height="72" rx="4"/><text class="m" x="12" y="20">MEASURED READ</text><text class="t" x="12" y="46">~32.6% slower</text><text class="s" x="12" y="64">sync host timing</text></g><path class="a" d="M545 91h45"/><path d="M35 155h730" stroke="#666861"/><text class="s" x="35" y="180">Trade-off: fewer persistent cache bytes, more decode-time latent-space arithmetic.</text><text class="m" x="35" y="220">VALIDATION EVIDENCE LANE</text><g transform="translate(35 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">ORACLE</text><text class="t" x="12" y="44">Python</text></g><g transform="translate(305 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">REFERENCE</text><text class="t" x="12" y="44">Rust CPU</text></g><g transform="translate(575 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">EXECUTION</text><text class="t" x="12" y="44">cuTile GPU parity</text></g><path class="a" d="M225 270h80M495 270h80"/><text class="s" x="35" y="335">Scope: persistent cache bytes only; not total GPU memory, serving, MLA reproduction, or general ranking.</text></svg>
++<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 800 360"><title>LatentPagedAttention memory versus compute</title><desc>Persistent full K/V rows are compared with persistent FP16 latent rows and decode-time latent arithmetic. A small validation lane shows Python, Rust CPU, and cuTile parity.</desc><style>.b{fill:#F5F3ED;stroke:#666861}.a{stroke:#9A6136;stroke-width:2;fill:none;marker-end:url(#m)}.t{font:16px sans-serif;fill:#1A1B18}.m{font:11px monospace;fill:#666861}.s{font:12px sans-serif;fill:#666861}</style><defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="#9A6136"/></marker></defs><rect width="800" height="360" fill="#F5F3ED"/><text class="m" x="35" y="28">MEMORY ↔ COMPUTE / SYNTHETIC PROFILE</text><g transform="translate(35 55)"><rect class="b" width="215" height="72" rx="4"/><text class="m" x="12" y="20">PERSISTENT STATE</text><text class="t" x="12" y="46">full K/V rows</text><text class="s" x="12" y="64">FP16</text></g><text class="s" x="270" y="94">vs</text><g transform="translate(330 55)"><rect class="b" width="215" height="72" rx="4"/><text class="m" x="12" y="20">PERSISTENT STATE</text><text class="t" x="12" y="46">latent rows</text><text class="s" x="12" y="64">FP16 • 16× cache-byte ratio</text></g><g transform="translate(590 55)"><rect class="b" width="175" height="72" rx="4"/><text class="m" x="12" y="20">HISTORICAL PROCESS</text><text class="t" x="12" y="46">~32.6% longer</text><text class="s" x="12" y="64">whole process; not kernel</text></g><path class="a" d="M545 91h45"/><path d="M35 155h730" stroke="#666861"/><text class="s" x="35" y="180">Trade-off: fewer persistent cache bytes, more decode-time latent-space arithmetic.</text><text class="m" x="35" y="220">VALIDATION EVIDENCE LANE</text><g transform="translate(35 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">ORACLE</text><text class="t" x="12" y="44">Python</text></g><g transform="translate(305 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">REFERENCE</text><text class="t" x="12" y="44">Rust CPU</text></g><g transform="translate(575 240)"><rect class="b" width="190" height="60" rx="4"/><text class="m" x="12" y="20">EXECUTION</text><text class="t" x="12" y="44">cuTile GPU parity</text></g><path class="a" d="M225 270h80M495 270h80"/><text class="s" x="35" y="335">Scope: persistent cache bytes only; not total GPU memory, serving, MLA reproduction, or general ranking.</text></svg>

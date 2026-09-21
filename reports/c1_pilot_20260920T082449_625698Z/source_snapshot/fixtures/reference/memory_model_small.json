@@ -1,0 +1,16 @@
+{
+  "config": {
+    "layers": 24,
+    "seq_len": 128,
+    "batch": 1,
+    "kv_heads": 2,
+    "head_dim": 32,
+    "latent_dim": 32,
+    "dtype_bytes": 2
+  },
+  "gqa_bytes_per_token_per_layer": 256,
+  "latent_bytes_per_token_per_layer": 64,
+  "gqa_total_kv_bytes": 786432,
+  "latent_total_kv_bytes": 196608,
+  "compression_ratio_vs_gqa": 4.0
+}

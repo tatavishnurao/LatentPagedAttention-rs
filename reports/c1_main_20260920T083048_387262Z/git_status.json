@@ -1,0 +1,9 @@
+{
+  "command": [
+    "git",
+    "status",
+    "--porcelain"
+  ],
+  "returncode": 0,
+  "output": " M README.md\n M RELEASE_NOTES.md\n M crates/plkv-kernels/src/cutile/mod.rs\n M docs/CAREER_POSITIONING.md\n M docs/FINAL_REPORT.md\n M docs/LAUNCH_COPY.md\n M docs/OUTREACH_MESSAGES.md\n M docs/TECHNICAL_ARTICLE.md\n M docs/architecture/README.md\n M docs/architecture/critical-path.svg\n?? AUTHOR_METADATA_REQUIRED.md\n?? CLAIM_RESOLUTION.md\n?? FIGURE2_SOURCE_VERIFICATION.md\n?? FIGURE_TABLE_AUDIT.md\n?? MANUSCRIPT_CLAIM_AUDIT.md\n?? REVISION_LOG.md\n?? SUBMISSION_BLOCKERS.md\n?? arxiv_v1_source/\n?? crates/plkv-kernels/examples/c1_rtable.rs\n?? crates/plkv-kernels/src/cutile/c1.rs\n?? docs/C1_BUDGET_FREEZE.md\n?? docs/C1_PROGRESS.md\n?? docs/C1_PROTOCOL.md\n?? docs/C1_THERMAL_CORRECTION.md\n?? manuscript/\n?? reports/arxiv_v1_final_audit/\n?? reports/c1_build_20260920/\n?? reports/c1_main_20260920T082902_048752Z/\n?? reports/c1_pilot_20260920T082449_625698Z/\n?? scripts/analyze_c1.py\n?? scripts/generate_c1.py\n?? scripts/run_c1_milestone.py\n?? scripts/validate_c1_oracle.py\n?? tests/test_c1.py\n"
+}

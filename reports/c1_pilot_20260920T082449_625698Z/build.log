@@ -1,0 +1,36 @@
+warning: unused import: `std::collections::BTreeMap`
+  --> crates/plkv-kernels/examples/c1_rtable.rs:16:9
+   |
+16 |     use std::collections::BTreeMap;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `BufWriter`
+  --> crates/plkv-kernels/examples/c1_rtable.rs:18:19
+   |
+18 |     use std::io::{BufWriter, Write};
+   |                   ^^^^^^^^^
+
+warning: unused imports: `SystemTime` and `UNIX_EPOCH`
+  --> crates/plkv-kernels/examples/c1_rtable.rs:21:21
+   |
+21 |     use std::time::{SystemTime, UNIX_EPOCH};
+   |                     ^^^^^^^^^^  ^^^^^^^^^^
+
+warning: struct `ErrorMetrics` is never constructed
+  --> crates/plkv-kernels/examples/c1_rtable.rs:45:12
+   |
+45 |     struct ErrorMetrics {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `error_metrics` is never used
+   --> crates/plkv-kernels/examples/c1_rtable.rs:380:8
+    |
+380 |     fn error_metrics(
+    |        ^^^^^^^^^^^^^
+
+warning: `plkv-kernels` (example "c1_rtable") generated 5 warnings (run `cargo fix --example "c1_rtable" -p plkv-kernels` to apply 3 suggestions)
+    Finished `release` profile [optimized] target(s) in 5.92s

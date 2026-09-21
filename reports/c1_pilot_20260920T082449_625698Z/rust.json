@@ -1,0 +1,8 @@
+{
+  "command": [
+    "rustc",
+    "--version"
+  ],
+  "returncode": 0,
+  "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n"
+}

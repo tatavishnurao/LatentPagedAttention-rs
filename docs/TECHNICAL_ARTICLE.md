@@ -1,5 +1,7 @@
 # Building Paged Latent-Cache Attention on an RTX 4060: A 16x Cache Reduction with a Measured Compute Trade-Off
 
+> Historical timing correction: every 32.6% comparison in this article refers to whole-process execution timed around `cargo run`, including initialization, allocation, CPU reference work and readback. It is not a steady-state kernel slowdown or an isolated compute-for-memory penalty. Cache warming in a prior process does not establish complete JIT exclusion. See [C1 report](C1_REPORT.md) and [evidence ledger](C1_EVIDENCE_LEDGER.md). These qualifications supersede the original timing interpretation below.
+
 ## 1. The Inference-Memory Problem
 
 Autoregressive inference has a simple but expensive habit: every generated token
@@ -210,9 +212,10 @@ FP16 full-KV cache bytes = 1,048,576
 persistent cache-byte ratio = 16x
 ```
 
-The latent cache is 16x smaller in persistent bytes, while the current latent
-read path is approximately 32.6% slower than the FP16 full-KV read baseline by
-mean synchronized host end-to-end time. This is a compute-for-memory trade-off.
+The latent cache is 16x smaller in persistent bytes. Historical whole-process
+execution was approximately 32.6% longer than the FP16 full-KV example by mean
+synchronized host timing; this is not a steady-state kernel result. The original
+kernel-cost interpretation is withdrawn pending the bounded C1 campaign.
 
 ## 10. Why the Latent Path Is Currently Slower
 
@@ -233,8 +236,8 @@ latent-space GQA kernels, masked for runtime active sequence lengths, and
 validated against Python and Rust references on an RTX 4060.
 
 It also proves a persistent cache-byte reduction for the synthetic `model_small`
-profile relative to an FP16 full-KV baseline, with a measured latency cost in the
-current implementation.
+profile relative to an FP16 full-KV baseline. It does not yet prove a C1 steady-state
+latency cost; the historical process-level timing is separately qualified.
 
 ## 12. What It Does Not Prove
 
@@ -275,6 +278,5 @@ bash scripts/run_final_benchmark.sh
 
 LatentPagedAttention-rs v0.1.1 is a completed correctness-first research prototype.
 It exposes a concrete memory-versus-compute trade-off: 16x fewer persistent cache
-bytes for the synthetic model-shaped profile, with approximately 32.6% higher
-measured latent-read time in the current implementation. That is a useful
+bytes for the synthetic model-shaped profile. The historical process-level timing is not a kernel result. That is a useful
 foundation for future kernel optimization, not a product launch.

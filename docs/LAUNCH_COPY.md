@@ -1,4 +1,10 @@
-# Launch Copy
+# Launch Copy — historical drafts, superseded
+
+**Do not reuse the timing claims in these drafts.** The 32.6% figure measures whole-process execution around `cargo run`, not steady-state GPU kernel slowdown. Prior-process cache warming does not verify JIT exclusion.
+
+Current approved summary: “Synthetic latent-KV GQA decode with a 16x analytical persistent-state ratio (1024 vs 64 bytes/token), excluding projections, metadata, intermediates and allocator overhead. Kernel latency is evaluated separately using resident CUDA-event pipelines; see [C1 report](C1_REPORT.md). Not complete DeepSeek MLA, trained-model evaluation or a production serving engine.”
+
+Historical draft text follows for context only.
 
 ## LinkedIn Launch Post
 
@@ -14,7 +20,7 @@ FP16 cache writes, GPU write-to-attention handoff, and FP32 attention arithmetic
 For a synthetic model-shaped profile, the latent path uses 16x fewer persistent
 FP16 cache bytes than an FP16 full-KV paged baseline: 65,536 bytes versus
 1,048,576 bytes. The trade-off is real: the current latent read path is
-approximately 32.6% slower under synchronized host end-to-end timing.
+historically approximately 32.6% longer in whole-process synchronized host timing; not a kernel result.
 
 That is the point of the release. This is not a production serving runtime or a
 speedup claim. It is a reproducible, correctness-first prototype for studying a
@@ -27,7 +33,7 @@ systems, Rust GPU tooling, or low-VRAM inference.
 
 ## X / Twitter Post
 
-Released LatentPagedAttention-rs v0.1.1: Rust+Python+cuTile paged latent-cache decode attention on RTX 4060. Synthetic profile: 16x fewer persistent FP16 cache bytes vs full-KV, with ~32.6% slower latent read time. Memory-compute trade-off, not a speedup claim.
+Released LatentPagedAttention-rs v0.1.1: Rust+Python+cuTile paged latent-cache decode attention on RTX 4060. Synthetic profile: 16x fewer persistent FP16 cache bytes vs full-KV, with historical ~32.6% longer whole-process execution; this is not a kernel-speed claim.
 
 ## Hacker News
 
@@ -52,7 +58,7 @@ into attention without a host cache round trip.
 For the synthetic model-shaped profile, persistent FP16 cache storage is 65,536
 bytes versus 1,048,576 bytes for an FP16 full-KV paged baseline: a 16x persistent
 cache-byte reduction. The current latent read path is not faster; it is about
-32.6% slower under synchronized host end-to-end timing. Compilation and cuTile JIT
+32.6% longer whole-process execution under synchronized host timing. This does not establish kernel latency. Compilation and cuTile JIT
 are excluded, but these are not kernel-only timings.
 
 Limitations: no real checkpoint, no production allocator, no continuous batching,
@@ -75,7 +81,7 @@ storage, and bit-exact FP16 write checks.
 
 The result is not a production inference engine. For a synthetic model-shaped
 profile, the latent cache uses 16x fewer persistent FP16 cache bytes than an
-FP16 full-KV baseline, but the current latent read path is about 32.6% slower
+FP16 full-KV baseline, but the historical process-level latent example was about 32.6% longer
 under synchronized host end-to-end timing.
 
 I’d be interested in feedback from Rust systems engineers on the API shape,
@@ -112,7 +118,7 @@ by attention using the updated device cache.
 
 The interesting result is mixed: 16x fewer persistent FP16 cache bytes versus an
 FP16 full-KV paged baseline for a synthetic model-shaped profile, but about
-32.6% slower latent-read time under synchronized host end-to-end timing.
+32.6% longer historical whole-process latent-example time; not steady-state kernel latency.
 
 I’d welcome feedback on the kernel structure, masking approach, block-table
 addressing, and what profiling should come before any optimization work.

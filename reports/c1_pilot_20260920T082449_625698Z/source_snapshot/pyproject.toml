@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "latent-paged-attention-rs"
+version = "0.1.0"
+description = "uv-centric Rust + Python research scaffold for paged latent-KV attention studies"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy>=2.1,<3",
+  "rich>=14,<15",
+  "typer>=0.16,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<0.13",
+]
+
+[project.scripts]
+plkv-memory = "latent_paged_attention.cli:main"
+plkv-bench-ref = "latent_paged_attention.bench_ref:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<0.13",
+]
+
+[tool.setuptools]
+package-dir = {"" = "python_ref"}
+
+[tool.setuptools.packages.find]
+where = ["python_ref"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["python_ref"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+# Research drivers preserve compact, command-like records for auditability.
+# They are validated by py_compile and their dedicated semantic validators.
+[tool.ruff.lint.per-file-ignores]
+"get-pip.py" = ["E", "F", "I", "B"]
+"scripts/analyze_p15_kernel_scaling.py" = ["E", "F", "I", "B"]
+"scripts/analyze_p15b_rtable.py" = ["E", "F", "I", "B"]
+"scripts/extract_p05_ncu.py" = ["E", "F", "I", "B"]
+"scripts/generate_p1_sequence_sources.py" = ["E", "F", "I", "B"]
+"scripts/generate_paper_readiness.py" = ["E", "F", "I", "B"]
+"scripts/offline_evidence_reconcile.py" = ["E", "F", "I", "B"]
+"scripts/reconcile_historical_evidence.py" = ["E", "F", "I", "B"]
+"scripts/run_central_evidence.py" = ["E", "F", "I", "B"]
+"scripts/run_p15_kernel_scaling.py" = ["E", "F", "I", "B"]
+"scripts/run_p15b_rtable.py" = ["E", "F", "I", "B"]
+"scripts/run_paper_repair_correctness.py" = ["E", "F", "I", "B"]
+"scripts/summarize_p1_results.py" = ["E", "F", "I", "B"]
+"scripts/validate_paper_readiness.py" = ["E", "F", "I", "B"]
+"scripts/validate_paper_run.py" = ["E", "F", "I", "B"]
+"scripts/validate_rtable_structure.py" = ["E", "F", "I", "B"]
