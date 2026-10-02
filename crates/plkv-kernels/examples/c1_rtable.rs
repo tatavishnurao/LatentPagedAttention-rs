@@ -267,6 +267,78 @@ mod gpu_impl {
                 .all(|&x| (0.0..=1.0).contains(&x));
         serde_json::json!({"pass":pass,"tensors":rows,"max_probability_row_sum_error":normalization,"atol":5e-3,"rtol":0,"relative_denominator_floor":1e-12})
     }
+    // In-process NVML reader (dlopen; no link-time dependency). Missing symbols are recorded
+    // as unavailable rather than fabricated.
+    struct Nvml {
+        _lib: libloading::Library,
+        device: *mut std::ffi::c_void,
+        clock: unsafe extern "C" fn(*mut std::ffi::c_void, u32, *mut u32) -> i32,
+        temperature: unsafe extern "C" fn(*mut std::ffi::c_void, u32, *mut u32) -> i32,
+        reasons: Option<unsafe extern "C" fn(*mut std::ffi::c_void, *mut u64) -> i32>,
+    }
+    impl Nvml {
+        fn open() -> Option<Self> {
+            unsafe {
+                let lib = libloading::Library::new("libnvidia-ml.so.1").ok()?;
+                let init: libloading::Symbol<unsafe extern "C" fn() -> i32> =
+                    lib.get(b"nvmlInit_v2\0").ok()?;
+                if init() != 0 {
+                    return None;
+                }
+                let handle: libloading::Symbol<
+                    unsafe extern "C" fn(u32, *mut *mut std::ffi::c_void) -> i32,
+                > = lib.get(b"nvmlDeviceGetHandleByIndex_v2\0").ok()?;
+                let mut device = std::ptr::null_mut();
+                if handle(0, &mut device) != 0 {
+                    return None;
+                }
+                let clock = *lib.get(b"nvmlDeviceGetClockInfo\0").ok()?;
+                let temperature = *lib.get(b"nvmlDeviceGetTemperature\0").ok()?;
+                let reasons = lib
+                    .get(b"nvmlDeviceGetCurrentClocksEventReasons\0")
+                    .or_else(|_| lib.get(b"nvmlDeviceGetCurrentClocksThrottleReasons\0"))
+                    .ok()
+                    .map(|f| *f);
+                Some(Self {
+                    _lib: lib,
+                    device,
+                    clock,
+                    temperature,
+                    reasons,
+                })
+            }
+        }
+        fn sm_clock(&self) -> Option<u32> {
+            let mut v = 0;
+            // NVML_CLOCK_SM = 1
+            (unsafe { (self.clock)(self.device, 1, &mut v) } == 0).then_some(v)
+        }
+        fn mem_clock(&self) -> Option<u32> {
+            let mut v = 0;
+            // NVML_CLOCK_MEM = 2
+            (unsafe { (self.clock)(self.device, 2, &mut v) } == 0).then_some(v)
+        }
+        fn temperature(&self) -> Option<u32> {
+            let mut v = 0;
+            (unsafe { (self.temperature)(self.device, 0, &mut v) } == 0).then_some(v)
+        }
+        fn reasons(&self) -> Option<u64> {
+            let mut v = 0;
+            self.reasons
+                .and_then(|f| (unsafe { f(self.device, &mut v) } == 0).then_some(v))
+        }
+    }
+    const ABORT_TEMPERATURE_C: u32 = 91;
+
+    fn write_json(dir: &std::path::Path, name: &str, value: &serde_json::Value, pretty: bool) {
+        let file = std::io::BufWriter::new(File::create(dir.join(name)).unwrap());
+        if pretty {
+            serde_json::to_writer_pretty(file, value).unwrap();
+        } else {
+            serde_json::to_writer(file, value).unwrap();
+        }
+    }
+
     pub fn main() {
         let args: Vec<String> = std::env::args().collect();
         let arg = |key: &str, default: &str| {
@@ -275,11 +347,23 @@ mod gpu_impl {
                 .map(|w| w[1].clone())
                 .unwrap_or(default.into())
         };
+        let flag = |key: &str| args.iter().any(|a| a == key);
         let n: usize = arg("--seq", "1024").parse().unwrap();
         let warmup: usize = arg("--warmup", "3").parse().unwrap();
         let iterations: usize = arg("--iterations", "12").parse().unwrap();
         let process: usize = arg("--process", "0").parse().unwrap();
-        let dir = PathBuf::from(arg("--output-dir", "reports/c1_native"));
+        let clock_warm_ms: u64 = arg("--clock-warm-ms", "2000").parse().unwrap();
+        let keepalive_max_ms: u64 = arg("--keepalive-max-ms", "0").parse().unwrap();
+        let skip_oracle_export = flag("--skip-oracle-export");
+        let variant_arg = arg("--variants", "A1,B1,C1");
+        let dir = PathBuf::from(arg("--output-dir", "/tmp/plkv_c1_native"));
+        // Slow 9P/OneDrive writes idle the GPU into P8 before and between timed samples
+        // (diagnosis 2026-10-02); require an explicit override to write under /mnt.
+        let absolute = std::path::absolute(&dir).unwrap();
+        assert!(
+            !absolute.starts_with("/mnt") || flag("--allow-slow-output"),
+            "--output-dir {absolute:?} is on /mnt; use a Linux filesystem path or --allow-slow-output"
+        );
         fs::create_dir_all(&dir).unwrap();
         let launch: Launch = match n {
             128 => launch_128,
@@ -297,10 +381,12 @@ mod gpu_impl {
             .unwrap()
             .unwrap();
         st.device().bind_to_thread().unwrap();
+        let nvml = Nvml::open();
         let (inp, cf, cb) = make_inputs(n, n, n / 16, &st, -0.4);
-        let variants = ["A1", "B1", "C1"];
-        let mut buffers: Vec<_> = variants.iter().map(|_| make_buffers(n, &st)).collect();
-        for (v, b) in variants.iter().zip(&mut buffers) {
+        // Correctness always covers A1/B1/C1; timing covers only the selected variants.
+        let all_variants = ["A1", "B1", "C1"];
+        let mut buffers: Vec<_> = all_variants.iter().map(|_| make_buffers(n, &st)).collect();
+        for (v, b) in all_variants.iter().zip(&mut buffers) {
             launch(v, "pipeline", b, &inp, &st, n);
         }
         unsafe {
@@ -308,78 +394,183 @@ mod gpu_impl {
         }
         let outputs: Vec<_> = buffers.iter().map(|b| read_outputs(b, &st)).collect();
         let checks = serde_json::json!({"A1_reference":validate(n,&outputs[0],&cf),"B1_reference":validate(n,&outputs[1],&cb),"C1_reference":validate(n,&outputs[2],&cb),"C1_B1":validate(n,&outputs[2],&outputs[1]),"C1_B1_bitwise_diagnostic":comparison_metrics(&outputs[2],&outputs[1])});
-        serde_json::to_writer_pretty(File::create(dir.join("correctness.json")).unwrap(), &checks)
-            .unwrap();
         for key in ["A1_reference", "B1_reference", "C1_reference", "C1_B1"] {
-            assert_eq!(checks[key]["pass"], true, "{checks}");
+            if checks[key]["pass"] != true {
+                write_json(&dir, "correctness.json", &checks, true);
+                panic!("{key} failed: {checks}");
+            }
         }
-        // Export actual inputs/outputs for an independent FP64, reconstructed-K/V oracle.
-        let q = deterministic_values(Q_HEADS * HEAD_DIM, 0.011, -0.4);
-        let z = deterministic_values(n * LATENT_DIM, 0.007, -1.2);
-        let kp = deterministic_values(LATENT_DIM * KV_HEADS * HEAD_DIM, 0.005, -0.7);
-        let vp = deterministic_values(LATENT_DIM * KV_HEADS * HEAD_DIM, 0.006, 0.3);
-        let data = serde_json::json!({"q":q,"latent_logical_prequantization":z,"kp":kp,"vp":vp,"scores":outputs[2].scores,"probabilities":outputs[2].probabilities,"context":outputs[2].context,"table":model_block_table(n/16)});
-        serde_json::to_writer(
-            File::create(dir.join("oracle_inputs_outputs.json")).unwrap(),
-            &data,
-        )
-        .unwrap();
         // A distinct decode query must refresh the projection; never reuse stale projected q.
-        {
+        let refresh = {
             let (changed, _, changed_ref) = make_inputs(n, n, n / 16, &st, 0.2);
             launch("C1", "pipeline", &mut buffers[2], &changed, &st, n);
             let changed_output = read_outputs(&buffers[2], &st);
             let refresh = validate(n, &changed_output, &changed_ref);
-            serde_json::to_writer_pretty(
-                File::create(dir.join("query_refresh.json")).unwrap(),
-                &refresh,
-            )
-            .unwrap();
-            assert_eq!(
-                refresh["pass"], true,
-                "changed-query projection was not refreshed"
-            );
-            assert_ne!(outputs[2].scores, changed_output.scores);
+            if refresh["pass"] != true || outputs[2].scores == changed_output.scores {
+                write_json(&dir, "query_refresh.json", &refresh, true);
+                panic!("changed-query projection was not refreshed");
+            }
             // Restore matched resident inputs before warmup and timing.
             launch("C1", "pipeline", &mut buffers[2], &inp, &st, n);
-        }
+            refresh
+        };
+        let selected: Vec<usize> = variant_arg
+            .split(',')
+            .map(|v| {
+                all_variants
+                    .iter()
+                    .position(|x| *x == v)
+                    .expect("unknown variant")
+            })
+            .collect();
         let phases = ["pipeline", "score", "softmax", "context", "projection"];
         // JIT and fixed warmup outside event intervals.
         for phase in phases {
-            for (v, b) in variants.iter().zip(&mut buffers) {
-                if phase == "projection" && *v != "C1" {
+            for &index in &selected {
+                let v = all_variants[index];
+                if phase == "projection" && v != "C1" {
                     continue;
                 }
                 for _ in 0..warmup {
-                    launch(v, phase, b, &inp, &st, n);
+                    launch(v, phase, &mut buffers[index], &inp, &st, n);
                 }
             }
         }
-        unsafe {
-            st.synchronize().unwrap();
+        // Clock warm-up: back-to-back untimed pipelines until the SM clock settles.
+        let mut warm_clocks = Vec::new();
+        let warm_start = std::time::Instant::now();
+        while warm_start.elapsed().as_millis() < u128::from(clock_warm_ms) {
+            for _ in 0..8 {
+                for &index in &selected {
+                    launch(
+                        all_variants[index],
+                        "pipeline",
+                        &mut buffers[index],
+                        &inp,
+                        &st,
+                        n,
+                    );
+                }
+            }
+            unsafe {
+                st.synchronize().unwrap();
+            }
+            if let Some(c) = nvml.as_ref().and_then(Nvml::sm_clock) {
+                warm_clocks.push(c);
+            }
         }
+        // Reference clock: mode of the second half of warm-up reads.
+        let reference_clock = {
+            let tail = &warm_clocks[warm_clocks.len() / 2..];
+            let mut counts = std::collections::BTreeMap::new();
+            for c in tail {
+                *counts.entry(*c).or_insert(0usize) += 1;
+            }
+            counts.into_iter().max_by_key(|(_, k)| *k).map(|(c, _)| c)
+        };
+        let keepalive_threshold = reference_clock.map(|c| f64::from(c) * 0.95);
         let ev = Events::new();
-        let mut raw = File::options()
-            .write(true)
-            .create_new(true)
-            .open(dir.join("samples.jsonl"))
-            .unwrap();
-        for iteration in 0..iterations {
-            for phase in phases {
-                for offset in 0..3 {
-                    let index = (iteration + process + offset) % 3;
-                    let v = variants[index];
-                    if phase == "projection" && v != "C1" {
+        let mut samples: Vec<serde_json::Value> = Vec::new();
+        let mut aborted = None;
+        let timing_start = std::time::Instant::now();
+        'timing: for iteration in 0..iterations {
+            for phase in ["empty"].into_iter().chain(phases) {
+                for offset in 0..selected.len() {
+                    let index = selected[(iteration + process + offset) % selected.len()];
+                    let v = if phase == "empty" {
+                        "NONE"
+                    } else {
+                        all_variants[index]
+                    };
+                    if (phase == "projection" && v != "C1") || (phase == "empty" && offset > 0) {
                         continue;
                     }
-                    let ms =
-                        ev.measure(&st, || launch(v, phase, &mut buffers[index], &inp, &st, n));
-                    writeln!(raw,"{}",serde_json::json!({"seq":n,"process":process,"iteration":iteration,"order":offset,"variant":v,"component":phase,"latency_ms":ms})).unwrap();
-                    raw.flush().unwrap();
+                    // Optional keep-alive (off by default; --keepalive-max-ms > 0 enables it).
+                    // Disabled because it cannot override temperature-driven DVFS and adds heat
+                    // (diagnosis 2026-10-02, E0b).
+                    let mut keepalive_launches = 0usize;
+                    let mut pre_clock = nvml.as_ref().and_then(Nvml::sm_clock);
+                    if let (Some(threshold), Some(_)) = (keepalive_threshold, pre_clock) {
+                        let started = std::time::Instant::now();
+                        while pre_clock.is_some_and(|c| f64::from(c) < threshold)
+                            && started.elapsed().as_millis() < u128::from(keepalive_max_ms)
+                        {
+                            for _ in 0..8 {
+                                launch(
+                                    v_or(v, all_variants[index]),
+                                    "pipeline",
+                                    &mut buffers[index],
+                                    &inp,
+                                    &st,
+                                    n,
+                                );
+                                keepalive_launches += 1;
+                            }
+                            unsafe {
+                                st.synchronize().unwrap();
+                            }
+                            pre_clock = nvml.as_ref().and_then(Nvml::sm_clock);
+                        }
+                    }
+                    let ms = if phase == "empty" {
+                        ev.measure(&st, || {})
+                    } else {
+                        ev.measure(&st, || launch(v, phase, &mut buffers[index], &inp, &st, n))
+                    };
+                    let post_clock = nvml.as_ref().and_then(Nvml::sm_clock);
+                    let mem_clock = nvml.as_ref().and_then(Nvml::mem_clock);
+                    let keepalive_restored = keepalive_threshold
+                        .zip(pre_clock)
+                        .map(|(threshold, c)| f64::from(c) >= threshold);
+                    let temperature = nvml.as_ref().and_then(Nvml::temperature);
+                    let reasons = nvml.as_ref().and_then(Nvml::reasons);
+                    samples.push(serde_json::json!({"seq":n,"process":process,"iteration":iteration,"order":offset,"variant":v,"component":phase,"latency_ms":ms,"t_ms":timing_start.elapsed().as_secs_f64()*1e3,"sm_clock_pre_mhz":pre_clock,"sm_clock_post_mhz":post_clock,"reference_clock_mhz":reference_clock,"keepalive_launches":keepalive_launches,"keepalive_restored":keepalive_restored,"mem_clock_post_mhz":mem_clock,"temperature_c":temperature,"clock_event_reasons":reasons}));
+                    if temperature.is_some_and(|t| t >= ABORT_TEMPERATURE_C) {
+                        aborted = Some(temperature);
+                        break 'timing;
+                    }
                 }
             }
         }
+        // All file output happens after the timing loop.
+        let mut raw = std::io::BufWriter::new(
+            File::options()
+                .write(true)
+                .create_new(true)
+                .open(dir.join("samples.jsonl"))
+                .unwrap(),
+        );
+        for sample in &samples {
+            writeln!(raw, "{sample}").unwrap();
+        }
+        raw.flush().unwrap();
+        write_json(&dir, "correctness.json", &checks, true);
+        write_json(&dir, "query_refresh.json", &refresh, true);
+        write_json(
+            &dir,
+            "timing_meta.json",
+            &serde_json::json!({"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"clock_warm_ms":clock_warm_ms,"keepalive_max_ms":keepalive_max_ms,"timed_variants":variant_arg,"iterations":iterations,"warmup":warmup,"aborted_temperature_c":aborted}),
+            true,
+        );
+        if !skip_oracle_export {
+            // Export actual inputs/outputs for an independent FP64, reconstructed-K/V oracle.
+            let q = deterministic_values(Q_HEADS * HEAD_DIM, 0.011, -0.4);
+            let z = deterministic_values(n * LATENT_DIM, 0.007, -1.2);
+            let kp = deterministic_values(LATENT_DIM * KV_HEADS * HEAD_DIM, 0.005, -0.7);
+            let vp = deterministic_values(LATENT_DIM * KV_HEADS * HEAD_DIM, 0.006, 0.3);
+            let data = serde_json::json!({"q":q,"latent_logical_prequantization":z,"kp":kp,"vp":vp,"scores":outputs[2].scores,"probabilities":outputs[2].probabilities,"context":outputs[2].context,"table":model_block_table(n/16)});
+            write_json(&dir, "oracle_inputs_outputs.json", &data, false);
+        }
+        if aborted.is_some() {
+            eprintln!(
+                "THERMAL_ABORT temperature >= {ABORT_TEMPERATURE_C} C; partial samples saved"
+            );
+            std::process::exit(3);
+        }
         println!("C1_OK=1");
+    }
+    fn v_or<'a>(v: &'a str, fallback: &'a str) -> &'a str {
+        if v == "NONE" { fallback } else { v }
     }
     define_launch!(
         launch_128,

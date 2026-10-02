@@ -600,6 +600,7 @@ version = "0.1.0"
 dependencies = [
  "cutile",
  "cutile-compiler",
+ "libloading",
  "plkv-core",
  "serde",
  "serde_json",
