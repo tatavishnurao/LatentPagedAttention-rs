@@ -1,6 +1,7 @@
 //! Placeholder boundaries for future GPU kernel work.
 
 pub mod alignment;
+pub mod block_table;
 
 #[cfg(feature = "gpu-cutile")]
 pub mod cutile;
