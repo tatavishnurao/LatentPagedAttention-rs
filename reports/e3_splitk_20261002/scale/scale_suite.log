@@ -1,0 +1,30 @@
+E3_TEMPERATURE_START_C=Some(77)
+SCALE inputs=uniform active=4096 splits=1 steps_per_split=128 blocks_read=256 c3_max=6.275e-4 c3_mean=1.780e-4 a3_max=7.625e-4 a3_mean=2.084e-4 a3pad_max=7.215e-4 a3pad_mean=2.886e-4
+SCALE inputs=uniform active=4096 splits=8 steps_per_split=16 blocks_read=256 c3_max=5.250e-4 c3_mean=9.983e-5 a3_max=7.994e-4 a3_mean=1.912e-4 a3pad_max=7.927e-4 a3pad_mean=1.939e-4
+SCALE inputs=uniform active=4096 splits=64 steps_per_split=2 blocks_read=256 c3_max=4.866e-4 c3_mean=9.982e-5 a3_max=7.937e-4 a3_mean=1.954e-4 a3pad_max=7.927e-4 a3pad_mean=1.969e-4
+SCALE_SUMMARY inputs=uniform active=4096 worst_max c3=6.275e-4 a3=7.994e-4 a3pad=7.927e-4 worst_mean c3=1.780e-4 a3=2.084e-4 a3pad=2.886e-4
+SCALE inputs=uniform active=8192 splits=1 steps_per_split=256 blocks_read=512 c3_max=9.375e-4 c3_mean=2.780e-4 a3_max=7.601e-4 a3_mean=2.057e-4 a3pad_max=9.670e-4 a3pad_mean=4.096e-4
+SCALE inputs=uniform active=8192 splits=8 steps_per_split=32 blocks_read=512 c3_max=5.386e-4 c3_mean=9.928e-5 a3_max=8.035e-4 a3_mean=1.784e-4 a3pad_max=7.932e-4 a3pad_mean=1.888e-4
+SCALE inputs=uniform active=8192 splits=64 steps_per_split=4 blocks_read=512 c3_max=5.047e-4 c3_mean=8.671e-5 a3_max=7.668e-4 a3_mean=1.914e-4 a3pad_max=7.648e-4 a3pad_mean=1.930e-4
+SCALE_SUMMARY inputs=uniform active=8192 worst_max c3=9.375e-4 a3=8.035e-4 a3pad=9.670e-4 worst_mean c3=2.780e-4 a3=2.057e-4 a3pad=4.096e-4
+SCALE inputs=uniform active=32768 splits=1 steps_per_split=1024 blocks_read=2048 c3_max=2.942e-3 c3_mean=1.045e-3 a3_max=7.615e-4 a3_mean=2.256e-4 a3pad_max=3.093e-3 a3pad_mean=1.110e-3
+SCALE inputs=uniform active=32768 splits=8 steps_per_split=128 blocks_read=2048 c3_max=6.294e-4 c3_mean=1.799e-4 a3_max=7.634e-4 a3_mean=1.974e-4 a3pad_max=7.234e-4 a3pad_mean=3.015e-4
+SCALE inputs=uniform active=32768 splits=64 steps_per_split=16 blocks_read=2048 c3_max=5.302e-4 c3_mean=8.693e-5 a3_max=7.894e-4 a3_mean=1.998e-4 a3pad_max=7.839e-4 a3pad_mean=2.004e-4
+SCALE_SUMMARY inputs=uniform active=32768 worst_max c3=2.942e-3 a3=7.894e-4 a3pad=3.093e-3 worst_mean c3=1.045e-3 a3=2.256e-4 a3pad=1.110e-3
+SCALE inputs=heavy_tailed active=4096 splits=1 steps_per_split=128 blocks_read=256 c3_max=2.729e-3 c3_mean=4.788e-4 a3_max=1.096e-3 a3_mean=1.509e-4 a3pad_max=1.251e-3 a3pad_mean=2.004e-4
+SCALE inputs=heavy_tailed active=4096 splits=8 steps_per_split=16 blocks_read=256 c3_max=2.650e-3 c3_mean=4.627e-4 a3_max=2.337e-4 a3_mean=5.343e-5 a3pad_max=2.604e-4 a3pad_mean=6.035e-5
+SCALE inputs=heavy_tailed active=4096 splits=64 steps_per_split=2 blocks_read=256 c3_max=2.666e-3 c3_mean=4.643e-4 a3_max=2.398e-4 a3_mean=5.602e-5 a3pad_max=2.422e-4 a3pad_mean=5.640e-5
+SCALE_SUMMARY inputs=heavy_tailed active=4096 worst_max c3=2.729e-3 a3=1.096e-3 a3pad=1.251e-3 worst_mean c3=4.788e-4 a3=1.509e-4 a3pad=2.004e-4
+SCALE inputs=heavy_tailed active=8192 splits=1 steps_per_split=256 blocks_read=512 c3_max=4.181e-3 c3_mean=5.037e-4 a3_max=1.184e-3 a3_mean=2.230e-4 a3pad_max=1.503e-3 a3pad_mean=2.942e-4
+SCALE inputs=heavy_tailed active=8192 splits=8 steps_per_split=32 blocks_read=512 c3_max=4.182e-3 c3_mean=5.553e-4 a3_max=5.894e-4 a3_mean=8.488e-5 a3pad_max=5.946e-4 a3pad_mean=9.053e-5
+SCALE inputs=heavy_tailed active=8192 splits=64 steps_per_split=4 blocks_read=512 c3_max=4.182e-3 c3_mean=5.484e-4 a3_max=5.894e-4 a3_mean=8.683e-5 a3pad_max=5.946e-4 a3pad_mean=8.825e-5
+SCALE_SUMMARY inputs=heavy_tailed active=8192 worst_max c3=4.182e-3 a3=1.184e-3 a3pad=1.503e-3 worst_mean c3=5.553e-4 a3=2.230e-4 a3pad=2.942e-4
+SCALE inputs=heavy_tailed active=32768 splits=1 steps_per_split=1024 blocks_read=2048 c3_max=2.748e-3 c3_mean=3.493e-4 a3_max=1.066e-3 a3_mean=1.829e-4 a3pad_max=2.198e-3 a3pad_mean=2.793e-4
+SCALE inputs=heavy_tailed active=32768 splits=8 steps_per_split=128 blocks_read=2048 c3_max=3.192e-3 c3_mean=3.001e-4 a3_max=9.403e-4 a3_mean=1.554e-4 a3pad_max=1.002e-3 a3pad_mean=1.735e-4
+SCALE inputs=heavy_tailed active=32768 splits=64 steps_per_split=16 blocks_read=2048 c3_max=3.266e-3 c3_mean=2.931e-4 a3_max=8.936e-4 a3_mean=1.462e-4 a3pad_max=9.117e-4 a3pad_mean=1.502e-4
+SCALE_SUMMARY inputs=heavy_tailed active=32768 worst_max c3=3.266e-3 a3=1.066e-3 a3pad=2.198e-3 worst_mean c3=3.493e-4 a3=1.829e-4 a3pad=2.793e-4
+SCALE_TOLERANCE_EXCEEDED tol=0.003: uniform N=32768 splits=1 a3pad max=3.093e-3; heavy_tailed N=8192 splits=1 c3 max=4.181e-3; heavy_tailed N=8192 splits=8 c3 max=4.182e-3; heavy_tailed N=8192 splits=64 c3 max=4.182e-3; heavy_tailed N=32768 splits=8 c3 max=3.192e-3; heavy_tailed N=32768 splits=64 c3 max=3.266e-3
+
+thread 'main' (2487521) panicked at crates/plkv-kernels/examples/e3_splitk_gpu.rs:888:13:
+scale tolerance exceeded; FP16 probability path may need FP32 P accumulation
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

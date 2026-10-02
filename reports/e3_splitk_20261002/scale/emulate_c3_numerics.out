@@ -1,0 +1,5 @@
+all FP32 (online softmax only)     max=1.907e-05 mean=2.785e-06
+FP16 P only                        max=1.426e-03 mean=2.321e-04
+FP16 q' only                       max=4.163e-03 mean=5.829e-04
+FP16 q' + FP16 P (C3 numerics)     max=4.163e-03 mean=5.034e-04
+max |score| 26.273168563842773  max |q'| 17.578258514404297
