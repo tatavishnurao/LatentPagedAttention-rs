@@ -2,6 +2,8 @@
 
 LatentPagedAttention-rs is a correctness-first Rust, Python, and cuTile experiment measuring the memory-compute trade-off of paged latent-cache decode attention on an RTX 4060.
 
+> **Status (2026-10-02): read [docs/DIAGNOSIS_2026-10-02.md](docs/DIAGNOSIS_2026-10-02.md) first.** No kernel-level latent-vs-full-KV speed result is established. The 32.6% figure below is whole-process `cargo run` timing, not a kernel result. Phase-2 latent/full ratios were measured at idle GPU clocks and are VOID; the only clean point (1K tokens, steady 1890 MHz, one process) has the C1 latent pipeline 1.13x slower than full-KV. The 16x ratio is persistent cache bytes for a synthetic shape (one shared 32-dim latent replacing 4 KV heads x 64 dims for both K and V, random weights, no RoPE); realistic MLA-style ratios for 7-8B models are roughly 1.6-13x and depend on rank and model quality.
+
 ## Research question
 
 Can a paged latent cache be mutated and consumed directly on GPU without storing persistent full K/V tensors?
@@ -18,7 +20,7 @@ The model-shaped synthetic profile compares a paged latent cache with an FP16 fu
 | FP16 full-KV cache | 1,048,576 |
 | persistent cache-byte ratio | 16x |
 
-Historical **process-level** execution was approximately 32.6% longer for the latent example; this does **not** establish steady-state kernel slowdown. The timer surrounds `cargo run`, including process initialization, allocations, reference validation and readback. The 16x analytical ratio counts persistent cache bytes only, excluding projections, metadata, intermediates and allocator overhead.
+Historical **process-level** execution was approximately 32.6% longer for the latent example; this does **not** establish steady-state kernel slowdown. The timer surrounds `cargo run`, including process initialization, allocations, reference validation and readback. The 16x analytical ratio counts persistent cache bytes only, for this synthetic shape (see the status note above), excluding projections, metadata, intermediates and allocator overhead.
 
 The bounded hoisted-projection + R-TABLE milestone is documented in [C1 report](docs/C1_REPORT.md), [protocol](docs/C1_PROTOCOL.md) and [claim ledger](docs/C1_EVIDENCE_LEDGER.md).
 
