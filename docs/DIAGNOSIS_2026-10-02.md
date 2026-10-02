@@ -373,7 +373,7 @@ See [`docs/E3_SPLITK_DESIGN.md`](E3_SPLITK_DESIGN.md) for the design: split-K wi
 
 ## Follow-ups (2026-10-02, third pass; no GPU campaigns on the laptop)
 
-- **Tensor-core mapping (MEASURED, compile-only, CPU):** cuTile 0.2 lowers FP16 `mma` for the latent score GEMM [16×32]×[32×T], T = 64…512, to `HMMA.16816.F32` on sm_89. The whole GEMM is on tensor cores: T/16 HMMA per warp with 4 warps = T/4 per CTA, as required. All 48 existing kernel functions contain 0 HMMA. The probe's FP16 loads were scalar `LDG.E.U16`, an E3 risk. See [`MMA_PROBE_PLAN.md`](MMA_PROBE_PLAN.md).
+- **Tensor-core mapping (MEASURED, compile-only, CPU):** cuTile 0.2 lowers FP16 `mma` for the latent score GEMM [16×32]×[32×T], T = 64…512, to `HMMA.16816.F32` on sm_89. The whole GEMM is on tensor cores: T/16 HMMA per warp with 4 warps = T/4 per CTA, as required. All 48 existing kernel functions contain 0 HMMA. Without hints the probe's FP16 loads were scalar `LDG.E.U16`. **P1:** `CompileOptions::max_divisibility(16)` or runtime-style `spec_args` makes them `LDG.E.128`, with HMMA unchanged. Paged gathers are untested. See [`MMA_PROBE_PLAN.md`](MMA_PROBE_PLAN.md).
 - **Portable E0b runner** for a native-Linux sm_89 host (e.g. a cloud L4): `scripts/e0b/run_e0b_portable.sh`, with requirements and a checklist in [`E0B_CLOUD_RUNBOOK.md`](E0B_CLOUD_RUNBOOK.md). Its refusal paths and individual checks were tested here; the full native run is untested.
 - **Driver/toolkit fact (MEASURED):** this laptop's driver (595.97) reports CUDA 13.2 and runs the CUDA 13.3 toolkit correctly. tileiras emits sm_89 cubins ahead of time, so the driver does not need to report 13.3.
 

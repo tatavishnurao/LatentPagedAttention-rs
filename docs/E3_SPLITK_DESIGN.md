@@ -128,7 +128,7 @@ Configurations:
 
 ## 9. Risks and unknowns
 
-- **`mma` lowering: resolved for compile (MEASURED, CPU-only probe, `docs/MMA_PROBE_PLAN.md`).** FP16 `mma` at 16×T×32 (T = 64…512) lowers to `HMMA.16816.F32` on sm_89, with the whole GEMM on the tensor cores. **New risk:** in the probe's compile configuration, global loads were scalar `LDG.E.U16`. E3 must verify vector loads (`LDG.E.128`), probably via divisibility hints, or it will be load-issue-bound. Runtime tensor-pipe utilization is still unmeasured.
+- **`mma` lowering: resolved for compile (MEASURED, CPU-only probe, `docs/MMA_PROBE_PLAN.md`).** FP16 `mma` at 16×T×32 (T = 64…512) lowers to `HMMA.16816.F32` on sm_89, with the whole GEMM on the tensor cores. Probe P1: the scalar `LDG.E.U16` loads seen without hints become `LDG.E.128` with `max_divisibility(16)` or runtime-style `spec_args`. **Remaining risk:** paged gathers (row offset computed from a loaded table entry) are untested; E3 must check SASS on the paged kernel. Runtime tensor-pipe utilization is still unmeasured.
 - **Static specialization:** kernels are specialized per N today (SOURCE `scripts/generate_c1.py`), so R and S must be compile-time constants per configuration. The generator has to emit (N, S, G) variants.
 - **Atomics:** the one-launch reduction depends on cuTile atomics memory-ordering semantics. Two launches are the safe default.
 - **Thermal:** split-K raises SM utilization, so it will heat the GPU faster than today's kernels. Expect more THROTTLED tags at 32K; the policy is unchanged.

@@ -9,6 +9,8 @@
 #[cfg(feature = "gpu-cutile")]
 mod probe {
     use cutile::compile_api::KernelCompiler;
+    use cutile::cutile_compiler::hints::CompileOptions;
+    use cutile::cutile_compiler::specialization::{SpecializationBits, compute_spec};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
     use std::process::Command;
@@ -62,8 +64,23 @@ mod probe {
     }
     use mma_probe_module::__module_ast_self;
 
-    const N_TOKENS: i32 = 8192; // stride basis for the dynamic token dimension
-    type KernelStrides<'a> = (&'a str, Vec<(&'a str, Vec<i32>)>);
+    const N_TOKENS: i32 = 8192; // size of the dynamic token dimension
+    // A cudaMalloc-style base address: 256-byte aligned, so DivHint::from_ptr clamps to 16.
+    const ALIGNED_BASE_PTR: u64 = 0x7f00_0000_0000;
+    /// (parameter, full-tensor shape, element bytes); strides are row-major over the shape.
+    type Param<'a> = (&'a str, Vec<i32>, i32);
+    type KernelParams<'a> = (&'a str, Vec<Param<'a>>);
+    /// P1 hint modes: none (baseline), CompileOptions::max_divisibility(16), spec_args
+    /// computed like the runtime JIT does for aligned allocations, and both.
+    const HINT_MODES: [&str; 4] = ["none", "maxdiv16", "spec", "spec+maxdiv16"];
+
+    fn row_major_strides(shape: &[i32]) -> Vec<i32> {
+        let mut strides = vec![1; shape.len()];
+        for i in (0..shape.len().saturating_sub(1)).rev() {
+            strides[i] = strides[i + 1] * shape[i + 1];
+        }
+        strides
+    }
 
     fn sass_counts(cubin: &Path, cuobjdump: &Path) -> BTreeMap<String, usize> {
         let out = Command::new(cuobjdump)
@@ -91,6 +108,11 @@ mod probe {
                 continue;
             }
             let base = op.split('.').next().unwrap().to_string();
+            // Keep full opcodes for memory instructions so access width (e.g. LDG.E.U16 vs
+            // LDG.E.128) stays visible.
+            if matches!(base.as_str(), "LDG" | "STG" | "LDS" | "STS" | "LDGSTS") {
+                *counts.entry(format!("op:{op}")).or_insert(0) += 1;
+            }
             *counts.entry(base).or_insert(0) += 1;
             *counts.entry("_total".into()).or_insert(0) += 1;
         }
@@ -116,78 +138,118 @@ mod probe {
         let cuobjdump = toolkit.join("bin/cuobjdump");
         let mut results = Vec::new();
         for t in [64, 128, 256, 512] {
-            let kernels: [KernelStrides; 3] = [
+            let n = N_TOKENS;
+            let kernels: [KernelParams; 3] = [
                 (
                     "scores_qz_f16",
                     vec![
-                        ("out", vec![t, 1]),
-                        ("q", vec![32, 1]),
-                        ("zt", vec![N_TOKENS, 1]),
+                        ("out", vec![16, n], 4),
+                        ("q", vec![16, 32], 2),
+                        ("zt", vec![32, n], 2),
                     ],
                 ),
                 (
                     "scores_zq_f16",
                     vec![
-                        ("out", vec![16, 1]),
-                        ("z", vec![32, 1]),
-                        ("qt", vec![16, 1]),
+                        ("out", vec![n, 16], 4),
+                        ("z", vec![n, 32], 2),
+                        ("qt", vec![32, 16], 2),
                     ],
                 ),
                 (
                     "scores_reduce_f32",
-                    vec![("out", vec![t, 1]), ("q", vec![32, 1]), ("z", vec![32, 1])],
+                    vec![
+                        ("out", vec![16, n], 4),
+                        ("q", vec![16, 32], 4),
+                        ("z", vec![n, 32], 4),
+                    ],
                 ),
             ];
-            for (name, strides) in kernels {
-                let stride_refs: Vec<(&str, &[i32])> =
-                    strides.iter().map(|(n, s)| (*n, s.as_slice())).collect();
-                let tag = format!("{name}_T{t}_{target}");
-                let compiled = KernelCompiler::new(__module_ast_self, "mma_probe_module", name)
-                    .generics(vec![t.to_string()])
-                    .strides(&stride_refs)
-                    .target(&target)
-                    .compile();
-                let artifacts = match compiled {
-                    Ok(a) => a,
-                    Err(e) => {
-                        results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"stage":"tile_ir_compile","error":format!("{e:?}")}));
+            for (name, params) in &kernels {
+                let strides: Vec<Vec<i32>> = params
+                    .iter()
+                    .map(|(_, shape, _)| row_major_strides(shape))
+                    .collect();
+                let stride_refs: Vec<(&str, &[i32])> = params
+                    .iter()
+                    .zip(&strides)
+                    .map(|((p, _, _), s)| (*p, s.as_slice()))
+                    .collect();
+                let specs: Vec<SpecializationBits> = params
+                    .iter()
+                    .zip(&strides)
+                    .map(|((_, shape, bytes), s)| compute_spec(ALIGNED_BASE_PTR, shape, s, *bytes))
+                    .collect();
+                let spec_refs: Vec<(&str, SpecializationBits)> = params
+                    .iter()
+                    .zip(&specs)
+                    .map(|((p, _, _), spec)| (*p, spec.clone()))
+                    .collect();
+                for mode in HINT_MODES {
+                    let name = *name;
+                    let tag = if mode == "none" {
+                        format!("{name}_T{t}_{target}")
+                    } else {
+                        format!("{name}_T{t}_{target}_{}", mode.replace('+', "_"))
+                    };
+                    let mut compiler =
+                        KernelCompiler::new(__module_ast_self, "mma_probe_module", name)
+                            .generics(vec![t.to_string()])
+                            .strides(&stride_refs)
+                            .target(&target);
+                    if mode.contains("spec") {
+                        compiler = compiler.spec_args(&spec_refs);
+                    }
+                    if mode.contains("maxdiv16") {
+                        compiler = compiler.options(CompileOptions::new().max_divisibility(16));
+                    }
+                    let artifacts = match compiler.compile() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"hint_mode":mode,"stage":"tile_ir_compile","error":format!("{e:?}")}));
+                            continue;
+                        }
+                    };
+                    // Tile IR spells the op `mmaf` (float) or `mmai` (integer); the module
+                    // name also contains "mma".
+                    let ir = artifacts.ir_text();
+                    let ir_has_mma = ir.contains(" mmaf ")
+                        || ir.contains(" mmai ")
+                        || ir.contains(".mmaf")
+                        || ir.contains(".mmai");
+                    let bc = dir.join(format!("{tag}.bc"));
+                    let cubin = dir.join(format!("{tag}.cubin"));
+                    std::fs::write(&bc, artifacts.bytecode().expect("bytecode")).unwrap();
+                    std::fs::write(dir.join(format!("{tag}.mlir")), &ir).unwrap();
+                    let status = Command::new(&tileiras)
+                        .args(["--gpu-name", &target, "--opt-level", "3", "-o"])
+                        .arg(&cubin)
+                        .arg(&bc)
+                        .output()
+                        .expect("tileiras failed to start");
+                    if !status.status.success() {
+                        results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"hint_mode":mode,"stage":"tileiras","ir_has_mma":ir_has_mma,"error":String::from_utf8_lossy(&status.stderr)}));
                         continue;
                     }
-                };
-                // Tile IR spells the op `mmaf` (float) or `mmai` (integer); the module name also contains "mma".
-                let ir = artifacts.ir_text();
-                let ir_has_mma = ir.contains(" mmaf ")
-                    || ir.contains(" mmai ")
-                    || ir.contains(".mmaf")
-                    || ir.contains(".mmai");
-                let bc = dir.join(format!("{tag}.bc"));
-                let cubin = dir.join(format!("{tag}.cubin"));
-                std::fs::write(&bc, artifacts.bytecode().expect("bytecode")).unwrap();
-                std::fs::write(dir.join(format!("{tag}.mlir")), artifacts.ir_text()).unwrap();
-                let status = Command::new(&tileiras)
-                    .args(["--gpu-name", &target, "--opt-level", "3", "-o"])
-                    .arg(&cubin)
-                    .arg(&bc)
-                    .output()
-                    .expect("tileiras failed to start");
-                if !status.status.success() {
-                    results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"stage":"tileiras","ir_has_mma":ir_has_mma,"error":String::from_utf8_lossy(&status.stderr)}));
-                    continue;
+                    let counts = sass_counts(&cubin, &cuobjdump);
+                    let mma: usize = counts
+                        .iter()
+                        .filter(|(k, _)| !k.starts_with("op:") && k.contains("MMA"))
+                        .map(|(_, v)| v)
+                        .sum();
+                    let loads: Vec<String> = counts
+                        .iter()
+                        .filter(|(k, _)| k.starts_with("op:LDG"))
+                        .map(|(k, v)| format!("{}x{v}", &k[3..]))
+                        .collect();
+                    println!(
+                        "{tag}: ir_mma={ir_has_mma} sass_mma={mma} HMMA={} total={} global_loads=[{}]",
+                        counts.get("HMMA").unwrap_or(&0),
+                        counts.get("_total").unwrap_or(&0),
+                        loads.join(" ")
+                    );
+                    results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"hint_mode":mode,"ir_has_mma":ir_has_mma,"sass_mma_instructions":mma,"opcode_counts":counts,"cubin":cubin.file_name().map(|f| f.to_string_lossy().into_owned())}));
                 }
-                let counts = sass_counts(&cubin, &cuobjdump);
-                let mma: usize = counts
-                    .iter()
-                    .filter(|(k, _)| k.contains("MMA"))
-                    .map(|(_, v)| v)
-                    .sum();
-                println!(
-                    "{tag}: ir_mma={ir_has_mma} sass_mma={mma} HMMA={} FFMA={} HFMA2={} total={}",
-                    counts.get("HMMA").unwrap_or(&0),
-                    counts.get("FFMA").unwrap_or(&0),
-                    counts.get("HFMA2").unwrap_or(&0),
-                    counts.get("_total").unwrap_or(&0)
-                );
-                results.push(serde_json::json!({"kernel":name,"T":t,"target":target,"ir_has_mma":ir_has_mma,"sass_mma_instructions":mma,"opcode_counts":counts,"cubin":cubin.file_name().map(|f| f.to_string_lossy().into_owned())}));
             }
         }
         std::fs::write(
