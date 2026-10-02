@@ -43,6 +43,9 @@ pythonpath = ["python_ref"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# reports/ holds checksummed evidence: frozen source snapshots and copies of the exact
+# scripts that produced each run. Editing them would break SHA256SUMS, so they are not linted.
+extend-exclude = ["reports"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
@@ -51,18 +54,22 @@ select = ["E", "F", "I", "B"]
 # They are validated by py_compile and their dedicated semantic validators.
 [tool.ruff.lint.per-file-ignores]
 "get-pip.py" = ["E", "F", "I", "B"]
+"scripts/analyze_c1.py" = ["E", "F", "I", "B"]
 "scripts/analyze_p15_kernel_scaling.py" = ["E", "F", "I", "B"]
+"scripts/analyze_phase2.py" = ["E", "F", "I", "B"]
 "scripts/analyze_p15b_rtable.py" = ["E", "F", "I", "B"]
 "scripts/extract_p05_ncu.py" = ["E", "F", "I", "B"]
 "scripts/generate_p1_sequence_sources.py" = ["E", "F", "I", "B"]
 "scripts/generate_paper_readiness.py" = ["E", "F", "I", "B"]
 "scripts/offline_evidence_reconcile.py" = ["E", "F", "I", "B"]
 "scripts/reconcile_historical_evidence.py" = ["E", "F", "I", "B"]
+"scripts/run_c1_milestone.py" = ["E", "F", "I", "B"]
 "scripts/run_central_evidence.py" = ["E", "F", "I", "B"]
 "scripts/run_p15_kernel_scaling.py" = ["E", "F", "I", "B"]
 "scripts/run_p15b_rtable.py" = ["E", "F", "I", "B"]
 "scripts/run_paper_repair_correctness.py" = ["E", "F", "I", "B"]
 "scripts/summarize_p1_results.py" = ["E", "F", "I", "B"]
+"scripts/validate_c1_oracle.py" = ["E", "F", "I", "B"]
 "scripts/validate_paper_readiness.py" = ["E", "F", "I", "B"]
 "scripts/validate_paper_run.py" = ["E", "F", "I", "B"]
 "scripts/validate_rtable_structure.py" = ["E", "F", "I", "B"]
