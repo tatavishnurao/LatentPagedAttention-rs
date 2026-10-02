@@ -78,3 +78,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "mma_probe"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "p3_probe"
+required-features = ["gpu-cutile"]
