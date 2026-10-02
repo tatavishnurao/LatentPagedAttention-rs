@@ -1,0 +1,105 @@
+{
+  "campaign": "<home>/plkv_runs/e0b_20261002T092930",
+  "binary_sha256": "389b4a8d62de75258838d04ed73fb81a8685c1ca385b39b8a7a27c5ff47572a2",
+  "runs": [
+    {
+      "label": "seq1024_p0",
+      "start_condition": "hot-start",
+      "start_temp_c": 80,
+      "cooldown_wait_s": 303.3,
+      "modal_clock": 1890,
+      "mem_clock_mode": 8001,
+      "low_reads": 3157,
+      "reads": 4000,
+      "temp_max_ext": 87,
+      "temp_max_inproc": 87,
+      "keepalive_launches": 385224,
+      "keepalive_failed": 1899,
+      "reference_clock": 2355,
+      "correct": true,
+      "tags": [
+        "THROTTLED(clock: 3157/4000 reads <95% of mode 1890)",
+        "THROTTLED(thermal bits in-proc 0x21 ext 0x21)",
+        "hot-start"
+      ],
+      "throttled": true,
+      "excluded": null
+    }
+  ],
+  "results": {
+    "1024": {
+      "clean": {
+        "processes": []
+      },
+      "THROTTLED_or_hot_descriptive": {
+        "processes": [
+          "seq1024_p0"
+        ],
+        "pipeline": {
+          "A1_median_us_per_process": [
+            149.5
+          ],
+          "C1_median_us_per_process": [
+            161.28
+          ],
+          "C1_over_A1_per_process": [
+            1.0788
+          ],
+          "C1_over_A1_geomean": 1.0788,
+          "paired_iteration_ratio_median": 1.082
+        },
+        "score": {
+          "A1_median_us_per_process": [
+            33.28
+          ],
+          "C1_median_us_per_process": [
+            28.67
+          ],
+          "C1_over_A1_per_process": [
+            0.8615
+          ],
+          "C1_over_A1_geomean": 0.8615,
+          "paired_iteration_ratio_median": 0.9393
+        },
+        "softmax": {
+          "A1_median_us_per_process": [
+            12.29
+          ],
+          "C1_median_us_per_process": [
+            15.36
+          ],
+          "C1_over_A1_per_process": [
+            1.25
+          ],
+          "C1_over_A1_geomean": 1.25,
+          "paired_iteration_ratio_median": 1.0
+        },
+        "context": {
+          "A1_median_us_per_process": [
+            88.06
+          ],
+          "C1_median_us_per_process": [
+            67.07
+          ],
+          "C1_over_A1_per_process": [
+            0.7616
+          ],
+          "C1_over_A1_geomean": 0.7616,
+          "paired_iteration_ratio_median": 0.732
+        },
+        "launch_floor": {
+          "empty_event_us": 2.05,
+          "smallest_kernel_projection_us": 17.41,
+          "floor_us": {
+            "A1": 52.22,
+            "C1": 69.63
+          },
+          "floor_fraction_of_pipeline": {
+            "A1": 0.349,
+            "C1": 0.432
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "max_window_clock_mhz": 1890,
+  "bucket_counts": {
+    "HIGH": 822,
+    "LOW": 3078
+  },
+  "median_us": {
+    "HIGH/A1/context": {
+      "median": 48.13,
+      "n": 62
+    },
+    "HIGH/A1/pipeline": {
+      "median": 103.76,
+      "n": 64
+    },
+    "HIGH/A1/score": {
+      "median": 13.31,
+      "n": 65
+    },
+    "HIGH/A1/softmax": {
+      "median": 5.12,
+      "n": 62
+    },
+    "HIGH/B1/context": {
+      "median": 41.98,
+      "n": 63
+    },
+    "HIGH/B1/pipeline": {
+      "median": 79.58,
+      "n": 63
+    },
+    "HIGH/B1/score": {
+      "median": 44.03,
+      "n": 65
+    },
+    "HIGH/B1/softmax": {
+      "median": 8.19,
+      "n": 62
+    },
+    "HIGH/C1/context": {
+      "median": 39.94,
+      "n": 63
+    },
+    "HIGH/C1/pipeline": {
+      "median": 106.5,
+      "n": 63
+    },
+    "HIGH/C1/projection": {
+      "median": 7.97,
+      "n": 63
+    },
+    "HIGH/C1/score": {
+      "median": 16.34,
+      "n": 64
+    },
+    "HIGH/C1/softmax": {
+      "median": 6.14,
+      "n": 63
+    },
+    "LOW/A1/context": {
+      "median": 321.54,
+      "n": 238
+    },
+    "LOW/A1/pipeline": {
+      "median": 378.88,
+      "n": 236
+    },
+    "LOW/A1/score": {
+      "median": 41.98,
+      "n": 235
+    },
+    "LOW/A1/softmax": {
+      "median": 20.48,
+      "n": 238
+    },
+    "LOW/B1/context": {
+      "median": 218.11,
+      "n": 237
+    },
+    "LOW/B1/pipeline": {
+      "median": 453.63,
+      "n": 237
+    },
+    "LOW/B1/score": {
+      "median": 223.23,
+      "n": 235
+    },
+    "LOW/B1/softmax": {
+      "median": 20.48,
+      "n": 238
+    },
+    "LOW/C1/context": {
+      "median": 217.09,
+      "n": 237
+    },
+    "LOW/C1/pipeline": {
+      "median": 282.62,
+      "n": 237
+    },
+    "LOW/C1/projection": {
+      "median": 17.41,
+      "n": 237
+    },
+    "LOW/C1/score": {
+      "median": 38.91,
+      "n": 236
+    },
+    "LOW/C1/softmax": {
+      "median": 20.48,
+      "n": 237
+    }
+  }
+}
