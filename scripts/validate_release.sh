@@ -32,6 +32,7 @@ run_gpu_validation() {
   run_step bash scripts/run_gpu_runtime_sequence_validation.sh
   run_step bash scripts/run_gpu_model_profile_validation.sh
   run_step bash scripts/run_gpu_fp16_full_kv_baseline.sh
+  run_step bash scripts/run_gpu_e3_splitk_validation.sh
   echo "GPU_RELEASE_VALIDATION_OK=1"
 }
 

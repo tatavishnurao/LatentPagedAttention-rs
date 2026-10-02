@@ -90,3 +90,7 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "e3_sass_probe"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "e3_splitk_gpu"
+required-features = ["gpu-cutile"]
