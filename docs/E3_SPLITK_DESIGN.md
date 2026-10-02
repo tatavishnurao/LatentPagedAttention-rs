@@ -10,6 +10,42 @@ Evidence labels:
 - **DERIVED**: arithmetic from the stated shape.
 - **HYPOTHESIS**: not verified.
 
+## 0. Constraints from probes P1–P3 (MEASURED, compile-only, sm_89; `docs/MMA_PROBE_PLAN.md`)
+
+These were measured after the design was first written. They override anything below that disagrees.
+
+**(a) The alignment hint changes nothing at runtime.**
+- cuTile's runtime JIT derives divisibility from the real device pointers, shapes and strides (`cutile-0.2.0/src/tensor.rs:582`, `compute_spec`).
+- The runtime-JIT cubins of today's kernels already match the `max_divisibility(16)` builds: same load widths, ±3 % instruction count. Examples: latent context REG 128, 3152 instructions, 50×LDG.E + 4×LDG.E.128 + 25×LDG.E.64; A1 context REG 181.
+- So forcing the hint is **not** an optimization, and E3 claims no speedup from it. It matters only for compile-only probes, and as a correctness hazard: a forced hint on misaligned storage is wrong. Hence the host-side check in (e).
+
+**(b) The score GEMM must cover at least 2 blocks (32 tokens) per `mma` step. This is mandatory.**
+- With 128 threads (4 warps), cuTile lowers `mma` to `HMMA.16816.F32` only when the output tile has at least 4 × (16×8) = 512 elements.
+- A per-block score tile (16 heads × 16 tokens = 256 outputs) falls back to CUDA cores (FMUL+FADD) in both operand orientations.
+- Two gathered blocks concatenated to 32 tokens (16×32 = 512 outputs) give full HMMA, including the register-transpose form.
+- The PV GEMM (16×32 output) meets the rule at one block per step.
+- **Gather width:** with 2-block steps the gathered tiles load as **`LDG.E.64`** (9 per warp at R=4: 8 tiles + q′). One-block steps load as `LDGSTS.E.64` into shared memory. **No 128-bit gather was observed** in the gather probes; a 1 KiB tile over 128 threads is exactly 8 B per thread. The 128-bit table-indirected loads in P2 come from the existing one-head-per-CTA kernels, not from an `mma` path. Whether a different tile/warp arrangement yields `LDG.E.128` is open.
+
+**(c) Pipeline depth cannot be controlled directly (SOURCE).**
+- cuTile 0.2 exposes no explicit pipeline-depth or stage-count control.
+- Entry-level hints: `occupancy`, `num_cta_in_cga`, `max_divisibility` (`cutile-compiler-0.2.0/src/hints.rs:13-24`).
+- Per-load hints: `latency: Option<i32>` and `allow_tma` on partition loads (`load_view_tko`, `cutile-0.2.0/src/_core.rs:2335`).
+- `tileiras --help-hidden` lists no stage, unroll or max-register option.
+- Software pipelining appears automatically when divisibility is known: today's context kernels gain a prefetch prologue and a reduction-draining epilogue (+1832 / +2384 instructions). The only levers on its depth and register cost are the `occupancy` hint, the per-load `latency` hint and loop structure. Their effect is **untested** (HYPOTHESIS).
+
+**(d) Register target: ≤ 128 registers per thread for C3 and A3 split kernels.**
+- Today: latent context 126–128, A1 context 168–181, gather probe 106 (R=4) and 162 (R=16, fully unrolled).
+- ≤ 128 registers keeps ≥ 4 CTAs/SM (33 % theoretical occupancy).
+- Means: keep the block loop a runtime loop (not a compile-time-unrolled R), keep the score GEMM on HMMA (the CUDA-core fallback was the main register cost in the probes), and try the `occupancy` hint if needed.
+- Every build reports `cuobjdump --dump-resource-usage`. Exceeding 128 registers is a review flag, not a correctness failure.
+
+**(e) Validate block tables on the host before every launch.**
+- Every logical block that covers `active_seq_len` must map to a physical block in `[0, num_physical_blocks)`.
+- The table must have at least `ceil(active_seq_len / 16)` entries.
+- The latent/K/V base pointers and strides must pass `plkv_kernels::alignment::check_layouts` (16-byte base, unit inner stride, 16-byte outer strides).
+- Duplicate physical blocks are allowed (read-only aliasing), but are reported.
+- An invalid table fails before launch. Kernels never read out-of-range physical blocks.
+
 ## 1. Problem being solved
 
 Today's pipelines have three structural costs.
@@ -46,11 +82,11 @@ All arithmetic is FP32 accumulate. Storage is FP16.
 
 1. **Projection, amortized.** Load q `[16/G, 64]` and the K-projections of the KV heads in this head group, then compute `q' = q·P^K` as `[16/G, 32]`. That costs 2·(16/G)·32·64 FLOP once per CTA, not once per block (as B1 does) and not in a separate launch (as C1 does).
 2. **Table entries.** Load the R entries for this CTA's contiguous logical range with one `[R]` tile load. This replaces R dependent single-entry loads (the per-iteration dependency A1/C1 pay today).
-3. **For each of the R blocks:**
-   - load a latent tile `Z [16 tok, 32]` (FP16, 1 KiB);
-   - compute scores `s = q'·Zᵀ / 8` as `[16/G, 16]`, masked by the active length;
+3. **For each pair of blocks among the R (two blocks per step, required by §0(b)):**
+   - gather two latent tiles and concatenate them: `Z [32 tok, 32]` (FP16, 2 KiB);
+   - compute scores `s = q'·Zᵀ / 8` as `[16/G, 32]` (512 outputs at G = 1), masked by the active length;
    - update online softmax: `m_new = max(m, rowmax s)`, `α = exp(m − m_new)`, `p = exp(s − m_new)`, `l = α·l + rowsum p`, `acc = α·acc + p·Z` with `acc` of shape `[16/G, 32]`.
-   - At G = 1 both products are 16×16×32 and 16×32×16 tiles, which fit `cutile::core::mma` (tensor-core MMA, SOURCE `cutile-0.2.0/src/_core.rs:1264`) with FP16 operands and FP32 accumulate. Compile-only SASS shows `HMMA.16816.F32` at these shapes on sm_89 (`docs/MMA_PROBE_PLAN.md`). Runtime tensor-pipe utilization needs ncu `sm__pipe_tensor_cycles_active` once counters are available.
+   - At G = 1 the products are 16×32×32 (scores) and 16×32×32 (PV) tiles, both ≥ 512 outputs, which fit `cutile::core::mma` (tensor-core MMA, SOURCE `cutile-0.2.0/src/_core.rs:1264`) with FP16 operands and FP32 accumulate. Compile-only SASS shows `HMMA.16816.F32` at these shapes on sm_89 (`docs/MMA_PROBE_PLAN.md`). Runtime tensor-pipe utilization needs ncu `sm__pipe_tensor_cycles_active` once counters are available.
 4. **Write the partial** `(m, l, acc)`: (16/G)·(1+1+32) FP32 values per CTA, which is 2,176 B at G = 1.
 
 **Kernel 2, `c3_reduce`.** Grid `(Hq, B)`.
@@ -69,7 +105,8 @@ So R ≥ 16 blocks per CTA keeps projection overhead ≤ 12.5 %, and R ≥ 32 ke
 
 **Kernel 1.** Grid `(S, Hkv, B)`. Each CTA handles the g = 4 Q heads of one KV head over R blocks:
 - load the R table entries once;
-- per block: load the K tile `[16, 64]` and V tile `[16, 64]` (2 KiB each, FP16), compute scores `[4, 16]` with q `[4, 64]`, update online softmax, and accumulate `acc [4, 64]`;
+- per step of two blocks (same treatment as C3): gather K and V tiles `[32, 64]` (4 KiB each, FP16), compute scores `[4, 32]` with q `[4, 64]` via `mma`, update online softmax, and accumulate `acc [4, 64]` via `mma`;
+- **tensor-core caveat (HYPOTHESIS, to be measured in E3 SASS):** with only g = 4 query rows, the score output (4×32 = 128) and PV output (4×64 = 256) are below the 512-output rule. A3 may therefore fall back to CUDA cores unless the 4 head rows are padded to 16, which costs 4× MACs. That asymmetry is inherent to GQA vs a shared latent, where all 16 heads share one tile. E3 reports A3's SASS as measured and does not claim tensor-core use it does not have;
 - write the partial: 4·(2 + 64) FP32 = 1,056 B.
 
 **Kernel 2.** LSE merge per head, write `[64]`. There is no projection.
@@ -128,7 +165,7 @@ Configurations:
 
 ## 9. Risks and unknowns
 
-- **`mma` lowering: resolved for compile (MEASURED, CPU-only probe, `docs/MMA_PROBE_PLAN.md`).** FP16 `mma` at 16×T×32 (T = 64…512) lowers to `HMMA.16816.F32` on sm_89, with the whole GEMM on the tensor cores. Probe P1: the scalar `LDG.E.U16` loads seen without hints become `LDG.E.128` with `max_divisibility(16)` or runtime-style `spec_args`. **Remaining risk:** paged gathers (row offset computed from a loaded table entry) are untested; E3 must check SASS on the paged kernel. Runtime tensor-pipe utilization is still unmeasured.
+- **`mma` lowering: resolved for compile (MEASURED, CPU-only probe, `docs/MMA_PROBE_PLAN.md`).** FP16 `mma` at 16×T×32 (T = 64…512) lowers to `HMMA.16816.F32` on sm_89, with the whole GEMM on the tensor cores. Probe P1: the scalar `LDG.E.U16` loads seen in hint-less compile-only builds become `LDG.E.128` with `max_divisibility(16)` or runtime-style `spec_args`. That is a probe artifact with no runtime effect (§0(a)). **Remaining risk:** paged gathers (row offset computed from a loaded table entry) are untested; E3 must check SASS on the paged kernel. Runtime tensor-pipe utilization is still unmeasured.
 - **Static specialization:** kernels are specialized per N today (SOURCE `scripts/generate_c1.py`), so R and S must be compile-time constants per configuration. The generator has to emit (N, S, G) variants.
 - **Atomics:** the one-launch reduction depends on cuTile atomics memory-ordering semantics. Two launches are the safe default.
 - **Thermal:** split-K raises SM utilization, so it will heat the GPU faster than today's kernels. Expect more THROTTLED tags at 32K; the policy is unchanged.
