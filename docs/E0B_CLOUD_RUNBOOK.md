@@ -57,12 +57,17 @@ Consequences:
    bash scripts/e0b/run_e0b_portable.sh --out-dir ~/e0b_l4_$(date -u +%Y%m%dT%H%M%SZ) --preflight-only
    ```
    It must print `PREFLIGHT_OK`. The preflight creates the output directory and writes `environment.txt` there, so use a new `--out-dir` (or delete that directory) for the full run.
-10. Full run, with a new `--out-dir`:
+10. Dry run, with a new `--out-dir`. It runs every stage (build, MMA probe, one 1K process, analysis, packaging), takes a few minutes, and fails fast on a broken environment:
+    ```bash
+    bash scripts/e0b/run_e0b_portable.sh --out-dir ~/e0b_l4_dry_<stamp> --dry-run
+    ```
+    It must end with `DRY_RUN_OK`. It checks correctness, per-sample NVML clocks, telemetry, HMMA in the FP16 probe kernels, and that a 1K analysis row exists. A dry run is never evidence.
+11. Full run, with a new `--out-dir`:
     ```bash
     bash scripts/e0b/run_e0b_portable.sh --out-dir ~/e0b_l4_<stamp>
     ```
     It builds, runs the CPU-only MMA probe, collects ≥5 cool-start processes per length (at most 8 attempts each), analyzes, and writes `~/e0b_l4_<stamp>.tar.gz` without oracle dumps.
-11. Bring back the tarball. In this repository it goes under `reports/e0b_l4_<stamp>/`, and the results get added to the diagnosis doc only after you approve.
+12. Bring back the tarball. In this repository it goes under `reports/e0b_l4_<stamp>/`, and the results get added to the diagnosis doc only after you approve.
 
 **Expected duration.** HYPOTHESIS, not measured on an L4: the build takes 5–10 min the first time; each process takes about 10–40 s of GPU time, plus cooldown, which should be near zero on a datacenter GPU idling below 80 °C. With 15 processes, expect about 10–20 min in total.
 
