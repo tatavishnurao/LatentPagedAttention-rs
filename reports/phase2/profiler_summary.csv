@@ -1,0 +1,5 @@
+kernel,source,kernel_name,gpu__time_duration.sum,dram__bytes_read.sum,dram__bytes_write.sum,lts__t_bytes.sum,lts__t_sector_hit_rate.pct,l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum,l1tex__t_requests_pipe_lsu_mem_global_op_ld.sum,smsp__inst_executed.sum,smsp__sass_thread_inst_executed_op_fp32_pred_on.sum,launch__registers_per_thread,launch__shared_mem_per_block,sm__warps_active.avg.pct_of_peak_sustained_active,smsp__issue_active.avg.pct_of_peak_sustained_active,sass__inst_executed_register_spilling_mem_local
+full_score,historical_P05_not_C1,model_small_full_kv_scores_fp16_storage_entry,50080,563072,4098176,35844032,98.49,102400,16384,876544,2490368,84,2304,38.62,10,0
+latent_score,historical_P05_not_C1,model_small_scores_fp16_storage_entry,53952,148096,2540416,40738272,100.25,331776,32768,3182592,28835840,98,4352,31.71,33.96,0
+full_context,historical_P05_not_C1,model_small_full_kv_context_fp16_storage_entry,76704,604160,0,34231136,98.23,90112,12288,938368,4718592,113,6144,8.33,10.64,0
+latent_context,historical_P05_not_C1,model_small_context_fp16_storage_entry,90624,194560,67328,33357216,99.44,61440,12544,831632,3670016,106,13824,8.33,9.47,0

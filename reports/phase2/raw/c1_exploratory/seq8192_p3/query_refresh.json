@@ -1,0 +1,33 @@
+{
+  "atol": 0.005,
+  "max_probability_row_sum_error": 7.62939453125e-6,
+  "pass": true,
+  "relative_denominator_floor": 1e-12,
+  "rtol": 0,
+  "tensors": [
+    {
+      "elements": 131072,
+      "first_failure": null,
+      "max_absolute_error": 9.5367431640625e-6,
+      "max_absolute_location": 19468,
+      "max_relative_error": 0.01793570219966159,
+      "tensor": "scores"
+    },
+    {
+      "elements": 131072,
+      "first_failure": null,
+      "max_absolute_error": 2.6309862732887268e-8,
+      "max_absolute_location": 40960,
+      "max_relative_error": 0.00001186831198462915,
+      "tensor": "probabilities"
+    },
+    {
+      "elements": 1024,
+      "first_failure": null,
+      "max_absolute_error": 0.0002384185791015625,
+      "max_absolute_location": 192,
+      "max_relative_error": 0.000017940044039053225,
+      "tensor": "context"
+    }
+  ]
+}
