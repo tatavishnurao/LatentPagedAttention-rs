@@ -1,0 +1,30 @@
+7a2a4501c123433e6cfbaaaf29c0c84733b787c4
+ M crates/plkv-kernels/examples/c1_rtable.rs
+ M crates/plkv-kernels/src/cutile/c1.rs
+ M crates/plkv-kernels/src/cutile/p15b_rtable_kernels.rs
+ M crates/plkv-kernels/src/cutile/p1_sequence_kernels.rs
+ M scripts/generate_c1.py
+ M scripts/generate_p1_sequence_sources.py
+?? AUDIT_COMMIT.txt
+?? AUTHOR_METADATA_REQUIRED.md
+?? CLAIM_RESOLUTION.md
+?? FIGURE2_SOURCE_VERIFICATION.md
+?? FIGURE_TABLE_AUDIT.md
+?? LATENT_PAGED_ATTENTION_VALIDATION_REPORT.md
+?? MANUSCRIPT_CLAIM_AUDIT.md
+?? REVISION_LOG.md
+?? SESSION_SAVE.md
+?? SKILL.md
+?? SUBMISSION_BLOCKERS.md
+?? arxiv_v1_source/
+?? crates/plkv-kernels/examples/p1_seq_128.rs
+?? crates/plkv-kernels/examples/p1_seq_256.rs
+?? crates/plkv-kernels/examples/p1_seq_512.rs
+?? docs/C2_DESIGN.md
+?? docs/LPA_COST_MODEL.md
+?? docs/RELATED_WORK_GAP.md
+?? manuscript/
+?? reports/arxiv_v1_final_audit/
+?? reports/c2/
+?? reports/phase2/
+?? scripts/analyze_phase2.py

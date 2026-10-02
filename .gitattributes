@@ -1,2 +1,9 @@
 * text=auto
 *.sh text eol=lf
+
+# Checksummed evidence directories: store bytes verbatim so SHA256SUMS stay valid.
+reports/phase2/** -text
+reports/c2/** -text
+reports/crossover/** -text
+reports/ablations/** -text
+reports/diagnosis_20261002/** -text

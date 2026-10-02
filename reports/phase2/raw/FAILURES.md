@@ -1,0 +1,7 @@
+# Retained Phase-2 failures and exclusions
+
+1. **Initial nine direct executions:** all returned 101 because `CUTILE_TILEIRAS_PATH` was not exported at runtime. Classification: CUTILE environment configuration. The documented CUDA/cuTile environment fixed it. The subsequent retry reused the stdout paths, so the repository does not retain those first failure logs; the agent shell transcript is the only record. This violates the desired immutable-failure practice and prevents this exploratory campaign from being canonical evidence.
+2. **Long p1/p2 campaign:** the outer command timed out while `seq32768_p2` was between correctness/export and timing. Its partial directory was then replaced by a new shorter p2 attempt in the same exploratory namespace. This overwrite is a second procedural weakness; the agent shell transcript records it. The final p2 file has 20 complete samples/phase.
+3. **Short p3/p4 campaign:** outer timeout killed `seq8192_p4` after 30/130 JSONL rows. The partial file is retained and excluded by `analyze_phase2.py` because its count is incomplete. `seq16384_p4` and `seq32768_p4` were never started.
+4. **Nonstationary long runs:** selected 4K--32K process sets fail a >20% first/last-quartile drift screen for at least one pipeline variant. Samples are retained and CSV rows are labeled `EXPLORATORY_NONSTATIONARY_BALANCED_POWER`.
+5. **Canonical campaign:** not attempted by weakening its guard. Windows remained on `Balanced`; canonical status remains blocked.

@@ -1,0 +1,75 @@
+<!-- VOID (2026-10-02): the latent/full ratios and latencies in this file were measured with the GPU at idle clocks (~210 MHz) for N<=16K and at uncontrolled clocks at 32K; harness wrote JSON to /mnt/c between samples. Do not cite. See docs/DIAGNOSIS_2026-10-02.md (E0). Removing this first line restores the original SHA256. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520"><text x="8" y="14" font-size="11" fill="#c00" font-family="sans-serif">VOID 2026-10-02: idle-clock measurement, do not cite (docs/DIAGNOSIS_2026-10-02.md)</text>
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="30" text-anchor="middle" font-family="sans-serif" font-size="20">Exploratory per-token latency (4K+ nonstationary)</text>
+<line x1="90" y1="450" x2="870" y2="450" stroke="black"/>
+<line x1="90" y1="60" x2="90" y2="450" stroke="black"/>
+<line x1="90.0" y1="450" x2="90.0" y2="455" stroke="black"/>
+<text x="90.0" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">128</text>
+<line x1="187.5" y1="450" x2="187.5" y2="455" stroke="black"/>
+<text x="187.5" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">256</text>
+<line x1="285.0" y1="450" x2="285.0" y2="455" stroke="black"/>
+<text x="285.0" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">512</text>
+<line x1="382.5" y1="450" x2="382.5" y2="455" stroke="black"/>
+<text x="382.5" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">1024</text>
+<line x1="480.0" y1="450" x2="480.0" y2="455" stroke="black"/>
+<text x="480.0" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">2048</text>
+<line x1="577.5" y1="450" x2="577.5" y2="455" stroke="black"/>
+<text x="577.5" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">4096</text>
+<line x1="675.0" y1="450" x2="675.0" y2="455" stroke="black"/>
+<text x="675.0" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">8192</text>
+<line x1="772.5" y1="450" x2="772.5" y2="455" stroke="black"/>
+<text x="772.5" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">16384</text>
+<line x1="870.0" y1="450" x2="870.0" y2="455" stroke="black"/>
+<text x="870.0" y="472" text-anchor="middle" font-family="sans-serif" font-size="11">32768</text>
+<line x1="85" y1="450.0" x2="870" y2="450.0" stroke="#ddd"/>
+<text x="80" y="454.0" text-anchor="end" font-family="sans-serif" font-size="11">-0.0394</text>
+<line x1="85" y1="372.0" x2="870" y2="372.0" stroke="#ddd"/>
+<text x="80" y="376.0" text-anchor="end" font-family="sans-serif" font-size="11">0.162</text>
+<line x1="85" y1="294.0" x2="870" y2="294.0" stroke="#ddd"/>
+<text x="80" y="298.0" text-anchor="end" font-family="sans-serif" font-size="11">0.364</text>
+<line x1="85" y1="216.0" x2="870" y2="216.0" stroke="#ddd"/>
+<text x="80" y="220.0" text-anchor="end" font-family="sans-serif" font-size="11">0.566</text>
+<line x1="85" y1="138.0" x2="870" y2="138.0" stroke="#ddd"/>
+<text x="80" y="142.0" text-anchor="end" font-family="sans-serif" font-size="11">0.768</text>
+<line x1="85" y1="60.0" x2="870" y2="60.0" stroke="#ddd"/>
+<text x="80" y="64.0" text-anchor="end" font-family="sans-serif" font-size="11">0.97</text>
+<polyline points="90.0,168.8 187.5,226.4 285.0,274.7 382.5,291.4 480.0,299.9 577.5,303.8 675.0,293.6 772.5,304.7 870.0,418.8" fill="none" stroke="#0072B2" stroke-width="2"/>
+<circle cx="90.0" cy="168.8" r="3" fill="#0072B2"/>
+<circle cx="187.5" cy="226.4" r="3" fill="#0072B2"/>
+<circle cx="285.0" cy="274.7" r="3" fill="#0072B2"/>
+<circle cx="382.5" cy="291.4" r="3" fill="#0072B2"/>
+<circle cx="480.0" cy="299.9" r="3" fill="#0072B2"/>
+<circle cx="577.5" cy="303.8" r="3" fill="#0072B2"/>
+<circle cx="675.0" cy="293.6" r="3" fill="#0072B2"/>
+<circle cx="772.5" cy="304.7" r="3" fill="#0072B2"/>
+<circle cx="870.0" cy="418.8" r="3" fill="#0072B2"/>
+<line x1="690" y1="65" x2="715" y2="65" stroke="#0072B2" stroke-width="3"/>
+<text x="722" y="69" font-family="sans-serif" font-size="12">A1</text>
+<polyline points="90.0,86.9 187.5,181.2 285.0,240.7 382.5,262.4 480.0,272.1 577.5,276.1 675.0,279.6 772.5,330.6 870.0,416.0" fill="none" stroke="#D55E00" stroke-width="2"/>
+<circle cx="90.0" cy="86.9" r="3" fill="#D55E00"/>
+<circle cx="187.5" cy="181.2" r="3" fill="#D55E00"/>
+<circle cx="285.0" cy="240.7" r="3" fill="#D55E00"/>
+<circle cx="382.5" cy="262.4" r="3" fill="#D55E00"/>
+<circle cx="480.0" cy="272.1" r="3" fill="#D55E00"/>
+<circle cx="577.5" cy="276.1" r="3" fill="#D55E00"/>
+<circle cx="675.0" cy="279.6" r="3" fill="#D55E00"/>
+<circle cx="772.5" cy="330.6" r="3" fill="#D55E00"/>
+<circle cx="870.0" cy="416.0" r="3" fill="#D55E00"/>
+<line x1="690" y1="85" x2="715" y2="85" stroke="#D55E00" stroke-width="3"/>
+<text x="722" y="89" font-family="sans-serif" font-size="12">B1</text>
+<polyline points="90.0,134.8 187.5,236.9 285.0,302.6 382.5,326.5 480.0,337.9 577.5,343.7 675.0,346.4 772.5,375.5 870.0,423.1" fill="none" stroke="#009E73" stroke-width="2"/>
+<circle cx="90.0" cy="134.8" r="3" fill="#009E73"/>
+<circle cx="187.5" cy="236.9" r="3" fill="#009E73"/>
+<circle cx="285.0" cy="302.6" r="3" fill="#009E73"/>
+<circle cx="382.5" cy="326.5" r="3" fill="#009E73"/>
+<circle cx="480.0" cy="337.9" r="3" fill="#009E73"/>
+<circle cx="577.5" cy="343.7" r="3" fill="#009E73"/>
+<circle cx="675.0" cy="346.4" r="3" fill="#009E73"/>
+<circle cx="772.5" cy="375.5" r="3" fill="#009E73"/>
+<circle cx="870.0" cy="423.1" r="3" fill="#009E73"/>
+<line x1="690" y1="105" x2="715" y2="105" stroke="#009E73" stroke-width="3"/>
+<text x="722" y="109" font-family="sans-serif" font-size="12">C1</text>
+<text x="450.0" y="505" text-anchor="middle" font-family="sans-serif" font-size="13">sequence length (log2 spacing)</text>
+<text x="18" y="260.0" transform="rotate(-90 18 260.0)" text-anchor="middle" font-family="sans-serif" font-size="13">us/token</text>
+</svg>

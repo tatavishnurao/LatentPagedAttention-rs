@@ -1,0 +1,36 @@
+{
+  "seq": 128,
+  "oracle": "FP64 reconstructed K/V from FP16 latent; FP32 input q/projections",
+  "atol": 0.005,
+  "rtol": 0.0,
+  "relative_floor": 1e-12,
+  "pass": true,
+  "scores": {
+    "max_absolute_error": 2.565431820755748e-06,
+    "max_relative_error": 0.00019883691445876393,
+    "max_absolute_location": [
+      15,
+      57
+    ],
+    "first_failure": null
+  },
+  "probabilities": {
+    "max_absolute_error": 5.057167553612629e-07,
+    "max_relative_error": 2.8881945310783682e-06,
+    "max_absolute_location": [
+      2,
+      0
+    ],
+    "first_failure": null
+  },
+  "context": {
+    "max_absolute_error": 2.1073190694664845e-06,
+    "max_relative_error": 2.215951612745155e-07,
+    "max_absolute_location": [
+      1,
+      3
+    ],
+    "first_failure": null
+  },
+  "normalization_error": 1.2299855445263574e-07
+}

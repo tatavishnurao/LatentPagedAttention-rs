@@ -1,0 +1,166 @@
+{
+  "max_window_clock_mhz": 1890,
+  "bucket_counts": {
+    "LOW": 269,
+    "HIGH": 384,
+    "MID": 127
+  },
+  "median_us": {
+    "HIGH/A1/context": {
+      "median": 1507.84,
+      "n": 30
+    },
+    "HIGH/A1/pipeline": {
+      "median": 1361.41,
+      "n": 28
+    },
+    "HIGH/A1/score": {
+      "median": 176.13,
+      "n": 29
+    },
+    "HIGH/A1/softmax": {
+      "median": 55.3,
+      "n": 31
+    },
+    "HIGH/B1/context": {
+      "median": 1084.93,
+      "n": 30
+    },
+    "HIGH/B1/pipeline": {
+      "median": 1678.85,
+      "n": 28
+    },
+    "HIGH/B1/score": {
+      "median": 784.1,
+      "n": 29
+    },
+    "HIGH/B1/softmax": {
+      "median": 64.51,
+      "n": 31
+    },
+    "HIGH/C1/context": {
+      "median": 1095.68,
+      "n": 30
+    },
+    "HIGH/C1/pipeline": {
+      "median": 1040.74,
+      "n": 28
+    },
+    "HIGH/C1/projection": {
+      "median": 13.31,
+      "n": 29
+    },
+    "HIGH/C1/score": {
+      "median": 159.74,
+      "n": 30
+    },
+    "HIGH/C1/softmax": {
+      "median": 58.37,
+      "n": 31
+    },
+    "LOW/A1/context": {
+      "median": 4493.82,
+      "n": 20
+    },
+    "LOW/A1/pipeline": {
+      "median": 4855.81,
+      "n": 22
+    },
+    "LOW/A1/score": {
+      "median": 302.08,
+      "n": 21
+    },
+    "LOW/A1/softmax": {
+      "median": 86.53,
+      "n": 20
+    },
+    "LOW/B1/context": {
+      "median": 2895.87,
+      "n": 21
+    },
+    "LOW/B1/pipeline": {
+      "median": 4451.84,
+      "n": 22
+    },
+    "LOW/B1/score": {
+      "median": 1544.19,
+      "n": 21
+    },
+    "LOW/B1/softmax": {
+      "median": 97.79,
+      "n": 20
+    },
+    "LOW/C1/context": {
+      "median": 2781.7,
+      "n": 20
+    },
+    "LOW/C1/pipeline": {
+      "median": 2702.34,
+      "n": 22
+    },
+    "LOW/C1/projection": {
+      "median": 10.24,
+      "n": 21
+    },
+    "LOW/C1/score": {
+      "median": 260.61,
+      "n": 20
+    },
+    "LOW/C1/softmax": {
+      "median": 184.32,
+      "n": 19
+    },
+    "MID/A1/context": {
+      "median": 3166.72,
+      "n": 10
+    },
+    "MID/A1/pipeline": {
+      "median": 2315.26,
+      "n": 10
+    },
+    "MID/A1/score": {
+      "median": 183.3,
+      "n": 10
+    },
+    "MID/A1/softmax": {
+      "median": 99.33,
+      "n": 9
+    },
+    "MID/B1/context": {
+      "median": 1933.31,
+      "n": 9
+    },
+    "MID/B1/pipeline": {
+      "median": 3251.71,
+      "n": 10
+    },
+    "MID/B1/score": {
+      "median": 1801.22,
+      "n": 10
+    },
+    "MID/B1/softmax": {
+      "median": 71.68,
+      "n": 9
+    },
+    "MID/C1/context": {
+      "median": 2375.17,
+      "n": 10
+    },
+    "MID/C1/pipeline": {
+      "median": 1982.46,
+      "n": 10
+    },
+    "MID/C1/projection": {
+      "median": 9.73,
+      "n": 10
+    },
+    "MID/C1/score": {
+      "median": 164.86,
+      "n": 10
+    },
+    "MID/C1/softmax": {
+      "median": 71.17,
+      "n": 10
+    }
+  }
+}

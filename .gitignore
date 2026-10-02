@@ -42,3 +42,6 @@ reports/p15b_rtable/
 reports/paper_readiness_*/
 reports/repair_correctness_*/
 reports/source_identified_campaign_*/
+
+# Large regenerable oracle dumps (up to ~43 MB each; reports/phase2/raw holds ~350 MB of them).
+reports/**/oracle_inputs_outputs.json

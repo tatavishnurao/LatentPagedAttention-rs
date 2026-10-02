@@ -1,0 +1,7 @@
+ crates/plkv-kernels/examples/c1_rtable.rs          |  57 +-
+ crates/plkv-kernels/src/cutile/c1.rs               | 320 +++++++++
+ .../plkv-kernels/src/cutile/p15b_rtable_kernels.rs | 726 +++++++++++++++++++++
+ scripts/generate_c1.py                             |  10 +-
+ scripts/generate_p1_sequence_sources.py            |   3 +-
+ tests/test_c1.py                                   |   6 +-
+ 6 files changed, 1116 insertions(+), 6 deletions(-)

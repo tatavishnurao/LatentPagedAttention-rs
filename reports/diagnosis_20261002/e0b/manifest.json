@@ -1,0 +1,38 @@
+{
+  "binary_sha256": "389b4a8d62de75258838d04ed73fb81a8685c1ca385b39b8a7a27c5ff47572a2",
+  "git_head": "7a2a4501c123433e6cfbaaaf29c0c84733b787c4",
+  "plan": {
+    "1024": 200,
+    "8192": 60
+  },
+  "processes": 5,
+  "runs": [
+    {
+      "label": "seq1024_p0",
+      "seq": 1024,
+      "process": 0,
+      "start_condition": "hot-start",
+      "start_temp_c": 80,
+      "cooldown_wait_s": 303.3,
+      "returncode": 0,
+      "external_thermal_kill": false,
+      "wall_s": 168.22,
+      "start_unix": 1790933673.7142682,
+      "cmd": [
+        "<repo>/target/release/examples/c1_rtable",
+        "--seq",
+        "1024",
+        "--process",
+        "0",
+        "--variants",
+        "A1,C1",
+        "--warmup",
+        "10",
+        "--iterations",
+        "200",
+        "--output-dir",
+        "<home>/plkv_runs/e0b_20261002T092930/seq1024_p0"
+      ]
+    }
+  ]
+}

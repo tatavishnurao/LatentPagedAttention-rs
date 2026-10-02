@@ -1,0 +1,4 @@
+# Post-VOID-banner checksums (2026-10-02). Original pre-banner hashes remain in SHA256SUMS (where present).
+# MD/CSV: deleting the banner (first line, plus one blank line for .md) restores the original bytes.
+# SVG: banner = first comment line + one <text> element after the <svg> tag; original hash listed for reference.
+f6aba33727c68f1f4bbed13cb977eb92248bfdffb70f7cb48505a95788d486d4  ./C2_PERFORMANCE.md  pre_banner=c3191639bc7b58420cae9afbaf9688b106a0f27fd7c00ea4d9e819c478dc8034

@@ -1,0 +1,11 @@
+# Post-VOID-banner checksums (2026-10-02). Original pre-banner hashes remain in SHA256SUMS (where present).
+# MD/CSV: deleting the banner (first line, plus one blank line for .md) restores the original bytes.
+# SVG: banner = first comment line + one <text> element after the <svg> tag; original hash listed for reference.
+653d13123053c1e9c96fb9811c475237666293f2a5200ccc36dc824f2c0d5f95  ./PHASE2_SUMMARY.md  pre_banner=512f6518735781de25acf73e0451cc3d6963cca4c9fb4cfb8f87d211e2e3f4e9
+7d908c408429782ed013428fcd40d0c35a4c3985bfae5adcf90f80527b9f7343  ./crossover_results.csv  pre_banner=da1697779920527e9a7742b742370dbd5d2564dc85901666fb9ac29f2ce196bb
+72d08f0cbcd5adfc8fb554332acc7a27b76d0f973a50163f0657ce3e6646db62  ./cache_residency_results.csv  pre_banner=c1607d4e280d4fd41039f5bc74d9054a78fb0016e997a0498f23a51d47b0a8ef
+2ac1e4ef98278e5df4fb8467a31d3fd9d670627251a9f4b74b27bc23bc83671a  ./ablation_results.csv  pre_banner=8eba041a4f7280216c0becaf99d656034c3bacec35bb0553306168f7c9164c46
+0d5830e5912b7925b837f7bc764ddeb17f16428061a320d99c096ce3d31ee866  ./plots/ratio_vs_sequence.svg  pre_banner=e14f7c8a0bf5917e1a879ac2fa7a4dfc9ddc5e4aea7a71b836bf73b0878af36f
+3453ad5d2e1a9d3153318cbeea45b71273d49ecf6f4c985d6ae45c02d47d6e6a  ./plots/latency_vs_sequence.svg  pre_banner=a30b09f6b03764685a87b97e36fdf2b9522c71369f443586146fe3cf39fb030c
+be6dadcffaea7cd90496117eeae0e31f9050f16ceb818bc3d378ef1ab8230fb3  ./plots/latency_per_token.svg  pre_banner=8992eb0012a5dc9d21424f8d464622289f01b1f8e9cdc798ac2d803dfb5f8cd0
+d37036442f3303335df721627ac9ce26406a9deef35e777e70960b9ccf7f7298  ./plots/phase_map.svg  pre_banner=8de6daa3cfbe721a442150124a10f394f0e86d14e68412fb7a0545ddf92f18a5

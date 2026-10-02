@@ -81,9 +81,12 @@ processes; it is not kernel-only latency.
 | latent_paged_attention_read | 3 | 1705.150 | 1844.891 | 2017.385 |
 | latent_write_to_attention | 3 | 1367.174 | 1487.776 | 1586.213 |
 
-The latent read path is approximately `32.6%` slower than the FP16 full-KV read
-baseline by mean synchronized host end-to-end time. The result is therefore a
-memory-versus-compute trade-off, not an unconditional speedup.
+The latent process mean is approximately `32.6%` above the FP16 full-KV process
+mean by synchronized host end-to-end time. **Correction (2026-10-02):** this is
+whole-process `cargo run` timing (process start, allocation, reference validation,
+readback) and is not a kernel-level or steady-state result; it does not show that
+the latent path is slower or faster. See
+[DIAGNOSIS_2026-10-02.md](DIAGNOSIS_2026-10-02.md) for the kernel-level status.
 
 ## Numerical Error
 
@@ -96,7 +99,10 @@ for context in the validated run.
 
 For `model_small`, FP16 latent cache bytes are `65,536`. FP16 full-KV cache bytes
 are `1,048,576`. The persistent cache-byte ratio is `16x` for this synthetic
-profile. This ratio does not describe total GPU memory.
+profile. This ratio does not describe total GPU memory, and the shape (one shared
+32-dim latent for 4 KV heads x 64 dims, K and V) is far more aggressive than
+realistic MLA-style compression (roughly 1.6-13x for 7-8B models; see
+[DIAGNOSIS_2026-10-02.md](DIAGNOSIS_2026-10-02.md)).
 
 ## Limitations
 

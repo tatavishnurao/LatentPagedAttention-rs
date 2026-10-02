@@ -1,0 +1,148 @@
+{
+  "A1_reference": {
+    "atol": 0.005,
+    "max_probability_row_sum_error": 1.1920928955078125e-6,
+    "pass": true,
+    "relative_denominator_floor": 1e-12,
+    "rtol": 0,
+    "tensors": [
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 0.0000133514404296875,
+        "max_absolute_location": 12786,
+        "max_relative_error": 0.004352126607319486,
+        "tensor": "scores"
+      },
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 1.3597309589385986e-7,
+        "max_absolute_location": 13059,
+        "max_relative_error": 0.000012094647258335108,
+        "tensor": "probabilities"
+      },
+      {
+        "elements": 1024,
+        "first_failure": null,
+        "max_absolute_error": 0.00002574920654296875,
+        "max_absolute_location": 382,
+        "max_relative_error": 3.356179232621236e-6,
+        "tensor": "context"
+      }
+    ]
+  },
+  "B1_reference": {
+    "atol": 0.005,
+    "max_probability_row_sum_error": 1.1920928955078125e-6,
+    "pass": true,
+    "relative_denominator_floor": 1e-12,
+    "rtol": 0,
+    "tensors": [
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 7.62939453125e-6,
+        "max_absolute_location": 4241,
+        "max_relative_error": 0.0012626262626262627,
+        "tensor": "scores"
+      },
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 8.009374141693115e-8,
+        "max_absolute_location": 29707,
+        "max_relative_error": 8.515104606525838e-6,
+        "tensor": "probabilities"
+      },
+      {
+        "elements": 1024,
+        "first_failure": null,
+        "max_absolute_error": 0.000012874603271484375,
+        "max_absolute_location": 840,
+        "max_relative_error": 4.209197498320865e-6,
+        "tensor": "context"
+      }
+    ]
+  },
+  "C1_B1": {
+    "atol": 0.005,
+    "max_probability_row_sum_error": 1.3113021850585938e-6,
+    "pass": true,
+    "relative_denominator_floor": 1e-12,
+    "rtol": 0,
+    "tensors": [
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 3.814697265625e-6,
+        "max_absolute_location": 2707,
+        "max_relative_error": 0.00048623942429252165,
+        "tensor": "scores"
+      },
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 3.91155481338501e-8,
+        "max_absolute_location": 31233,
+        "max_relative_error": 3.989550641497075e-6,
+        "tensor": "probabilities"
+      },
+      {
+        "elements": 1024,
+        "first_failure": null,
+        "max_absolute_error": 1.9073486328125e-6,
+        "max_absolute_location": 129,
+        "max_relative_error": 6.165349747960502e-7,
+        "tensor": "context"
+      }
+    ]
+  },
+  "C1_B1_bitwise_diagnostic": {
+    "element_count": 66560,
+    "exact_mismatch_count": 26538,
+    "finite_left_count": 66560,
+    "finite_right_count": 66560,
+    "left_checksum": "fnv1a64:0b3f4171c5f37ab2",
+    "max_absolute_error": 3.814697265625e-6,
+    "max_relative_error": 0.00048623942429252165,
+    "mean_absolute_error": 9.819417919935786e-8,
+    "nan_count": 0,
+    "negative_infinity_count": 0,
+    "positive_infinity_count": 0,
+    "right_checksum": "fnv1a64:f2080717dfe39493"
+  },
+  "C1_reference": {
+    "atol": 0.005,
+    "max_probability_row_sum_error": 1.3113021850585938e-6,
+    "pass": true,
+    "relative_denominator_floor": 1e-12,
+    "rtol": 0,
+    "tensors": [
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 9.5367431640625e-6,
+        "max_absolute_location": 29066,
+        "max_relative_error": 0.0017482517482517483,
+        "tensor": "scores"
+      },
+      {
+        "elements": 32768,
+        "first_failure": null,
+        "max_absolute_error": 8.009374141693115e-8,
+        "max_absolute_location": 29707,
+        "max_relative_error": 7.90398753296861e-6,
+        "tensor": "probabilities"
+      },
+      {
+        "elements": 1024,
+        "first_failure": null,
+        "max_absolute_error": 0.0000133514404296875,
+        "max_absolute_location": 853,
+        "max_relative_error": 4.113533918813573e-6,
+        "tensor": "context"
+      }
+    ]
+  }
+}

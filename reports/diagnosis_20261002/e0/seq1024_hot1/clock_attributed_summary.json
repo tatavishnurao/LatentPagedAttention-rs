@@ -1,0 +1,113 @@
+{
+  "max_window_clock_mhz": 1890,
+  "bucket_counts": {
+    "HIGH": 3730,
+    "MID": 170
+  },
+  "median_us": {
+    "HIGH/A1/context": {
+      "median": 51.04,
+      "n": 287
+    },
+    "HIGH/A1/pipeline": {
+      "median": 101.22,
+      "n": 287
+    },
+    "HIGH/A1/score": {
+      "median": 14.34,
+      "n": 287
+    },
+    "HIGH/A1/softmax": {
+      "median": 10.24,
+      "n": 287
+    },
+    "HIGH/B1/context": {
+      "median": 39.81,
+      "n": 287
+    },
+    "HIGH/B1/pipeline": {
+      "median": 98.3,
+      "n": 287
+    },
+    "HIGH/B1/score": {
+      "median": 38.91,
+      "n": 287
+    },
+    "HIGH/B1/softmax": {
+      "median": 10.24,
+      "n": 287
+    },
+    "HIGH/C1/context": {
+      "median": 38.91,
+      "n": 287
+    },
+    "HIGH/C1/pipeline": {
+      "median": 125.92,
+      "n": 287
+    },
+    "HIGH/C1/projection": {
+      "median": 10.24,
+      "n": 286
+    },
+    "HIGH/C1/score": {
+      "median": 13.31,
+      "n": 287
+    },
+    "HIGH/C1/softmax": {
+      "median": 10.24,
+      "n": 287
+    },
+    "MID/A1/context": {
+      "median": 46.08,
+      "n": 13
+    },
+    "MID/A1/pipeline": {
+      "median": 91.01,
+      "n": 13
+    },
+    "MID/A1/score": {
+      "median": 12.06,
+      "n": 13
+    },
+    "MID/A1/softmax": {
+      "median": 9.22,
+      "n": 13
+    },
+    "MID/B1/context": {
+      "median": 33.79,
+      "n": 13
+    },
+    "MID/B1/pipeline": {
+      "median": 75.78,
+      "n": 13
+    },
+    "MID/B1/score": {
+      "median": 32.8,
+      "n": 13
+    },
+    "MID/B1/softmax": {
+      "median": 9.22,
+      "n": 13
+    },
+    "MID/C1/context": {
+      "median": 33.79,
+      "n": 13
+    },
+    "MID/C1/pipeline": {
+      "median": 112.64,
+      "n": 13
+    },
+    "MID/C1/projection": {
+      "median": 11.09,
+      "n": 14
+    },
+    "MID/C1/score": {
+      "median": 11.26,
+      "n": 13
+    },
+    "MID/C1/softmax": {
+      "median": 9.22,
+      "n": 13
+    }
+  }
+}
