@@ -50,7 +50,7 @@ All arithmetic is FP32 accumulate. Storage is FP16.
    - load a latent tile `Z [16 tok, 32]` (FP16, 1 KiB);
    - compute scores `s = q'·Zᵀ / 8` as `[16/G, 16]`, masked by the active length;
    - update online softmax: `m_new = max(m, rowmax s)`, `α = exp(m − m_new)`, `p = exp(s − m_new)`, `l = α·l + rowsum p`, `acc = α·acc + p·Z` with `acc` of shape `[16/G, 32]`.
-   - At G = 1 both products are 16×16×32 and 16×32×16 tiles, which fit `cutile::core::mma` (tensor-core MMA, SOURCE `cutile-0.2.0/src/_core.rs:1264`) with FP16 operands and FP32 accumulate. Whether `mma` lowers to tensor cores at these shapes on sm_89 is a HYPOTHESIS; verify it in SASS or with ncu `sm__pipe_tensor_cycles_active` once counters are available.
+   - At G = 1 both products are 16×16×32 and 16×32×16 tiles, which fit `cutile::core::mma` (tensor-core MMA, SOURCE `cutile-0.2.0/src/_core.rs:1264`) with FP16 operands and FP32 accumulate. Compile-only SASS shows `HMMA.16816.F32` at these shapes on sm_89 (`docs/MMA_PROBE_PLAN.md`). Runtime tensor-pipe utilization needs ncu `sm__pipe_tensor_cycles_active` once counters are available.
 4. **Write the partial** `(m, l, acc)`: (16/G)·(1+1+32) FP32 values per CTA, which is 2,176 B at G = 1.
 
 **Kernel 2, `c3_reduce`.** Grid `(Hq, B)`.
@@ -128,7 +128,7 @@ Configurations:
 
 ## 9. Risks and unknowns
 
-- **`mma` lowering (HYPOTHESIS):** tile-shape constraints and tensor-core lowering on sm_89 are unverified. The fallback is CUDA-core FP32, which is still memory-bound at ~32 FLOP/B for C3.
+- **`mma` lowering: resolved for compile (MEASURED, CPU-only probe, `docs/MMA_PROBE_PLAN.md`).** FP16 `mma` at 16×T×32 (T = 64…512) lowers to `HMMA.16816.F32` on sm_89, with the whole GEMM on the tensor cores. **New risk:** in the probe's compile configuration, global loads were scalar `LDG.E.U16`. E3 must verify vector loads (`LDG.E.128`), probably via divisibility hints, or it will be load-issue-bound. Runtime tensor-pipe utilization is still unmeasured.
 - **Static specialization:** kernels are specialized per N today (SOURCE `scripts/generate_c1.py`), so R and S must be compile-time constants per configuration. The generator has to emit (N, S, G) variants.
 - **Atomics:** the one-launch reduction depends on cuTile atomics memory-ordering semantics. Two launches are the safe default.
 - **Thermal:** split-K raises SM utilization, so it will heat the GPU faster than today's kernels. Expect more THROTTLED tags at 32K; the policy is unchanged.

@@ -371,6 +371,12 @@ Interpretation: the irreducible per-launch cost on this WSL2 + cuTile stack is a
 ### E3 design
 See [`docs/E3_SPLITK_DESIGN.md`](E3_SPLITK_DESIGN.md) for the design: split-K with an in-CTA projection amortized over R ≥ 16 blocks (overhead 2/R of FLOPs), 2 launches per step, per-N bytes/FLOPs tables, and pre-declared success and stop criteria. Not implemented.
 
+## Follow-ups (2026-10-02, third pass; no GPU campaigns on the laptop)
+
+- **Tensor-core mapping (MEASURED, compile-only, CPU):** cuTile 0.2 lowers FP16 `mma` for the latent score GEMM [16×32]×[32×T], T = 64…512, to `HMMA.16816.F32` on sm_89. The whole GEMM is on tensor cores: T/16 HMMA per warp with 4 warps = T/4 per CTA, as required. All 48 existing kernel functions contain 0 HMMA. The probe's FP16 loads were scalar `LDG.E.U16`, an E3 risk. See [`MMA_PROBE_PLAN.md`](MMA_PROBE_PLAN.md).
+- **Portable E0b runner** for a native-Linux sm_89 host (e.g. a cloud L4): `scripts/e0b/run_e0b_portable.sh`, with requirements and a checklist in [`E0B_CLOUD_RUNBOOK.md`](E0B_CLOUD_RUNBOOK.md). Its refusal paths and individual checks were tested here; the full native run is untested.
+- **Driver/toolkit fact (MEASURED):** this laptop's driver (595.97) reports CUDA 13.2 and runs the CUDA 13.3 toolkit correctly. tileiras emits sm_89 cubins ahead of time, so the driver does not need to report 13.3.
+
 ## Experiment plan (each needs approval)
 
 | # | hypothesis | change | measurement | success / failure | cost |
