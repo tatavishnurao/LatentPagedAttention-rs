@@ -1,0 +1,62 @@
+LatentPagedAttention-rs E3 split-K correctness validation (no timing)
+generated_utc=2026-10-02T18:22:33+00:00
+git_commit=188c0511058310d42e7803e21ab93bb15d2c18cf
+NVIDIA GeForce RTX 4060 Laptop GPU, 8.9, 595.97, 70, 8188 MiB, 2250 MiB
+
+   Compiling plkv-kernels v0.1.0 (<repo>/crates/plkv-kernels)
+    Finished `release` profile [optimized] target(s) in 25.59s
+     Running `target/release/examples/e3_splitk_gpu`
+E3_TEMPERATURE_START_C=Some(70)
+case=tiny/balanced_attention+balanced active=1 splits=1 c3_vs_rust=3.725e-9 a3_vs_rust=0.000e0
+case=tiny/balanced_attention+balanced active=1 splits=2 c3_vs_rust=3.725e-9 a3_vs_rust=0.000e0
+case=tiny/balanced_attention+balanced active=3 splits=1 c3_vs_rust=6.378e-6 a3_vs_rust=5.734e-5
+case=tiny/balanced_attention+balanced active=3 splits=2 c3_vs_rust=6.378e-6 a3_vs_rust=5.734e-5
+case=tiny/balanced_attention+balanced active=4 splits=1 c3_vs_rust=5.826e-6 a3_vs_rust=1.179e-4
+case=tiny/balanced_attention+balanced active=4 splits=2 c3_vs_rust=5.826e-6 a3_vs_rust=1.179e-4
+case=tiny/balanced_attention+balanced active=7 splits=1 c3_vs_rust=3.451e-5 a3_vs_rust=7.385e-5
+case=tiny/balanced_attention+balanced active=7 splits=2 c3_vs_rust=2.772e-5 a3_vs_rust=7.385e-5
+case=tiny/balanced_attention+balanced active=8 splits=1 c3_vs_rust=2.193e-5 a3_vs_rust=1.209e-4
+case=tiny/balanced_attention+balanced active=8 splits=2 c3_vs_rust=3.070e-5 a3_vs_rust=1.209e-4
+case=tiny/balanced_attention+balanced c3_vs_python_oracle_fp32=3.576e-5 (includes FP16 storage rounding)
+case=tiny/balanced_attention+balanced a3_vs_python_oracle_fp32=1.568e-4 (includes FP16 storage rounding)
+TINY_CASE=tiny/balanced_attention+balanced worst_c3=3.451e-5 worst_a3=1.209e-4 split_spread=5.263e-5
+case=tiny/stable_softmax_attention+stable_softmax active=1 splits=1 c3_vs_rust=1.490e-8 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=1 splits=2 c3_vs_rust=1.490e-8 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=3 splits=1 c3_vs_rust=7.983e-6 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=3 splits=2 c3_vs_rust=7.983e-6 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=4 splits=1 c3_vs_rust=9.671e-6 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=4 splits=2 c3_vs_rust=9.671e-6 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=7 splits=1 c3_vs_rust=1.474e-5 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=7 splits=2 c3_vs_rust=1.111e-5 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=8 splits=1 c3_vs_rust=1.099e-5 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax active=8 splits=2 c3_vs_rust=1.099e-5 a3_vs_rust=0.000e0
+case=tiny/stable_softmax_attention+stable_softmax c3_vs_python_oracle_fp32=1.532e-5 (includes FP16 storage rounding)
+case=tiny/stable_softmax_attention+stable_softmax a3_vs_python_oracle_fp32=8.593e-4 (includes FP16 storage rounding)
+TINY_CASE=tiny/stable_softmax_attention+stable_softmax worst_c3=1.474e-5 worst_a3=0.000e0 split_spread=6.236e-6
+E3_ORACLE_CHAIN_OK=1
+E3_TINY_C3_OK=1
+E3_TINY_A3_OK=1
+case=model_small/nonidentity active=17 splits=1 c3_vs_rust=1.075e-3 a3_vs_rust=1.555e-3
+case=model_small/nonidentity active=17 splits=4 c3_vs_rust=1.075e-3 a3_vs_rust=1.555e-3
+case=model_small/nonidentity active=17 splits=8 c3_vs_rust=1.075e-3 a3_vs_rust=1.555e-3
+case=model_small/nonidentity active=129 splits=1 c3_vs_rust=8.116e-4 a3_vs_rust=9.105e-4
+case=model_small/nonidentity active=129 splits=4 c3_vs_rust=8.116e-4 a3_vs_rust=9.105e-4
+case=model_small/nonidentity active=129 splits=8 c3_vs_rust=8.116e-4 a3_vs_rust=9.105e-4
+case=model_small/nonidentity active=513 splits=1 c3_vs_rust=8.736e-4 a3_vs_rust=7.541e-4
+case=model_small/nonidentity active=513 splits=4 c3_vs_rust=6.828e-4 a3_vs_rust=8.130e-4
+case=model_small/nonidentity active=513 splits=8 c3_vs_rust=5.169e-4 a3_vs_rust=8.125e-4
+case=model_small/nonidentity active=1021 splits=1 c3_vs_rust=5.274e-4 a3_vs_rust=7.722e-4
+case=model_small/nonidentity active=1021 splits=4 c3_vs_rust=5.319e-4 a3_vs_rust=7.951e-4
+case=model_small/nonidentity active=1021 splits=8 c3_vs_rust=4.809e-4 a3_vs_rust=7.951e-4
+case=model_small/nonidentity active=1024 splits=1 c3_vs_rust=5.279e-4 a3_vs_rust=7.708e-4
+case=model_small/nonidentity active=1024 splits=4 c3_vs_rust=5.326e-4 a3_vs_rust=7.923e-4
+case=model_small/nonidentity active=1024 splits=8 c3_vs_rust=4.828e-4 a3_vs_rust=7.923e-4
+MODEL_CASE worst_c3=1.075e-3 worst_a3=1.555e-3 split_spread=1.245e-3
+E3_MODEL_C3_OK=1
+E3_MODEL_A3_OK=1
+E3_PARTIAL_BLOCK_OK=1
+E3_SPLIT_INVARIANCE_OK=1
+identity_table_control active=129 c3_err=1.791e0 a3_err=1.791e0 (must exceed 0.005)
+E3_NON_IDENTITY_TABLE_OK=1
+E3_TEMPERATURE_END_C=Some(72)
+E3_SPLITK_GPU_OK=1

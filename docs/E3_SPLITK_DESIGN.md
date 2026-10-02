@@ -1,6 +1,6 @@
 # E3 design: split-K paged decode with an amortized in-CTA projection
 
-Status: **design only, not implemented.** Written 2026-10-02 on `diagnose/feasibility-2026-10-02`.
+Status: **implemented, correctness only** (2026-10-02, branch `diagnose/e3-splitk`); results and SASS in [`E3_RESULTS.md`](E3_RESULTS.md). No timing. Written 2026-10-02 on `diagnose/feasibility-2026-10-02`.
 
 It replaces the rejected "fuse the projection into the C1 score kernel" step: projection-into-score fusion is out of scope. The projection is instead amortized across a CTA that covers many blocks.
 
