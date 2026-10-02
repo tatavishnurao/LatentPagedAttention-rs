@@ -80,5 +80,9 @@ name = "mma_probe"
 required-features = ["gpu-cutile"]
 
 [[example]]
+name = "paged_gather_probe"
+required-features = ["gpu-cutile"]
+
+[[example]]
 name = "p3_probe"
 required-features = ["gpu-cutile"]

@@ -45,7 +45,7 @@ line-length = 100
 target-version = "py312"
 # reports/ holds checksummed evidence: frozen source snapshots and copies of the exact
 # scripts that produced each run. Editing them would break SHA256SUMS, so they are not linted.
-extend-exclude = ["reports"]
+extend-exclude = ["reports", "manuscript/tools/generate_figures.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]

@@ -37,6 +37,34 @@ Without hints, the compile-only probe loads FP16 data with scalar 16-bit global 
 - **Which change gets there:** `KernelCompiler::options(CompileOptions::new().max_divisibility(16))` alone is sufficient. So is `KernelCompiler::spec_args(...)` with `SpecializationBits` computed as the runtime does for 256-byte-aligned allocations, where `DivHint::from_ptr` clamps to 16. The SASS for `maxdiv16` and `spec` is identical, ignoring addresses. In kernel source, the equivalent is the entry attribute `optimization_hints = (sm_89 = (max_divisibility = 16,),)`, the form used in upstream `cutile-0.2.0/tests/flash_attention_compile.rs`. That form was **not tested here**.
 - **What it means for E3:** the scalar-load risk was an artifact of compiling without the runtime's alignment information. It applies to contiguous, aligned tiles. **Not covered:** paged gathers, where the row offset is `physical_block × 16 × 32 × 2 B` computed from a loaded table entry. Divisibility then depends on how cuTile propagates the table value. E3 must re-check SASS on the paged kernel itself.
 
+**P2: real R-TABLE paged-gather score/context kernels (MEASURED, compile-only, CPU; `reports/diagnosis_20261002/paged_gather_p2/`).**
+
+A compile-only probe of the 1024-token latent R-TABLE kernels shows the alignment hint also vectorizes the table-indirected FP16 latent loads. This is not an E3 implementation: it compiles the existing serial score/context kernels and counts SASS only.
+
+| kernel | hint mode | table-indirected FP16 latent loads | all global loads per warp | HMMA | SASS instr | vs no hint |
+|---|---|---|---|---:|---:|---:|
+| `model_small_scores_fp16_storage_rtable_1024` | none | 4 × `LDG.E.U16` | 19 × `LDG.E` + 4 × `LDG.E.U16` | 0 | 544 | baseline |
+| same | builder `CompileOptions::max_divisibility(16)` | 4 × `LDG.E.128` | 3 × `LDG.E` + 1 × `LDG.E.64` + 4 × `LDG.E.128` | 0 | 688 | +144 |
+| same | source `#[cutile::entry(optimization_hints = (sm_89 = (max_divisibility = 16,),))]` | 4 × `LDG.E.128` | 3 × `LDG.E` + 1 × `LDG.E.64` + 4 × `LDG.E.128` | 0 | 688 | +144 |
+| `model_small_context_fp16_storage_rtable_1024` | none | 4 × `LDG.E.U16` | 18 × `LDG.E` + 4 × `LDG.E.U16` | 0 | 1256 | baseline |
+| same | builder `CompileOptions::max_divisibility(16)` | 4 × `LDG.E.128` | 50 × `LDG.E` + 25 × `LDG.E.64` + 4 × `LDG.E.128` | 0 | 3088 | +1832 |
+| same | source `#[cutile::entry(optimization_hints = (sm_89 = (max_divisibility = 16,),))]` | 4 × `LDG.E.128` | 50 × `LDG.E` + 25 × `LDG.E.64` + 4 × `LDG.E.128` | 0 | 3088 | +1832 |
+
+- The builder form and in-source form produce the same load-width counts and instruction counts.
+- HMMA remains 0 because these are the current reduce-style kernels, not an `mma` rewrite.
+- The hint removes scalar 16-bit global loads for the table-indirected latent tile. The instruction count increases in the current reduce-style kernels, so this result should be used only as a load-width proof, not as a performance prediction.
+
+**Runtime assert design for safe alignment hints.** Before launching any hinted paged-gather kernel, assert that the base pointer and row pitch make every table-indirected row start at a 16-byte boundary:
+
+```text
+require base_ptr(latent_fp16) % 16 == 0
+require (latent_dim * sizeof(f16)) % 16 == 0        # 32 * 2 = 64 today
+require block_size * latent_dim * sizeof(f16) % 16 == 0  # 16 * 32 * 2 = 1024 today
+require all physical_block values are in bounds
+```
+
+For FP32 score/probability/projection tensors that are also compiled with the same max-divisibility ceiling, apply the analogous base-pointer and stride-byte checks. If any check fails, dispatch an unhinted fallback or fail before launch; do not use `max_divisibility(16)` on unaligned storage.
+
 **P3: resources, the +1832 growth, a gathered-tile MMA kernel, and the alignment assert (MEASURED, compile-only, CPU; `reports/diagnosis_20261002/p3_probe/`).**
 
 Probe: `crates/plkv-kernels/examples/p3_probe.rs`, with shared helpers in `examples/common/mod.rs`. It compiles with `KernelCompiler` for sm_89, runs `tileiras`, and reads `cuobjdump -sass`, `--dump-resource-usage` and `-elf` (`EIATTR_REQNTID`). No GPU or CUDA context is used.
@@ -173,7 +201,7 @@ The GPU was idle throughout the probe (210 MHz before and after, no compute proc
 | step | what | measurement | decision |
 |---|---|---|---|
 | P1 | Recompile with divisibility hints | SASS: `LDG.E.128` vs `LDG.E.U16` | **DONE.** `max_divisibility(16)` or runtime-style `spec_args` gives 128-bit loads (see P1 above). Paged gathers remain to be checked in E3. |
-| P2 | Same probe with FP32 operands into `mma` | SASS: HMMA (TF32) vs FFMA | Decides whether E3 can keep FP32 q′ or must cast it to FP16 |
+| P2 | Compile real R-TABLE paged-gather score/context kernels with builder and in-source alignment hints | SASS load widths for table-indirected latent loads, HMMA count, instruction count | **DONE.** Hints change the table-indirected latent loads from `LDG.E.U16` to `LDG.E.128`; builder and source forms match. Current reduce-style kernels still have 0 HMMA. |
 | P3 | Resources and spills for production kernels (none vs maxdiv16); gathered-tile `mma` kernel; host-side alignment assert | `--dump-resource-usage`, SASS regions, HMMA/LDGSTS counts, CPU tests | **DONE.** +1832 is software pipelining, not spills; gathers stay vectorized (`LDGSTS.E.64`); score `mma` needs ≥512 outputs (2 blocks); assert in `plkv_kernels::alignment` (see P3 above). |
 | P4 | Run the probe in `run_e0b_portable.sh` on an L4 | same SASS checks (sm_89) | Confirms the result is toolchain-only, not machine-specific |
 | P5 | Timed microbenchmark: one launch per T, CUDA events, interleaved MMA vs reduce variants, ≥5 processes, clock-logged harness, on a stable-clock host | latency, plus `sm__pipe_tensor_cycles_active` via focused ncu once counters are available | Only after P1. On this laptop it needs your approval and a stable clock, which is currently not achievable. |
