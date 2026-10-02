@@ -287,10 +287,10 @@ pub fn resource_usage(cubin: &Path, tc: &Toolchain) -> BTreeMap<String, u64> {
             continue;
         }
         for kv in line.split_whitespace() {
-            if let Some((k, v)) = kv.split_once(':') {
-                if let Ok(v) = v.parse() {
-                    fields.insert(k.to_string(), v);
-                }
+            if let Some((k, v)) = kv.split_once(':')
+                && let Ok(v) = v.parse()
+            {
+                fields.insert(k.to_string(), v);
             }
         }
     }
@@ -330,11 +330,9 @@ pub fn threads_per_cta(cubin: &Path, tc: &Toolchain) -> Option<u64> {
 pub fn occupancy_sm89(regs: u64, threads: u64, shared: u64) -> serde_json::Value {
     let warps = threads.div_ceil(32).max(1);
     let regs_per_warp = (regs.div_ceil(8) * 8 * 32).div_ceil(256) * 256;
-    let by_regs = if regs_per_warp == 0 {
-        24
-    } else {
-        (65536 / regs_per_warp) / warps
-    };
+    let by_regs = 65536u64
+        .checked_div(regs_per_warp)
+        .map_or(24, |w| w / warps);
     let smem_per_cta = (shared + 1024).div_ceil(128) * 128;
     let by_smem = 102_400 / smem_per_cta;
     let by_warps = 48 / warps;
