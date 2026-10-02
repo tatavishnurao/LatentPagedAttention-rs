@@ -107,6 +107,48 @@ mod probe {
                     ],
                 ),
                 (
+                    "a3_split8",
+                    [p.hq, p.hkv, g, p.d, p.blk, 2 * p.blk, 4 * p.blk, 8 * p.blk]
+                        .iter()
+                        .map(i32::to_string)
+                        .collect(),
+                    vec![
+                        param("out_acc", &[s, p.hq, p.d], 4),
+                        param("out_m", &[s, p.hq, 1], 4),
+                        param("out_l", &[s, p.hq, 1], 4),
+                        param("q", &[p.hq, p.d], 4),
+                        param("k_full", &[nb * p.hkv * p.blk, p.d], 2),
+                        param("v_full", &[nb * p.hkv * p.blk, p.d], 2),
+                        param("table", &[nb], 4),
+                    ],
+                ),
+                (
+                    "a3_split_pad",
+                    [p.hq, p.hkv, g, p.d, p.blk, tok, 16]
+                        .iter()
+                        .map(i32::to_string)
+                        .collect(),
+                    vec![
+                        param("out_acc", &[s, p.hkv * 16, p.d], 4),
+                        param("out_m", &[s, p.hkv * 16, 1], 4),
+                        param("out_l", &[s, p.hkv * 16, 1], 4),
+                        param("q", &[p.hq, p.d], 4),
+                        param("k_full", &[nb * p.hkv * p.blk, p.d], 2),
+                        param("v_full", &[nb * p.hkv * p.blk, p.d], 2),
+                        param("table", &[nb], 4),
+                    ],
+                ),
+                (
+                    "a3_reduce_pad",
+                    [g, p.d, 16].iter().map(i32::to_string).collect(),
+                    vec![
+                        param("out", &[p.hq, p.d], 4),
+                        param("partial_acc", &[s, p.hkv * 16, p.d], 4),
+                        param("partial_m", &[s, p.hkv * 16, 1], 4),
+                        param("partial_l", &[s, p.hkv * 16, 1], 4),
+                    ],
+                ),
+                (
                     "a3_reduce",
                     [p.hq, g, p.d].iter().map(i32::to_string).collect(),
                     vec![
@@ -117,15 +159,32 @@ mod probe {
                     ],
                 ),
             ];
+            let mut jobs: Vec<(&str, Vec<String>, Vec<Param>, &str)> = Vec::new();
             for (name, generics, params) in kernels {
-                let tag = format!("{name}_{}_{}", p.name, tc.target);
+                if matches!(name, "a3_split_pad" | "c3_split" | "a3_split") {
+                    // Also probe the occupancy hint that caps registers at 128 (4 CTAs x 128 thr).
+                    let copy: Vec<Param> = params
+                        .iter()
+                        .map(|q| param(q.name, &q.shape, q.elem_bytes))
+                        .collect();
+                    jobs.push((name, generics.clone(), copy, "spec+occ4"));
+                }
+                jobs.push((name, generics, params, "spec"));
+            }
+            for (name, generics, params, hint) in jobs {
+                let suffix = if hint == "spec" {
+                    String::new()
+                } else {
+                    format!("_{}", hint.replace('+', "_"))
+                };
+                let tag = format!("{name}_{}_{}{suffix}", p.name, tc.target);
                 let compiled = compile(
                     e3_kernels::__module_ast_self,
                     "e3_kernels",
                     name,
                     &generics,
                     &params,
-                    "spec",
+                    hint,
                     &tc,
                     &dir,
                     &tag,
@@ -165,7 +224,7 @@ mod probe {
                     loads["load_opcodes_per_warp"]
                 );
                 results.push(serde_json::json!({
-                    "kernel": name, "profile": p.name, "generics": generics, "hint": "spec",
+                    "kernel": name, "profile": p.name, "generics": generics, "hint": hint,
                     "instructions": instrs.len(), "resource_usage": res, "threads_per_cta": threads,
                     "occupancy_sm89": occ, "global_loads": loads, "opcode_counts": counts,
                     "cubin": cubin.file_name().map(|f| f.to_string_lossy().into_owned()),

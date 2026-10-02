@@ -81,7 +81,8 @@ pub fn assert_hint_layouts(params: &[Param], base_ptr: u64) {
     }
 }
 
-/// Compiles one kernel to a cubin. `hint` = None | "maxdiv16" | "spec" | "spec+maxdiv16".
+/// Compiles one kernel to a cubin. `hint` is "none" or a "+"-joined set of "maxdiv16",
+/// "spec" and "occN" (occupancy hint N CTAs/SM).
 #[allow(clippy::too_many_arguments)]
 pub fn compile(
     ast: fn() -> Module,
@@ -104,9 +105,23 @@ pub fn compile(
         .generics(generics.to_vec())
         .strides(&stride_refs)
         .target(&tc.target);
+    let mut options = CompileOptions::new();
+    let mut set_options = false;
     if hint.contains("maxdiv16") {
         assert_hint_layouts(params, ALIGNED_BASE_PTR);
-        compiler = compiler.options(CompileOptions::new().max_divisibility(16));
+        options = options.max_divisibility(16);
+        set_options = true;
+    }
+    if let Some(occ) = hint
+        .split('+')
+        .find_map(|h| h.strip_prefix("occ").and_then(|n| n.parse::<i32>().ok()))
+    {
+        // Entry-level occupancy hint: target CTAs per SM (bounds registers per thread).
+        options = options.occupancy(occ);
+        set_options = true;
+    }
+    if set_options {
+        compiler = compiler.options(options);
     }
     if hint.contains("spec") {
         let specs: Vec<(&str, SpecializationBits)> = params
