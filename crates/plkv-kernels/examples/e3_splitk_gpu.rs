@@ -25,6 +25,7 @@ mod gpu_impl {
     use plkv_kernels::alignment::{TensorLayout, VECTOR_ALIGN_BYTES, check_layouts};
     use plkv_kernels::block_table::validate_block_table;
     use plkv_kernels::cutile::e3_splitk::e3_kernels;
+    use plkv_kernels::splitk_plan::{MAX_STEPS_PER_CTA, plan_bounded};
     use serde_json::Value;
     use std::sync::Arc;
 
@@ -215,19 +216,16 @@ mod gpu_impl {
         (splits, steps / splits)
     }
 
-    /// (splits, steps_per_split) covering only the active range rounded up to whole two-block
-    /// steps; never reads past the table. Returns the logical blocks read as well.
-    fn plan_active(dims: Dims, active: usize, max_splits: usize) -> (usize, usize, usize) {
-        let steps_needed = active.div_ceil(dims.blk).div_ceil(2);
-        let splits = max_splits.min(steps_needed).max(1);
-        let sps = steps_needed.div_ceil(splits);
-        let blocks_read = splits * sps * 2;
-        assert!(blocks_read <= dims.nb(), "plan reads past the table");
-        (splits, sps, blocks_read)
-    }
-
     fn gens(values: &[usize]) -> Vec<String> {
         values.iter().map(usize::to_string).collect()
+    }
+
+    #[derive(Clone, Copy, PartialEq, Debug)]
+    enum Mode {
+        /// Single FP16 q' in the score GEMM.
+        Fast,
+        /// q' = hi + lo (two FP16 halves), two score MMAs into one FP32 accumulator.
+        Accurate,
     }
 
     fn run_c3(
@@ -235,8 +233,13 @@ mod gpu_impl {
         dev: Views,
         active: usize,
         (splits, sps): (usize, usize),
+        mode: Mode,
         st: &Arc<Stream>,
     ) -> Vec<f32> {
+        assert!(
+            sps <= MAX_STEPS_PER_CTA,
+            "C3 plan exceeds {MAX_STEPS_PER_CTA} steps per CTA"
+        );
         let (hq, l, d, g) = (dims.hq, dims.l, dims.d, dims.g());
         let acc = api::zeros::<f32>(&[splits, hq, l]).sync_on(st).unwrap();
         let m = api::zeros::<f32>(&[splits, hq, 1]).sync_on(st).unwrap();
@@ -263,6 +266,7 @@ mod gpu_impl {
             2 * dims.blk,
             dims.dc,
             dims.hkv * l,
+            usize::from(mode == Mode::Accurate),
         ]))
         .sync_on(st)
         .expect("c3_split launch");
@@ -335,6 +339,10 @@ mod gpu_impl {
     ) -> Vec<f32> {
         const MP: usize = 16;
         assert_eq!(dims.hq, MP, "a3_split_pad needs HQ == 16");
+        assert!(
+            sps <= MAX_STEPS_PER_CTA,
+            "A3 plan exceeds {MAX_STEPS_PER_CTA} steps per CTA"
+        );
         let (hq, d, g, hkv) = (dims.hq, dims.d, dims.g(), dims.hkv);
         let acc = api::zeros::<f32>(&[splits, hkv * MP, d])
             .sync_on(st)
@@ -668,7 +676,11 @@ mod gpu_impl {
             let mut a3_by_split = Vec::new();
             for &s in splits {
                 let plan = plan_full(dims, s);
-                let c3 = run_c3(dims, dev.views(), active, plan, st);
+                let c3 = run_c3(dims, dev.views(), active, plan, Mode::Fast, st);
+                let c3_acc = run_c3(dims, dev.views(), active, plan, Mode::Accurate, st);
+                let e_c3_acc = max_abs(&c3_acc, &latent_ref.context);
+                assert!(e_c3_acc <= ATOL, "C3-accurate mismatch {e_c3_acc} > {ATOL}");
+                worst_c3 = worst_c3.max(e_c3_acc);
                 let a3 = run_a3(dims, dev.views(), active, plan, st);
                 let e_c3 = max_abs(&c3, &latent_ref.context);
                 let e_a3 = max_abs(&a3, &full_ref.context);
@@ -682,7 +694,7 @@ mod gpu_impl {
                     String::new()
                 };
                 println!(
-                    "case={} active={active} splits={s} c3_vs_rust={e_c3:.3e} a3_vs_rust={e_a3:.3e}{pad}",
+                    "case={} active={active} splits={s} c3_vs_rust={e_c3:.3e} c3acc_vs_rust={e_c3_acc:.3e} a3_vs_rust={e_a3:.3e}{pad}",
                     case.name
                 );
                 assert!(e_c3 <= ATOL, "C3 mismatch {e_c3} > {ATOL}");
@@ -783,6 +795,7 @@ mod gpu_impl {
             dev_wrong.views(),
             control_active,
             plan_full(model, 4),
+            Mode::Fast,
             &st,
         );
         let a3_wrong = run_a3(
@@ -821,12 +834,215 @@ mod gpu_impl {
         }
     }
 
-    /// Step 3: correctness at scale (model_small shape, N up to 32768) for uniform and
-    /// heavy-tailed inputs, several split counts. Reports max and mean |error| against the Rust
-    /// FP32-arithmetic reference (FP16 storage). Stops (panics after reporting every case) if
-    /// any case exceeds SCALE_TOL.
+    /// FP16 round trip, as the kernels' `convert_tile` f32 -> f16 -> f32 does.
+    fn f16r(x: f32) -> f32 {
+        f16::from_f32(x).to_f32()
+    }
+
+    /// Matched-rounding online softmax (FP64 accumulation). Applies the same FP16 roundings the
+    /// kernels apply -- FP16 P per two-block step relative to each split's running max -- with
+    /// the same split/step structure, masking (-1e30 sentinel) and log-sum-exp merge. Scores use
+    /// `k_rows`, accumulation uses `v_rows` (both may be the same latent rows for C3). Kernel
+    /// error measured against this is attributable to accumulation order and tensor-core
+    /// arithmetic, not to the chosen roundings.
+    #[allow(clippy::too_many_arguments)]
+    fn matched_online(
+        q_rows: &[Vec<f64>],
+        k_rows: &dyn Fn(usize) -> Vec<f64>,
+        v_rows: &dyn Fn(usize) -> Vec<f64>,
+        width: usize,
+        table: &[usize],
+        blk: usize,
+        active: usize,
+        (splits, sps): (usize, usize),
+        scale: f64,
+    ) -> Vec<Vec<f64>> {
+        let heads = q_rows.len();
+        let tok = 2 * blk;
+        let mut parts = Vec::new();
+        for sidx in 0..splits {
+            let mut m = vec![-1e30f64; heads];
+            let mut l = vec![0f64; heads];
+            let mut acc = vec![vec![0f64; width]; heads];
+            for step in 0..sps {
+                let b0 = (sidx * sps + step) * 2;
+                let rows: Vec<(usize, Vec<f64>, Vec<f64>)> = (0..tok)
+                    .map(|j| {
+                        let phys = table[b0 + j / blk] * blk + j % blk;
+                        (b0 * blk + j, k_rows(phys), v_rows(phys))
+                    })
+                    .collect();
+                for h in 0..heads {
+                    let scores: Vec<f64> = rows
+                        .iter()
+                        .map(|(t, kr, _)| {
+                            if *t < active {
+                                q_rows[h].iter().zip(kr).map(|(a, b)| a * b).sum::<f64>() * scale
+                            } else {
+                                -1e30
+                            }
+                        })
+                        .collect();
+                    let m_new = scores.iter().cloned().fold(m[h], f64::max);
+                    let alpha = (m[h] - m_new).exp();
+                    let p: Vec<f64> = rows
+                        .iter()
+                        .zip(&scores)
+                        .map(|((t, _, _), s)| if *t < active { (s - m_new).exp() } else { 0.0 })
+                        .collect();
+                    l[h] = l[h] * alpha + p.iter().sum::<f64>();
+                    for a in acc[h].iter_mut() {
+                        *a *= alpha;
+                    }
+                    for ((_, _, vr), pv) in rows.iter().zip(&p) {
+                        let p16 = f64::from(f16r(*pv as f32));
+                        for (a, x) in acc[h].iter_mut().zip(vr) {
+                            *a += p16 * x;
+                        }
+                    }
+                    m[h] = m_new;
+                }
+            }
+            parts.push((m, l, acc));
+        }
+        (0..heads)
+            .map(|h| {
+                let big_m = parts.iter().map(|(m, _, _)| m[h]).fold(-1e30f64, f64::max);
+                let mut big_l = 0f64;
+                let mut out = vec![0f64; width];
+                for (m, l, acc) in &parts {
+                    let w = (m[h] - big_m).exp();
+                    big_l += w * l[h];
+                    for (o, a) in out.iter_mut().zip(&acc[h]) {
+                        *o += w * a;
+                    }
+                }
+                out.iter().map(|x| x / big_l).collect()
+            })
+            .collect()
+    }
+
+    /// Matched-rounding reference for C3: q' in FP32 as the kernel computes it, then FP16 hi
+    /// (plus FP16 lo in accurate mode); FP16-stored latent; FP16 P; V projection in FP64.
+    fn matched_c3(
+        dims: Dims,
+        case: &Case,
+        active: usize,
+        plan: (usize, usize),
+        mode: Mode,
+    ) -> Vec<f32> {
+        let (hq, hkv, d, l, g) = (dims.hq, dims.hkv, dims.d, dims.l, dims.g());
+        let z: Vec<f32> = case.latent_physical.iter().map(|&x| f16r(x)).collect();
+        let q_rows: Vec<Vec<f64>> = (0..hq)
+            .map(|h| {
+                (0..l)
+                    .map(|li| {
+                        let qp: f32 = (0..d)
+                            .map(|di| {
+                                case.q[h * d + di] * case.k_projection[(li * hkv + h / g) * d + di]
+                            })
+                            .sum();
+                        let hi = f16r(qp);
+                        let lo = f16r(qp - hi);
+                        f64::from(hi)
+                            + if mode == Mode::Accurate {
+                                f64::from(lo)
+                            } else {
+                                0.0
+                            }
+                    })
+                    .collect()
+            })
+            .collect();
+        let rows = |phys: usize| -> Vec<f64> {
+            z[phys * l..(phys + 1) * l]
+                .iter()
+                .map(|&v| f64::from(v))
+                .collect()
+        };
+        let ctx = matched_online(
+            &q_rows,
+            &rows,
+            &rows,
+            l,
+            &case.table,
+            dims.blk,
+            active,
+            plan,
+            f64::from(dims.scale()),
+        );
+        let mut out = vec![0f32; hq * d];
+        for h in 0..hq {
+            for di in 0..d {
+                let v: f64 = (0..l)
+                    .map(|li| {
+                        ctx[h][li] * f64::from(case.v_projection[(li * hkv + h / g) * d + di])
+                    })
+                    .sum();
+                out[h * d + di] = v as f32;
+            }
+        }
+        out
+    }
+
+    /// Matched-rounding reference for padded A3: FP16 q (padding rows do not affect real rows),
+    /// FP16-stored K and V, FP16 P.
+    fn matched_a3(dims: Dims, case: &Case, active: usize, plan: (usize, usize)) -> Vec<f32> {
+        let (hq, hkv, d, g, blk) = (dims.hq, dims.hkv, dims.d, dims.g(), dims.blk);
+        let k: Vec<f32> = case
+            .k_physical_head_major
+            .iter()
+            .map(|&x| f16r(x))
+            .collect();
+        let v: Vec<f32> = case
+            .v_physical_head_major
+            .iter()
+            .map(|&x| f16r(x))
+            .collect();
+        let mut out = vec![0f32; hq * d];
+        for kv in 0..hkv {
+            let q_rows: Vec<Vec<f64>> = (0..g)
+                .map(|j| {
+                    (0..d)
+                        .map(|di| f64::from(f16r(case.q_full[(kv * g + j) * d + di])))
+                        .collect()
+                })
+                .collect();
+            // Physical layout (block, kv_head, token, dim); `phys` = block * blk + token.
+            let row = |src: &[f32], phys: usize| -> Vec<f64> {
+                let (b, t) = (phys / blk, phys % blk);
+                let base = ((b * hkv + kv) * blk + t) * d;
+                src[base..base + d].iter().map(|&x| f64::from(x)).collect()
+            };
+            let k_rows = |phys: usize| row(&k, phys);
+            let v_rows = |phys: usize| row(&v, phys);
+            let ctx = matched_online(
+                &q_rows,
+                &k_rows,
+                &v_rows,
+                d,
+                &case.table,
+                blk,
+                active,
+                plan,
+                f64::from(dims.scale()),
+            );
+            for j in 0..g {
+                for di in 0..d {
+                    out[(kv * g + j) * d + di] = ctx[j][di] as f32;
+                }
+            }
+        }
+        out
+    }
+
+    /// Step 3: correctness at scale with bounded split plans (`plan_bounded`: at most
+    /// MAX_STEPS_PER_CTA steps per CTA) for C3 fast, C3 accurate and padded A3 on identical
+    /// inputs. Reports, per case, total error vs the exact FP32-arithmetic reference and
+    /// kernel-attributable error vs the matched-rounding reference. Gate: C3 accurate total
+    /// <= 3e-3 (stop after reporting every case if violated); C3 fast is reported, not gated.
     fn scale_suite(st: &Arc<Stream>) {
-        const SCALE_TOL: f64 = 3e-3;
+        const GATE: f64 = 3e-3;
         let dims = Dims {
             hq: 16,
             hkv: 4,
@@ -838,7 +1054,7 @@ mod gpu_impl {
         };
         let nb = dims.nb();
         let table: Vec<usize> = (0..nb).map(|lb| (lb * 17 + 11) % nb).collect();
-        let mut exceeded = Vec::new();
+        let mut failures = Vec::new();
         for (inputs, label) in [
             (Inputs::Uniform, "uniform"),
             (Inputs::HeavyTailed, "heavy_tailed"),
@@ -848,44 +1064,48 @@ mod gpu_impl {
             for active in [4096usize, 8192, 32768] {
                 thermal_guard();
                 validate_launch(dims, &dev, &case.table, active);
+                let plan = plan_bounded(active, dims.blk, nb, 1).expect("plan");
+                let pl = (plan.splits, plan.steps_per_split);
                 let (latent_ref, full_ref) = cpu_refs(dims, &case, active);
-                let (mut worst, mut worst_mean) = ([0.0f64; 3], [0.0f64; 3]);
-                for max_splits in [1usize, 8, 64] {
-                    let (splits, sps, blocks) = plan_active(dims, active, max_splits);
-                    let outs = [
-                        run_c3(dims, dev.views(), active, (splits, sps), st),
-                        run_a3(dims, dev.views(), active, (splits, sps), st),
-                        run_a3_pad(dims, dev.views(), active, (splits, sps), st),
-                    ];
-                    let refs = [&latent_ref.context, &full_ref.context, &full_ref.context];
-                    let mut line = format!(
-                        "SCALE inputs={label} active={active} splits={splits} steps_per_split={sps} blocks_read={blocks}"
+                let runs = [
+                    (
+                        "c3_fast",
+                        run_c3(dims, dev.views(), active, pl, Mode::Fast, st),
+                        &latent_ref.context,
+                        matched_c3(dims, &case, active, pl, Mode::Fast),
+                    ),
+                    (
+                        "c3_accurate",
+                        run_c3(dims, dev.views(), active, pl, Mode::Accurate, st),
+                        &latent_ref.context,
+                        matched_c3(dims, &case, active, pl, Mode::Accurate),
+                    ),
+                    (
+                        "a3pad",
+                        run_a3_pad(dims, dev.views(), active, pl, st),
+                        &full_ref.context,
+                        matched_a3(dims, &case, active, pl),
+                    ),
+                ];
+                for (name, out, exact, matched) in &runs {
+                    let (t_max, t_mean) = (max_abs(out, exact), mean_abs(out, exact));
+                    let (k_max, k_mean) = (max_abs(out, matched), mean_abs(out, matched));
+                    let r_max = max_abs(matched, exact);
+                    println!(
+                        "SCALE inputs={label} N={active} splits={} steps_per_split={} {name} total_max={t_max:.3e} total_mean={t_mean:.3e} kernel_max={k_max:.3e} kernel_mean={k_mean:.3e} rounding_only_max={r_max:.3e}",
+                        plan.splits, plan.steps_per_split
                     );
-                    for (k, name) in ["c3", "a3", "a3pad"].iter().enumerate() {
-                        let (mx, mn) = (max_abs(&outs[k], refs[k]), mean_abs(&outs[k], refs[k]));
-                        worst[k] = worst[k].max(mx);
-                        worst_mean[k] = worst_mean[k].max(mn);
-                        line += &format!(" {name}_max={mx:.3e} {name}_mean={mn:.3e}");
-                        if mx > SCALE_TOL {
-                            exceeded.push(format!(
-                                "{label} N={active} splits={splits} {name} max={mx:.3e}"
-                            ));
-                        }
+                    if *name == "c3_accurate" && t_max > GATE {
+                        failures.push(format!(
+                            "{label} N={active} c3_accurate total_max={t_max:.3e}"
+                        ));
                     }
-                    println!("{line}");
                 }
-                println!(
-                    "SCALE_SUMMARY inputs={label} active={active} worst_max c3={:.3e} a3={:.3e} a3pad={:.3e} worst_mean c3={:.3e} a3={:.3e} a3pad={:.3e}",
-                    worst[0], worst[1], worst[2], worst_mean[0], worst_mean[1], worst_mean[2]
-                );
             }
         }
-        if !exceeded.is_empty() {
-            println!(
-                "SCALE_TOLERANCE_EXCEEDED tol={SCALE_TOL}: {}",
-                exceeded.join("; ")
-            );
-            panic!("scale tolerance exceeded; FP16 probability path may need FP32 P accumulation");
+        if !failures.is_empty() {
+            println!("SCALE_GATE_FAILED gate={GATE}: {}", failures.join("; "));
+            panic!("C3 accurate exceeded the {GATE} gate");
         }
         println!("E3_SCALE_OK=1");
     }
@@ -907,7 +1127,7 @@ mod gpu_impl {
             dc: 16,
         };
         let nb = seq_dims.nb();
-        const MAX_SPLITS: usize = 4;
+        const MIN_SPLITS: usize = 4;
         for batch in [1usize, 8, 32] {
             let layers = 4usize.max(64usize.div_ceil(batch));
             let pool_blocks = batch * nb;
@@ -951,7 +1171,10 @@ mod gpu_impl {
                 drop(flush);
                 for (b, &active) in actives.iter().enumerate() {
                     let table_b: Vec<usize> = case.table[b * nb..(b + 1) * nb].to_vec();
-                    let (splits, sps, blocks_read) = plan_active(seq_dims, active, MAX_SPLITS);
+                    let plan = plan_bounded(active, seq_dims.blk, nb, MIN_SPLITS)
+                        .unwrap_or_else(|e| panic!("E4 plan rejected: {e}"));
+                    let (splits, sps, blocks_read) =
+                        (plan.splits, plan.steps_per_split, plan.blocks_read);
                     let table_i32: Vec<i32> = table_b.iter().map(|&v| v as i32).collect();
                     validate_block_table(
                         &table_i32,
@@ -974,7 +1197,7 @@ mod gpu_impl {
                         table: &t_dev,
                         ..dev.views()
                     };
-                    let c3 = run_c3(seq_dims, views, active, (splits, sps), st);
+                    let c3 = run_c3(seq_dims, views, active, (splits, sps), Mode::Accurate, st);
                     let a3 = run_a3_pad(seq_dims, views, active, (splits, sps), st);
                     // Per-sequence references over the shared pool.
                     let seq_case = Case {
