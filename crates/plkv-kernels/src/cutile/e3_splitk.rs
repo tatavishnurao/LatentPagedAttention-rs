@@ -35,6 +35,7 @@ pub mod e3_kernels {
         const TOK: i32,
         const DC: i32,
         const HKVL: i32,
+        const ACCURATE: i32,
     >(
         out_acc: &mut Tensor<f32, { [1, HQ, L] }>,
         out_m: &mut Tensor<f32, { [1, HQ, 1] }>,
@@ -67,7 +68,13 @@ pub mod e3_kernels {
             let part2: Tile<f32, { [HQ, L] }> = part.reshape(const_shape![HQ, L]);
             qp = qp + part2;
         }
+        // Projection modes (ACCURATE, chosen at launch via generics):
+        //   0 = fast:     scores from a single FP16 q' (rounding error 2^-11 relative in q');
+        //   1 = accurate: q' = hi + lo with hi = fp16(q'), lo = fp16(q' - hi); two score MMAs
+        //                 chained into the same FP32 accumulator (~2^-22 relative in q').
         let q16: Tile<f16, { [HQ, L] }> = convert_tile(qp);
+        let q16_f32: Tile<f32, { [HQ, L] }> = convert_tile(q16);
+        let q_lo: Tile<f16, { [HQ, L] }> = convert_tile(qp - q16_f32);
 
         let mut m_i: Tile<f32, { [HQ, 1] }> = constant(-1.0e30f32, const_shape![HQ, 1]);
         let mut l_i: Tile<f32, { [HQ, 1] }> = constant(0.0f32, const_shape![HQ, 1]);
@@ -84,7 +91,12 @@ pub mod e3_kernels {
             let z: Tile<f16, { [TOK, L] }> = cat(za, zb, 0i32);
             let zt: Tile<f16, { [L, TOK] }> = z.transpose();
             let zero: Tile<f32, { [HQ, TOK] }> = constant(0.0f32, const_shape![HQ, TOK]);
-            let raw: Tile<f32, { [HQ, TOK] }> = mma(q16, zt, zero);
+            let hi_part: Tile<f32, { [HQ, TOK] }> = mma(q16, zt, zero);
+            let raw: Tile<f32, { [HQ, TOK] }> = if ACCURATE > 0i32 {
+                mma(q_lo, zt, hi_part)
+            } else {
+                hi_part
+            };
             let s = raw * broadcast_scalar(scale, const_shape![HQ, TOK]);
 
             let tokens: Tile<i32, { [TOK] }> =

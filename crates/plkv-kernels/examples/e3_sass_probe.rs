@@ -65,7 +65,7 @@ mod probe {
             let kernels: Vec<(&str, Vec<String>, Vec<Param>)> = vec![
                 (
                     "c3_split",
-                    [p.hq, p.hkv, g, p.d, p.l, p.blk, tok, p.dc, p.hkv * p.l]
+                    [p.hq, p.hkv, g, p.d, p.l, p.blk, tok, p.dc, p.hkv * p.l, 0]
                         .iter()
                         .map(i32::to_string)
                         .collect(),
@@ -159,6 +159,22 @@ mod probe {
                     ],
                 ),
             ];
+            // C3 is probed in both projection modes (last generic ACCURATE = 0 fast, 1 accurate).
+            let mut kernels = kernels;
+            let accurate: Vec<_> = kernels
+                .iter()
+                .filter(|(n, _, _)| *n == "c3_split")
+                .map(|(_, gens, params)| {
+                    let mut gens = gens.clone();
+                    *gens.last_mut().unwrap() = "1".into();
+                    let params: Vec<Param> = params
+                        .iter()
+                        .map(|q| param(q.name, &q.shape, q.elem_bytes))
+                        .collect();
+                    ("c3_split", gens, params)
+                })
+                .collect();
+            kernels.extend(accurate);
             let mut jobs: Vec<(&str, Vec<String>, Vec<Param>, &str)> = Vec::new();
             for (name, generics, params) in kernels {
                 if matches!(name, "a3_split_pad" | "c3_split" | "a3_split") {
@@ -177,7 +193,12 @@ mod probe {
                 } else {
                     format!("_{}", hint.replace('+', "_"))
                 };
-                let tag = format!("{name}_{}_{}{suffix}", p.name, tc.target);
+                let mode = match (name, generics.last().map(String::as_str)) {
+                    ("c3_split", Some("1")) => "_accurate",
+                    ("c3_split", _) => "_fast",
+                    _ => "",
+                };
+                let tag = format!("{name}{mode}_{}_{}{suffix}", p.name, tc.target);
                 let compiled = compile(
                     e3_kernels::__module_ast_self,
                     "e3_kernels",
