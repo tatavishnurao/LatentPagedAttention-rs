@@ -69,7 +69,7 @@ Consequences:
     It builds, runs the CPU-only MMA probe, collects ≥5 cool-start processes per length (at most 8 attempts each), analyzes, and writes `~/e0b_l4_<stamp>.tar.gz` without oracle dumps.
 12. Bring back the tarball. In this repository it goes under `reports/e0b_l4_<stamp>/`, and the results get added to the diagnosis doc only after you approve.
 
-**Expected duration.** HYPOTHESIS, not measured on an L4: the build takes 5–10 min the first time; each process takes about 10–40 s of GPU time, plus cooldown, which should be near zero on a datacenter GPU idling below 80 °C. With 15 processes, expect about 10–20 min in total.
+**Expected duration.** HYPOTHESIS, not measured on an L4: the build takes 5–10 min the first time; each process takes about 10–40 s of GPU time, plus cooldown, which should be near zero on a datacenter GPU idling below 80 °C. With 15 E0b processes, expect about 10–20 min for E0b. The E3/E4 stages add 15 E3 timing processes and 15 E4 timing processes (≥ 5 each per configuration) plus the correctness suites. Expect roughly 30–60 min more on an L4 (HYPOTHESIS; dominated by 32K E3 and B = 32 E4 setup).
 
 ## 3. What the run records
 
@@ -87,6 +87,31 @@ Consequences:
   - geometric mean;
   - hierarchical-bootstrap 95 % CI (10,000 replicates, seed 20261002), computed over **clean** runs only, i.e. cool-start and not THROTTLED;
   - launch floor: the empty event pair and the smallest kernel × launch count.
+
+## 3b. E3 / E4 stages (same run, after E0b)
+
+`run_e0b_portable.sh` also runs the E3 split-K and E4 batch/layer paths, unless `--skip-e3e4` is given:
+
+1. **E3 correctness gate:** `e3_splitk_gpu --suite e3` (oracle chain, partial final blocks, split invariance, padded A3, both C3 modes) and `--suite scale` (N = 4K/8K/32K, uniform and heavy-tailed, matched-rounding reference). The scale suite is skipped in a dry run.
+2. **E3 timing** (`scripts/e0b/e3e4_campaign.py`): padded A3 vs C3 fast vs C3 accurate at `--e3-lengths` (default 1024, 8192, 32768), with ≥ 5 cool-start processes each.
+   - Each sample is one variant's split + reduce between CUDA events.
+   - Variant order rotates by (iteration + process).
+   - Plans come from `splitk_plan::plan_bounded`: at most 128 steps per CTA, giving 1 / 2 / 8 splits.
+3. **E4 correctness:** `--suite e4`, one process. B ∈ {1, 8, 32}, every batch element validated against per-sequence references over a shared block pool.
+4. **E4 timing:** `--suite e4-timing` at `--e4-batches` (default 1, 8, 32), with ≥ 5 cool-start processes each.
+   - L = max(4, ceil(64 / B)) resident per-layer pools.
+   - A 64 MiB L2-flush memset runs before each layer, outside the timed interval.
+   - The per-step total is the per-iteration sum of the layer intervals.
+5. **Analysis:** `scripts/e0b/analyze_variants.py` writes `e3e4/variants_analysis.json`.
+   - It reports per-process ratios of medians against padded A3, their geometric mean over clean processes, and a hierarchical-bootstrap 95 % CI.
+   - THROTTLED and hot-start processes are reported separately.
+   - `claim_eligible` requires ≥ 5 clean processes.
+
+**Dry run:** E3 timing at 1K and E4 timing at B = 1, one process each, 5 iterations, plus the E3 correctness suite. The full E4 correctness suite is skipped, but its path is exercised by the E4-timing pre-check, which validates every batch element of layer 0 before timing. The dry run also checks that the samples carry clocks, the expected variants and a correctness record, and that the analysis has E3 and E4 rows.
+
+**Status on the development laptop:** none of these timing paths was run there. They were exercised only with `--iterations 0` (setup, async-path correctness and output). The first real run is the cloud dry run.
+
+**Labeling:** results from this package must be labeled with the host (for example "cloud L4, native Linux"). Laptop results, if any are ever taken, must be labeled "laptop, WSL2, not a cloud result".
 
 ## 4. Analysis rules (fixed before running)
 

@@ -15,6 +15,10 @@ usage: scripts/e0b/run_e0b_portable.sh --out-dir DIR [options]
   --cooldown-s S       max cooldown wait per process (default 300)
   --abort-c C          hard thermal abort (default 91)
   --lock-sm-mhz MHZ    optional: lock SM clocks (needs root; reset on exit)
+  --e3-lengths LIST    E3 timing lengths (default 1024,8192,32768)
+  --e4-batches LIST    E4 timing batch sizes (default 1,8,32)
+  --e3e4-iterations N  timed iterations per E3/E4 process (default 50)
+  --skip-e3e4          run only the E0b (A1 vs C1) stages
   --skip-build         reuse an existing release build
   --preflight-only     check the environment and exit
   --dry-run            fail-fast smoke test: every stage, but 1K only, 1 process, 1 attempt;
@@ -24,6 +28,7 @@ EOF
 
 OUT_DIR="" LENGTHS="1024,8192,32768" MIN_COOL=5 MAX_ATTEMPTS=8 COOL_C=80 COOLDOWN_S=300
 ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0
+E3_LENGTHS="1024,8192,32768" E4_BATCHES="1,8,32" E3E4_ITERS=50 SKIP_E3E4=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;
@@ -34,6 +39,10 @@ while [[ $# -gt 0 ]]; do
     --cooldown-s) COOLDOWN_S="$2"; shift 2 ;;
     --abort-c) ABORT_C="$2"; shift 2 ;;
     --lock-sm-mhz) LOCK_SM="$2"; shift 2 ;;
+    --e3-lengths) E3_LENGTHS="$2"; shift 2 ;;
+    --e4-batches) E4_BATCHES="$2"; shift 2 ;;
+    --e3e4-iterations) E3E4_ITERS="$2"; shift 2 ;;
+    --skip-e3e4) SKIP_E3E4=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -43,7 +52,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$OUT_DIR" ]] || { usage >&2; exit 2; }
 if [[ "$DRY_RUN" == 1 ]]; then
-  LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1
+  LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1 E3_LENGTHS=1024 E4_BATCHES=1 E3E4_ITERS=5
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -80,6 +89,7 @@ export LIBCLANG_PATH
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 export C1_RTABLE_BIN="$TARGET_DIR/release/examples/c1_rtable"
 MMA_PROBE_BIN="$TARGET_DIR/release/examples/mma_probe"
+export E3_SPLITK_BIN="$TARGET_DIR/release/examples/e3_splitk_gpu"
 export OPENBLAS_NUM_THREADS=1
 
 command -v nvidia-smi >/dev/null || fail "nvidia-smi not found (NVIDIA driver missing)"
@@ -134,9 +144,10 @@ fi
 # ---- build -----------------------------------------------------------------------------------
 if [[ "$SKIP_BUILD" == 0 ]]; then
   (cd "$ROOT" && cargo build --locked --release -p plkv-kernels --features gpu-cutile \
-     --example c1_rtable --example mma_probe) 2>&1 | tee "$OUT_DIR/build.log" | tail -3
+     --example c1_rtable --example mma_probe --example e3_splitk_gpu) 2>&1 \
+    | tee "$OUT_DIR/build.log" | tail -3
 fi
-sha256sum "$C1_RTABLE_BIN" "$MMA_PROBE_BIN" \
+sha256sum "$C1_RTABLE_BIN" "$MMA_PROBE_BIN" "$E3_SPLITK_BIN" \
   | tee "$OUT_DIR/binaries.sha256"
 
 # ---- MMA compile probe (CPU only; no launches) -----------------------------------------------
@@ -147,6 +158,24 @@ sha256sum "$C1_RTABLE_BIN" "$MMA_PROBE_BIN" \
 python3 "$ROOT/scripts/e0b/e0b_campaign.py" --out-dir "$OUT_DIR/campaign" --lengths "$LENGTHS" \
   --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
   --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" | tee "$OUT_DIR/campaign.log"
+
+# ---- E3 correctness gate, then E3 / E4 campaign ----------------------------------------------
+if [[ "$SKIP_E3E4" == 0 ]]; then
+  # Correctness before any E3/E4 timing (oracle chain, partial blocks, split invariance, padded
+  # A3, both C3 modes). The scale suite (N up to 32K) is skipped in a dry run.
+  (cd "$ROOT" && "$E3_SPLITK_BIN" --suite e3) | tee "$OUT_DIR/e3_correctness.log"
+  grep -q '^E3_SPLITK_GPU_OK=1$' "$OUT_DIR/e3_correctness.log"
+  if [[ "$DRY_RUN" == 0 ]]; then
+    (cd "$ROOT" && "$E3_SPLITK_BIN" --suite scale) | tee "$OUT_DIR/e3_scale.log"
+    grep -q '^E3_SCALE_OK=1$' "$OUT_DIR/e3_scale.log"
+  fi
+  python3 "$ROOT/scripts/e0b/e3e4_campaign.py" --out-dir "$OUT_DIR/e3e4" \
+    --e3-lengths "$E3_LENGTHS" --e4-batches "$E4_BATCHES" --iterations "$E3E4_ITERS" \
+    --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
+    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" \
+    $([[ "$DRY_RUN" == 1 ]] && echo --skip-e4-correctness) | tee "$OUT_DIR/e3e4_campaign.log"
+  python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" > "$OUT_DIR/e3e4_analysis_stdout.json"
+fi
 
 # ---- analysis + package ----------------------------------------------------------------------
 python3 "$ROOT/scripts/e0b/analyze_e0b.py" "$OUT_DIR/campaign" > "$OUT_DIR/analysis_stdout.json"
@@ -188,6 +217,38 @@ if not f16 or any(x["sass_mma_instructions"] == 0 for x in f16):
 analysis = json.loads((camp / "e0b_analysis.json").read_text())
 if "1024" not in analysis["results"]:
     problems.append("analysis has no 1024 result")
+# E3 / E4 paths: correctness gate, timing samples with clocks, pre-timing correctness, analysis.
+e3e4 = out / "e3e4"
+if e3e4.exists():
+    if "E3_SPLITK_GPU_OK=1" not in (out / "e3_correctness.log").read_text():
+        problems.append("E3 correctness suite did not pass")
+    runs = json.loads((e3e4 / "manifest.json").read_text())["runs"]
+    expect = {
+        "e3_timing": ({"a3pad", "c3_fast", "c3_accurate"}, "pipeline"),
+        "e4_timing": ({"a3pad", "c3_accurate"}, "step_total"),
+    }
+    for kind, (variants, component) in expect.items():
+        kr = [r for r in runs if r.get("kind") == kind]
+        if not kr or kr[0]["returncode"] != 0:
+            problems.append(f"{kind}: process failed or missing: {kr[:1]}")
+            continue
+        d = e3e4 / kr[0]["label"]
+        rows = [json.loads(line) for line in (d / "samples.jsonl").open()]
+        got = {r["variant"] for r in rows if r.get("component") == component}
+        if got != variants:
+            problems.append(f"{kind}: variants {sorted(got)} != {sorted(variants)}")
+        timed = [r for r in rows if "sm_clock_pre_mhz" in r]
+        if not timed or any(r["sm_clock_pre_mhz"] is None for r in timed):
+            problems.append(f"{kind}: per-sample NVML clocks missing")
+        corr = json.dumps(json.loads((d / "correctness.json").read_text()))
+        if "max_abs_error" not in corr:
+            problems.append(f"{kind}: pre-timing correctness record missing")
+        print(f"dry-run {kind}: {kr[0]['label']} rows={len(rows)} variants={sorted(got)}")
+    va = json.loads((e3e4 / "variants_analysis.json").read_text())
+    if not any(k.startswith("e3_timing/") for k in va["results"]) or not any(
+        k.startswith("e4_timing/") for k in va["results"]
+    ):
+        problems.append("variants analysis missing E3 or E4 results")
 if problems:
     print("DRY_RUN_FAIL: " + "; ".join(problems))
     sys.exit(1)
