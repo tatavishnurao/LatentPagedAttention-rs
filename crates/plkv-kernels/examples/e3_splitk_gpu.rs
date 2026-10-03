@@ -8,7 +8,14 @@
 //! identity-table run is a negative control. Every launch is preceded by host-side block-table
 //! and layout validation.
 #[cfg(feature = "gpu-cutile")]
+#[path = "timing_common/mod.rs"]
+mod timing_common;
+
+#[cfg(feature = "gpu-cutile")]
 mod gpu_impl {
+    use super::timing_common::{
+        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields, clock_warmup, memset_d32,
+    };
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
     use cutile::cuda_core::Stream;
@@ -25,7 +32,7 @@ mod gpu_impl {
     use plkv_kernels::alignment::{TensorLayout, VECTOR_ALIGN_BYTES, check_layouts};
     use plkv_kernels::block_table::validate_block_table;
     use plkv_kernels::cutile::e3_splitk::e3_kernels;
-    use plkv_kernels::splitk_plan::{MAX_STEPS_PER_CTA, plan_bounded};
+    use plkv_kernels::splitk_plan::{MAX_STEPS_PER_CTA, SplitPlan, plan_bounded};
     use serde_json::Value;
     use std::sync::Arc;
 
@@ -1110,13 +1117,31 @@ mod gpu_impl {
         println!("E3_SCALE_OK=1");
     }
 
-    /// Step 4 (E4, correctness only): batch B in {1, 8, 32} over a shared physical block pool
-    /// per layer, L layers of resident, rotating per-layer pools. A3 pools total >= 64 MiB by
-    /// construction (L = max(4, ceil(64 / B)), 1 MiB K+V per sequence per layer); the latent
-    /// pools are smaller, so a 64 MiB L2-flush allocation is written before every layer. Each
-    /// sequence has its own non-identity table into the pool, its own query and its own active
-    /// length; every batch element is validated. Bytes are analytical accounting, not timing.
-    fn e4_suite(st: &Arc<Stream>) {
+    /// One sequence of an E4 batch: its query, its block table into the shared pool, its active
+    /// length and its bounded launch plan (identical across layers).
+    struct E4Seq {
+        q: Vec<f32>,
+        q_dev: Tensor<f32>,
+        table: Vec<usize>,
+        t_dev: Tensor<i32>,
+        active: usize,
+        plan: SplitPlan,
+    }
+
+    struct E4Setup {
+        seq_dims: Dims,
+        layers: usize,
+        pool_blocks: usize,
+        pools: Vec<(Case, Device)>,
+        seqs: Vec<E4Seq>,
+    }
+
+    /// E4 configuration: L = max(4, ceil(64 / B)) layers of resident per-layer pools (1 MiB of
+    /// K+V per sequence per layer, so A3 pools total >= 64 MiB); every sequence has its own
+    /// non-identity table into the pool, its own query and active length (b = 0 runs the full
+    /// 1024 tokens). Tables and plans are validated on the host here, before any launch.
+    fn e4_setup(batch: usize, st: &Arc<Stream>) -> E4Setup {
+        const MIN_SPLITS: usize = 4;
         let seq_dims = Dims {
             hq: 16,
             hkv: 4,
@@ -1127,148 +1152,648 @@ mod gpu_impl {
             dc: 16,
         };
         let nb = seq_dims.nb();
-        const MIN_SPLITS: usize = 4;
+        let layers = 4usize.max(64usize.div_ceil(batch));
+        let pool_blocks = batch * nb;
+        let pool_dims = Dims {
+            seq: batch * seq_dims.seq,
+            ..seq_dims
+        };
+        let pool_table: Vec<usize> = (0..pool_blocks)
+            .map(|lb| (lb * 1021 + 11) % pool_blocks)
+            .collect();
+        let pools: Vec<(Case, Device)> = (0..layers)
+            .map(|layer| {
+                let case = model_case_with(
+                    pool_dims,
+                    pool_table.clone(),
+                    &format!("e4/B{batch}/L{layer}"),
+                    Inputs::Uniform,
+                    layer as u64 + 1,
+                );
+                let dev = to_device(pool_dims, &case, st);
+                (case, dev)
+            })
+            .collect();
+        let seqs = (0..batch)
+            .map(|b| {
+                let active = if b == 0 {
+                    seq_dims.seq
+                } else {
+                    1 + (b * 373) % seq_dims.seq
+                };
+                let table: Vec<usize> = pool_table[b * nb..(b + 1) * nb].to_vec();
+                let plan = plan_bounded(active, seq_dims.blk, nb, MIN_SPLITS)
+                    .unwrap_or_else(|e| panic!("E4 plan rejected: {e}"));
+                let table_i32: Vec<i32> = table.iter().map(|&v| v as i32).collect();
+                validate_block_table(
+                    &table_i32,
+                    active,
+                    seq_dims.blk,
+                    plan.blocks_read,
+                    pool_blocks,
+                )
+                .unwrap_or_else(|e| panic!("E4 table rejected: {e}"));
+                let q =
+                    deterministic_values(seq_dims.hq * seq_dims.d, 0.011, -0.4 + 0.13 * b as f32);
+                E4Seq {
+                    q_dev: upload_f32(&q, &[seq_dims.hq, seq_dims.d], st),
+                    t_dev: upload_table(&table, st),
+                    q,
+                    table,
+                    active,
+                    plan,
+                }
+            })
+            .collect();
+        E4Setup {
+            seq_dims,
+            layers,
+            pool_blocks,
+            pools,
+            seqs,
+        }
+    }
+
+    fn e4_views<'a>(dev: &'a Device, seq: &'a E4Seq) -> Views<'a> {
+        Views {
+            q: &seq.q_dev,
+            q_full: &seq.q_dev,
+            table: &seq.t_dev,
+            ..dev.views()
+        }
+    }
+
+    /// Analytical bytes one sequence's launch pair reads or writes, per variant:
+    /// (c3, a3pad, cache-only minimum c3, cache-only minimum a3).
+    fn e4_bytes(plan: SplitPlan, active: usize) -> (u64, u64, u64, u64) {
+        let (hq, hkv, d, l, blk) = (16u64, 4u64, 64u64, 32u64, 16u64);
+        let (s, br) = (plan.splits as u64, plan.blocks_read as u64);
+        let table_bytes = br * 4;
+        let c3_partials = 2 * s * hq * (l + 2) * 4; // written by the split kernel, read by reduce
+        let c3 = br * blk * l * 2
+            + hq * d * 4
+            + s * hkv * l * d * 4
+            + hkv * l * d * 4
+            + c3_partials
+            + table_bytes
+            + hq * d * 4;
+        let a3_partials = 2 * s * hkv * 16 * (d + 2) * 4;
+        let a3 = br * blk * hkv * d * 2 * 2
+            + s * hkv * hq * d * 4
+            + a3_partials
+            + table_bytes
+            + hq * d * 4;
+        let active_blocks = active.div_ceil(16) as u64;
+        (
+            c3,
+            a3,
+            active_blocks * blk * l * 2,
+            active_blocks * blk * hkv * d * 2 * 2,
+        )
+    }
+
+    /// Step 4 (E4, correctness only): B in {1, 8, 32}, rotating per-layer pools (see
+    /// `e4_setup`); the latent pools are smaller than 64 MiB, so a 64 MiB L2-flush memset runs
+    /// before every layer. Every batch element is validated against per-sequence references over
+    /// the shared pool (C3 accurate and padded A3). Bytes are analytical, not timing.
+    fn e4_suite(st: &Arc<Stream>) {
+        let flush = api::zeros::<f32>(&[L2_FLUSH_WORDS]).sync_on(st).unwrap();
         for batch in [1usize, 8, 32] {
-            let layers = 4usize.max(64usize.div_ceil(batch));
-            let pool_blocks = batch * nb;
-            let pool_dims = Dims {
-                seq: batch * seq_dims.seq,
-                ..seq_dims
-            };
-            let pool_table: Vec<usize> = (0..pool_blocks)
-                .map(|lb| (lb * 1021 + 11) % pool_blocks)
-                .collect();
-            let actives: Vec<usize> = (0..batch)
-                .map(|b| {
-                    if b == 0 {
-                        seq_dims.seq
-                    } else {
-                        1 + (b * 373) % seq_dims.seq
-                    }
-                })
-                .collect();
-            // Resident, rotating per-layer pools.
-            let pools: Vec<(Case, Device)> = (0..layers)
-                .map(|layer| {
-                    let case = model_case_with(
-                        pool_dims,
-                        pool_table.clone(),
-                        &format!("e4/B{batch}/L{layer}"),
-                        Inputs::Uniform,
-                        layer as u64 + 1,
-                    );
-                    let dev = to_device(pool_dims, &case, st);
-                    (case, dev)
-                })
-                .collect();
-            let (mut c3_bytes, mut a3_bytes, mut min_bytes_c3, mut min_bytes_a3) =
-                (0u64, 0u64, 0u64, 0u64);
+            let setup = e4_setup(batch, st);
+            let (mut c3_b, mut a3_b, mut min_c3, mut min_a3) = (0u64, 0u64, 0u64, 0u64);
             let (mut worst_c3, mut worst_a3) = (0.0f64, 0.0f64);
-            for (case, dev) in &pools {
+            for (case, dev) in &setup.pools {
                 thermal_guard();
-                // Explicit L2 flush: write a fresh 64 MiB buffer before each layer.
-                let flush = api::zeros::<f32>(&[16 * 1024 * 1024]).sync_on(st).unwrap();
-                drop(flush);
-                for (b, &active) in actives.iter().enumerate() {
-                    let table_b: Vec<usize> = case.table[b * nb..(b + 1) * nb].to_vec();
-                    let plan = plan_bounded(active, seq_dims.blk, nb, MIN_SPLITS)
-                        .unwrap_or_else(|e| panic!("E4 plan rejected: {e}"));
-                    let (splits, sps, blocks_read) =
-                        (plan.splits, plan.steps_per_split, plan.blocks_read);
-                    let table_i32: Vec<i32> = table_b.iter().map(|&v| v as i32).collect();
-                    validate_block_table(
-                        &table_i32,
-                        active,
-                        seq_dims.blk,
-                        blocks_read,
-                        pool_blocks,
-                    )
-                    .unwrap_or_else(|e| panic!("E4 table rejected: {e}"));
-                    let q = deterministic_values(
-                        seq_dims.hq * seq_dims.d,
-                        0.011,
-                        -0.4 + 0.13 * b as f32,
-                    );
-                    let q_dev = upload_f32(&q, &[seq_dims.hq, seq_dims.d], st);
-                    let t_dev = upload_table(&table_b, st);
-                    let views = Views {
-                        q: &q_dev,
-                        q_full: &q_dev,
-                        table: &t_dev,
-                        ..dev.views()
-                    };
-                    let c3 = run_c3(seq_dims, views, active, (splits, sps), Mode::Accurate, st);
-                    let a3 = run_a3_pad(seq_dims, views, active, (splits, sps), st);
-                    // Per-sequence references over the shared pool.
-                    let seq_case = Case {
-                        name: format!("{}/b{b}", case.name),
-                        q: q.clone(),
-                        q_full: q,
-                        latent_physical: case.latent_physical.clone(),
-                        k_projection: case.k_projection.clone(),
-                        v_projection: case.v_projection.clone(),
-                        kp_head_major: Vec::new(),
-                        vp_head_major: Vec::new(),
-                        k_physical_head_major: case.k_physical_head_major.clone(),
-                        v_physical_head_major: case.v_physical_head_major.clone(),
-                        table: table_b,
-                        oracle_latent_context: None,
-                        oracle_full_context: None,
-                    };
-                    let ref_dims = Dims {
-                        seq: seq_dims.seq,
-                        ..seq_dims
-                    };
+                memset_d32(flush.device_pointer().cu_deviceptr(), L2_FLUSH_WORDS, st);
+                for seq in &setup.seqs {
+                    let views = e4_views(dev, seq);
+                    let pl = (seq.plan.splits, seq.plan.steps_per_split);
+                    let c3 = run_c3(setup.seq_dims, views, seq.active, pl, Mode::Accurate, st);
+                    let a3 = run_a3_pad(setup.seq_dims, views, seq.active, pl, st);
+                    let seq_case = e4_seq_case(case, seq);
                     let (latent_ref, full_ref) =
-                        cpu_refs_pool(ref_dims, &seq_case, active, pool_blocks);
+                        cpu_refs_pool(setup.seq_dims, &seq_case, seq.active, setup.pool_blocks);
                     let (e_c3, e_a3) = (
                         max_abs(&c3, &latent_ref.context),
                         max_abs(&a3, &full_ref.context),
                     );
-                    assert!(e_c3 <= ATOL, "E4 C3 B={batch} b={b} err {e_c3}");
-                    assert!(e_a3 <= ATOL, "E4 A3 B={batch} b={b} err {e_a3}");
+                    assert!(e_c3 <= ATOL, "E4 C3 B={batch} err {e_c3}");
+                    assert!(e_a3 <= ATOL, "E4 A3 B={batch} err {e_a3}");
                     worst_c3 = worst_c3.max(e_c3);
                     worst_a3 = worst_a3.max(e_a3);
-                    // Analytical bytes for this launch pair (unique bytes each kernel reads or writes).
-                    let (hq, hkv, d, l, blk) = (16u64, 4u64, 64u64, 32u64, 16u64);
-                    let (s, br) = (splits as u64, blocks_read as u64);
-                    let table_bytes = br * 4;
-                    let c3_partials = 2 * s * hq * (l + 2) * 4; // written by split, read by reduce
-                    c3_bytes += br * blk * l * 2
-                        + hq * d * 4
-                        + s * hkv * l * d * 4
-                        + hkv * l * d * 4
-                        + c3_partials
-                        + table_bytes
-                        + hq * d * 4;
-                    let a3_partials = 2 * s * hkv * 16 * (d + 2) * 4;
-                    a3_bytes += br * blk * hkv * d * 2 * 2
-                        + s * hkv * hq * d * 4
-                        + a3_partials
-                        + table_bytes
-                        + hq * d * 4;
-                    let active_blocks = active.div_ceil(seq_dims.blk) as u64;
-                    min_bytes_c3 += active_blocks * blk * l * 2;
-                    min_bytes_a3 += active_blocks * blk * hkv * d * 2 * 2;
+                    let (c, a, mc, ma) = e4_bytes(seq.plan, seq.active);
+                    c3_b += c;
+                    a3_b += a;
+                    min_c3 += mc;
+                    min_a3 += ma;
                 }
             }
             let mib = |x: u64| x as f64 / (1u64 << 20) as f64;
-            let a3_pool_mib = mib((layers * pool_blocks) as u64 * 4 * 16 * 64 * 2 * 2);
-            let c3_pool_mib = mib((layers * pool_blocks) as u64 * 16 * 32 * 2);
+            let pools = (setup.layers * setup.pool_blocks) as u64;
             println!(
-                "E4 B={batch} layers={layers} pools_resident: a3={a3_pool_mib:.1}MiB c3={c3_pool_mib:.1}MiB (+64MiB L2 flush per layer) worst_err c3={worst_c3:.3e} a3pad={worst_a3:.3e}"
+                "E4 B={batch} layers={} pools_resident: a3={:.1}MiB c3={:.1}MiB (+64MiB L2 flush per layer) worst_err c3_accurate={worst_c3:.3e} a3pad={worst_a3:.3e}",
+                setup.layers,
+                mib(pools * 4 * 16 * 64 * 2 * 2),
+                mib(pools * 16 * 32 * 2)
             );
             println!(
                 "E4_BYTES B={batch} per_decode_step(all layers): c3={:.2}MiB a3pad={:.2}MiB ratio_a3_over_c3={:.2} | cache-only minimum: c3={:.2}MiB a3={:.2}MiB ratio={:.2}",
-                mib(c3_bytes),
-                mib(a3_bytes),
-                a3_bytes as f64 / c3_bytes as f64,
-                mib(min_bytes_c3),
-                mib(min_bytes_a3),
-                min_bytes_a3 as f64 / min_bytes_c3 as f64
+                mib(c3_b),
+                mib(a3_b),
+                a3_b as f64 / c3_b as f64,
+                mib(min_c3),
+                mib(min_a3),
+                min_a3 as f64 / min_c3 as f64
             );
         }
         println!("E4_BATCH_LAYERS_OK=1");
+    }
+
+    fn e4_seq_case(case: &Case, seq: &E4Seq) -> Case {
+        Case {
+            name: case.name.clone(),
+            q: seq.q.clone(),
+            q_full: seq.q.clone(),
+            latent_physical: case.latent_physical.clone(),
+            k_projection: case.k_projection.clone(),
+            v_projection: case.v_projection.clone(),
+            kp_head_major: Vec::new(),
+            vp_head_major: Vec::new(),
+            k_physical_head_major: case.k_physical_head_major.clone(),
+            v_physical_head_major: case.v_physical_head_major.clone(),
+            table: seq.table.clone(),
+            oracle_latent_context: None,
+            oracle_full_context: None,
+        }
+    }
+
+    /// 64 MiB of 32-bit words: larger than the 32 MiB (RTX 4060 Laptop) and 48 MB (L4) L2.
+    const L2_FLUSH_WORDS: usize = 16 * 1024 * 1024;
+
+    // ---------------------------------------------------------------- timing (cloud only) ---
+    //
+    // Timing protocol, same as the fixed C1 harness: preallocated buffers, async launches
+    // bracketed by CUDA events on one stream (split + reduce inside one interval), per-sample
+    // NVML clocks, variant order rotated by (iteration + process), JIT and warm-up outside the
+    // intervals, correctness checked before timing, all file output after timing, 91 C abort.
+    // These suites are intended for a stable-clock host (scripts/e0b/run_e0b_portable.sh);
+    // `--iterations 0` exercises setup, correctness and output without taking samples.
+
+    #[derive(Clone, Copy, PartialEq, Debug)]
+    enum Variant {
+        A3Pad,
+        C3Fast,
+        C3Accurate,
+    }
+
+    impl Variant {
+        fn name(self) -> &'static str {
+            match self {
+                Self::A3Pad => "a3pad",
+                Self::C3Fast => "c3_fast",
+                Self::C3Accurate => "c3_accurate",
+            }
+        }
+    }
+
+    /// Preallocated split partials and output for one (variant, plan).
+    struct TBuf {
+        acc: Option<Tensor<f32>>,
+        m: Option<Tensor<f32>>,
+        l: Option<Tensor<f32>>,
+        out: Option<Tensor<f32>>,
+    }
+
+    fn tbuf(dims: Dims, variant: Variant, splits: usize, st: &Arc<Stream>) -> TBuf {
+        let (rows, width) = match variant {
+            Variant::A3Pad => (dims.hkv * 16, dims.d),
+            _ => (dims.hq, dims.l),
+        };
+        TBuf {
+            acc: Some(
+                api::zeros::<f32>(&[splits, rows, width])
+                    .sync_on(st)
+                    .unwrap(),
+            ),
+            m: Some(api::zeros::<f32>(&[splits, rows, 1]).sync_on(st).unwrap()),
+            l: Some(api::zeros::<f32>(&[splits, rows, 1]).sync_on(st).unwrap()),
+            out: Some(api::zeros::<f32>(&[dims.hq, dims.d]).sync_on(st).unwrap()),
+        }
+    }
+
+    /// Enqueues one variant's split + reduce on `st` without synchronizing.
+    fn launch_async(
+        dims: Dims,
+        dev: Views,
+        active: usize,
+        (splits, sps): (usize, usize),
+        variant: Variant,
+        b: &mut TBuf,
+        st: &Arc<Stream>,
+    ) {
+        assert!(sps <= MAX_STEPS_PER_CTA);
+        let (hq, hkv, d, l, g) = (dims.hq, dims.hkv, dims.d, dims.l, dims.g());
+        let (acc, m, lsum, out) = (
+            b.acc.take().unwrap(),
+            b.m.take().unwrap(),
+            b.l.take().unwrap(),
+            b.out.take().unwrap(),
+        );
+        let (acc, m, lsum, out) = match variant {
+            Variant::A3Pad => {
+                const MP: usize = 16;
+                let (acc, m, lsum, _, _, _, _, _, _, _) = unsafe {
+                    e3_kernels::a3_split_pad(
+                        acc.partition([1, MP, d]),
+                        m.partition([1, MP, 1]),
+                        lsum.partition([1, MP, 1]),
+                        dev.q_full,
+                        dev.k_full,
+                        dev.v_full,
+                        dev.table,
+                        active as i32,
+                        sps as i32,
+                        dims.scale(),
+                    )
+                    .generics(gens(&[hq, hkv, g, d, dims.blk, 2 * dims.blk, MP]))
+                    .compile_options(CompileOptions::new().occupancy(4))
+                    .async_on(st)
+                    .expect("a3_split_pad launch")
+                };
+                let (acc, m, lsum) = (acc.unpartition(), m.unpartition(), lsum.unpartition());
+                let (out, _, _, _, _) = unsafe {
+                    e3_kernels::a3_reduce_pad(out.partition([g, d]), &acc, &m, &lsum, splits as i32)
+                        .generics(gens(&[g, d, MP]))
+                        .async_on(st)
+                        .expect("a3_reduce_pad launch")
+                };
+                (acc, m, lsum, out.unpartition())
+            }
+            Variant::C3Fast | Variant::C3Accurate => {
+                let accurate = usize::from(variant == Variant::C3Accurate);
+                let (acc, m, lsum, _, _, _, _, _, _, _) = unsafe {
+                    e3_kernels::c3_split(
+                        acc.partition([1, hq, l]),
+                        m.partition([1, hq, 1]),
+                        lsum.partition([1, hq, 1]),
+                        dev.q,
+                        dev.kp,
+                        dev.latent,
+                        dev.table,
+                        active as i32,
+                        sps as i32,
+                        dims.scale(),
+                    )
+                    .generics(gens(&[
+                        hq,
+                        hkv,
+                        g,
+                        d,
+                        l,
+                        dims.blk,
+                        2 * dims.blk,
+                        dims.dc,
+                        hkv * l,
+                        accurate,
+                    ]))
+                    .async_on(st)
+                    .expect("c3_split launch")
+                };
+                let (acc, m, lsum) = (acc.unpartition(), m.unpartition(), lsum.unpartition());
+                let (out, _, _, _, _, _) = unsafe {
+                    e3_kernels::c3_reduce(
+                        out.partition([g, d]),
+                        &acc,
+                        &m,
+                        &lsum,
+                        dev.vp,
+                        splits as i32,
+                    )
+                    .generics(gens(&[hq, g, d, l]))
+                    .async_on(st)
+                    .expect("c3_reduce launch")
+                };
+                (acc, m, lsum, out.unpartition())
+            }
+        };
+        b.acc = Some(acc);
+        b.m = Some(m);
+        b.l = Some(lsum);
+        b.out = Some(out);
+    }
+
+    fn readback(b: &TBuf, st: &Arc<Stream>) -> Vec<f32> {
+        let t = b.out.as_ref().unwrap();
+        let alias = unsafe { t.into_shared_alias() };
+        (&alias).to_host_vec().sync_on(st).expect("readback")
+    }
+
+    struct TimingArgs {
+        process: usize,
+        iterations: usize,
+        warmup: usize,
+        clock_warm_ms: u64,
+        dir: std::path::PathBuf,
+    }
+
+    fn timing_args(args: &[String]) -> TimingArgs {
+        let arg = |key: &str, default: &str| {
+            args.windows(2)
+                .find(|w| w[0] == key)
+                .map(|w| w[1].clone())
+                .unwrap_or(default.into())
+        };
+        let dir = std::path::PathBuf::from(arg("--output-dir", "/tmp/plkv_e3_timing"));
+        let absolute = std::path::absolute(&dir).unwrap();
+        assert!(
+            !absolute.starts_with("/mnt"),
+            "--output-dir {absolute:?} is on /mnt; use a native filesystem path"
+        );
+        std::fs::create_dir_all(&dir).unwrap();
+        TimingArgs {
+            process: arg("--process", "0").parse().unwrap(),
+            iterations: arg("--iterations", "50").parse().unwrap(),
+            warmup: arg("--warmup", "10").parse().unwrap(),
+            clock_warm_ms: arg("--clock-warm-ms", "2000").parse().unwrap(),
+            dir,
+        }
+    }
+
+    fn write_outputs(
+        dir: &std::path::Path,
+        samples: &[serde_json::Value],
+        meta: &serde_json::Value,
+        correctness: &serde_json::Value,
+    ) {
+        use std::io::Write;
+        let mut f = std::io::BufWriter::new(
+            std::fs::File::options()
+                .write(true)
+                .create_new(true)
+                .open(dir.join("samples.jsonl"))
+                .expect("samples.jsonl must not exist"),
+        );
+        for s in samples {
+            writeln!(f, "{s}").unwrap();
+        }
+        f.flush().unwrap();
+        std::fs::write(
+            dir.join("timing_meta.json"),
+            serde_json::to_string_pretty(meta).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("correctness.json"),
+            serde_json::to_string_pretty(correctness).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// E3 timing: padded A3 vs C3 fast vs C3 accurate at one N (model_small shape, bounded
+    /// plan), one process. Each sample = split + reduce of one variant.
+    fn e3_timing_suite(args: &[String], st: &Arc<Stream>) {
+        let ta = timing_args(args);
+        let n: usize = args
+            .windows(2)
+            .find(|w| w[0] == "--seq")
+            .map(|w| w[1].parse().unwrap())
+            .unwrap_or(1024);
+        let dims = Dims {
+            hq: 16,
+            hkv: 4,
+            d: 64,
+            l: 32,
+            blk: 16,
+            seq: n,
+            dc: 16,
+        };
+        let nb = dims.nb();
+        let table: Vec<usize> = (0..nb).map(|lb| (lb * 17 + 11) % nb).collect();
+        let case = model_case(dims, table, "timing");
+        let dev = to_device(dims, &case, st);
+        validate_launch(dims, &dev, &case.table, n);
+        let plan = plan_bounded(n, dims.blk, nb, 1).expect("plan");
+        let pl = (plan.splits, plan.steps_per_split);
+        let variants = [Variant::A3Pad, Variant::C3Fast, Variant::C3Accurate];
+        let mut bufs: Vec<TBuf> = variants
+            .iter()
+            .map(|&v| tbuf(dims, v, plan.splits, st))
+            .collect();
+        // Correctness before timing, through the same async launch path.
+        let (latent_ref, full_ref) = cpu_refs(dims, &case, n);
+        let mut correctness = serde_json::Map::new();
+        for (v, b) in variants.iter().zip(bufs.iter_mut()) {
+            launch_async(dims, dev.views(), n, pl, *v, b, st);
+            let out = readback(b, st);
+            let reference = if *v == Variant::A3Pad {
+                &full_ref.context
+            } else {
+                &latent_ref.context
+            };
+            let err = max_abs(&out, reference);
+            assert!(err <= ATOL, "{} pre-timing correctness {err}", v.name());
+            correctness.insert(
+                v.name().into(),
+                serde_json::json!({"max_abs_error": err, "atol": ATOL}),
+            );
+        }
+        // JIT + fixed warm-up, then clock warm-up, all outside the timed intervals.
+        for _ in 0..ta.warmup {
+            for (v, b) in variants.iter().zip(bufs.iter_mut()) {
+                launch_async(dims, dev.views(), n, pl, *v, b, st);
+            }
+        }
+        let nvml = Nvml::open();
+        let (reference_clock, warm_clocks) =
+            clock_warmup(nvml.as_ref(), st, ta.clock_warm_ms, || {
+                for (v, b) in variants.iter().zip(bufs.iter_mut()) {
+                    launch_async(dims, dev.views(), n, pl, *v, b, st);
+                }
+            });
+        let ev = Events::new();
+        let mut samples = Vec::new();
+        let mut aborted = None;
+        let t0 = std::time::Instant::now();
+        'timing: for it in 0..ta.iterations {
+            let empty_pre = nvml.as_ref().and_then(Nvml::sm_clock);
+            let empty_ms = ev.measure(st, || {});
+            let mut row = clock_fields(nvml.as_ref(), empty_pre);
+            row.as_object_mut().unwrap().extend(
+                serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":0,"variant":"NONE","component":"empty","latency_ms":empty_ms})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            );
+            samples.push(row);
+            for off in 0..variants.len() {
+                let idx = (it + ta.process + off) % variants.len();
+                let pre = nvml.as_ref().and_then(Nvml::sm_clock);
+                let ms = ev.measure(st, || {
+                    launch_async(dims, dev.views(), n, pl, variants[idx], &mut bufs[idx], st)
+                });
+                let mut row = clock_fields(nvml.as_ref(), pre);
+                let temp = row["temperature_c"].as_u64();
+                row.as_object_mut().unwrap().extend(
+                    serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[idx].name(),"component":"pipeline","latency_ms":ms,"t_ms":t0.elapsed().as_secs_f64()*1e3,"splits":plan.splits,"steps_per_split":plan.steps_per_split})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                );
+                samples.push(row);
+                if temp.is_some_and(|t| t >= u64::from(ABORT_TEMPERATURE_C)) {
+                    aborted = temp;
+                    break 'timing;
+                }
+            }
+        }
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)"});
+        write_outputs(
+            &ta.dir,
+            &samples,
+            &meta,
+            &serde_json::Value::Object(correctness),
+        );
+        if aborted.is_some() {
+            eprintln!(
+                "THERMAL_ABORT temperature >= {ABORT_TEMPERATURE_C} C; partial samples saved"
+            );
+            std::process::exit(3);
+        }
+        println!("E3_TIMING_OK=1 samples={}", samples.len());
+    }
+
+    /// E4 timing: one decode step = every layer x every batch element for one variant. Each
+    /// layer's B launch pairs form one timed interval; a 64 MiB L2-flush memset runs before each
+    /// layer outside the interval. The per-step total is the sum of that iteration's layer
+    /// intervals (a per-iteration sum, never a sum of medians).
+    fn e4_timing_suite(args: &[String], st: &Arc<Stream>) {
+        let ta = timing_args(args);
+        let batch: usize = args
+            .windows(2)
+            .find(|w| w[0] == "--batch")
+            .map(|w| w[1].parse().unwrap())
+            .unwrap_or(1);
+        let setup = e4_setup(batch, st);
+        let dims = setup.seq_dims;
+        let variants = [Variant::A3Pad, Variant::C3Accurate];
+        let flush = api::zeros::<f32>(&[L2_FLUSH_WORDS]).sync_on(st).unwrap();
+        // Per (variant, sequence) buffers, reused across layers.
+        let mut bufs: Vec<Vec<TBuf>> = variants
+            .iter()
+            .map(|&v| {
+                setup
+                    .seqs
+                    .iter()
+                    .map(|s| tbuf(dims, v, s.plan.splits, st))
+                    .collect()
+            })
+            .collect();
+        // Correctness before timing: layer 0, every batch element, both variants.
+        let (case0, dev0) = &setup.pools[0];
+        let mut worst = [0.0f64; 2];
+        for (vi, v) in variants.iter().enumerate() {
+            for (si, seq) in setup.seqs.iter().enumerate() {
+                let pl = (seq.plan.splits, seq.plan.steps_per_split);
+                launch_async(
+                    dims,
+                    e4_views(dev0, seq),
+                    seq.active,
+                    pl,
+                    *v,
+                    &mut bufs[vi][si],
+                    st,
+                );
+                let out = readback(&bufs[vi][si], st);
+                let seq_case = e4_seq_case(case0, seq);
+                let (latent_ref, full_ref) =
+                    cpu_refs_pool(dims, &seq_case, seq.active, setup.pool_blocks);
+                let reference = if *v == Variant::A3Pad {
+                    &full_ref.context
+                } else {
+                    &latent_ref.context
+                };
+                let err = max_abs(&out, reference);
+                assert!(
+                    err <= ATOL,
+                    "E4 {} b={si} pre-timing correctness {err}",
+                    v.name()
+                );
+                worst[vi] = worst[vi].max(err);
+            }
+        }
+        let run_layer = |vi: usize, dev: &Device, bufs: &mut Vec<Vec<TBuf>>| {
+            for (si, seq) in setup.seqs.iter().enumerate() {
+                let pl = (seq.plan.splits, seq.plan.steps_per_split);
+                launch_async(
+                    dims,
+                    e4_views(dev, seq),
+                    seq.active,
+                    pl,
+                    variants[vi],
+                    &mut bufs[vi][si],
+                    st,
+                );
+            }
+        };
+        for _ in 0..ta.warmup {
+            for vi in 0..variants.len() {
+                for (_, dev) in &setup.pools {
+                    run_layer(vi, dev, &mut bufs);
+                }
+            }
+        }
+        let nvml = Nvml::open();
+        let (reference_clock, warm_clocks) =
+            clock_warmup(nvml.as_ref(), st, ta.clock_warm_ms, || {
+                for vi in 0..variants.len() {
+                    run_layer(vi, &setup.pools[0].1, &mut bufs);
+                }
+            });
+        let ev = Events::new();
+        let mut samples = Vec::new();
+        let mut aborted = None;
+        'timing: for it in 0..ta.iterations {
+            for off in 0..variants.len() {
+                let vi = (it + ta.process + off) % variants.len();
+                let mut step_ms = 0.0;
+                for (layer, (_, dev)) in setup.pools.iter().enumerate() {
+                    memset_d32(flush.device_pointer().cu_deviceptr(), L2_FLUSH_WORDS, st);
+                    let pre = nvml.as_ref().and_then(Nvml::sm_clock);
+                    let ms = ev.measure(st, || run_layer(vi, dev, &mut bufs));
+                    step_ms += ms;
+                    let mut row = clock_fields(nvml.as_ref(), pre);
+                    let temp = row["temperature_c"].as_u64();
+                    row.as_object_mut().unwrap().extend(
+                        serde_json::json!({"suite":"e4_timing","batch":batch,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"layer","layer":layer,"latency_ms":ms})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                    );
+                    samples.push(row);
+                    if temp.is_some_and(|t| t >= u64::from(ABORT_TEMPERATURE_C)) {
+                        aborted = temp;
+                        break 'timing;
+                    }
+                }
+                samples.push(serde_json::json!({"suite":"e4_timing","batch":batch,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"step_total","latency_ms":step_ms,"layers":setup.layers}));
+            }
+        }
+        let (mut c3_b, mut a3_b) = (0u64, 0u64);
+        for seq in &setup.seqs {
+            let (c, a, _, _) = e4_bytes(seq.plan, seq.active);
+            c3_b += c * setup.layers as u64;
+            a3_b += a * setup.layers as u64;
+        }
+        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":c3_b,"a3pad":a3_b},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted});
+        let correctness = serde_json::json!({"layer0_all_batch_elements":{"a3pad_max_abs_error":worst[0],"c3_accurate_max_abs_error":worst[1],"atol":ATOL}});
+        write_outputs(&ta.dir, &samples, &meta, &correctness);
+        if aborted.is_some() {
+            eprintln!(
+                "THERMAL_ABORT temperature >= {ABORT_TEMPERATURE_C} C; partial samples saved"
+            );
+            std::process::exit(3);
+        }
+        println!("E4_TIMING_OK=1 samples={}", samples.len());
     }
 
     /// CPU references for one sequence reading a shared pool of `pool_blocks` physical blocks.
@@ -1336,6 +1861,13 @@ mod gpu_impl {
         }
         if suite == "e4" || suite == "all" {
             e4_suite(&st);
+        }
+        // Timing suites: not part of "all"; intended for a stable-clock host.
+        if suite == "timing" {
+            e3_timing_suite(&args, &st);
+        }
+        if suite == "e4-timing" {
+            e4_timing_suite(&args, &st);
         }
         println!("E3_TEMPERATURE_END_C={:?}", gpu_temperature());
     }
