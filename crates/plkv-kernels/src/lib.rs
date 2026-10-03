@@ -2,6 +2,7 @@
 
 pub mod alignment;
 pub mod block_table;
+pub mod splitk_plan;
 
 #[cfg(feature = "gpu-cutile")]
 pub mod cutile;
