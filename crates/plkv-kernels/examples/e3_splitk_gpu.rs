@@ -14,7 +14,8 @@ mod timing_common;
 #[cfg(feature = "gpu-cutile")]
 mod gpu_impl {
     use super::timing_common::{
-        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields, clock_warmup, memset_d32,
+        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields, clock_fields_fast, clock_warmup,
+        memset_d32, rewarm,
     };
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
@@ -1460,6 +1461,7 @@ mod gpu_impl {
         iterations: usize,
         warmup: usize,
         clock_warm_ms: u64,
+        rewarm_max_ms: u64,
         dir: std::path::PathBuf,
     }
 
@@ -1482,6 +1484,7 @@ mod gpu_impl {
             iterations: arg("--iterations", "50").parse().unwrap(),
             warmup: arg("--warmup", "10").parse().unwrap(),
             clock_warm_ms: arg("--clock-warm-ms", "2000").parse().unwrap(),
+            rewarm_max_ms: arg("--rewarm-max-ms", "500").parse().unwrap(),
             dir,
         }
     }
@@ -1736,7 +1739,9 @@ mod gpu_impl {
                     let pre = nvml.as_ref().and_then(Nvml::sm_clock);
                     let ms = ev.measure(st, || run_layer(vi, dev, &mut bufs));
                     step_ms += ms;
-                    let mut row = clock_fields(nvml.as_ref(), pre);
+                    // No reasons query per layer: it costs ~20 ms under WSL2 (see
+                    // clock_fields_fast); the reasons are read once per step below.
+                    let mut row = clock_fields_fast(nvml.as_ref(), pre);
                     let temp = row["temperature_c"].as_u64();
                     row.as_object_mut().unwrap().extend(
                         serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"layer","layer":layer,"latency_ms":ms,"bytes_analytical":layer_bytes(variants[vi]),"achieved_gbps":achieved_gbps(layer_bytes(variants[vi]), ms)})
@@ -1751,13 +1756,22 @@ mod gpu_impl {
                     }
                 }
                 let step_bytes = layer_bytes(variants[vi]) * setup.layers as u64;
-                samples.push(serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"step_total","latency_ms":step_ms,"layers":setup.layers,"bytes_analytical":step_bytes,"achieved_gbps":achieved_gbps(step_bytes, step_ms)}));
+                // After the step's timed layers: the reasons bits once, then an untimed re-warm
+                // so the next step does not start from clocks lowered during this host pause.
+                let reasons = nvml.as_ref().and_then(Nvml::reasons);
+                let (rewarm_ms, rewarm_bursts, rewarm_restored) =
+                    rewarm(nvml.as_ref(), st, reference_clock, ta.rewarm_max_ms, || {
+                        for vj in 0..variants.len() {
+                            run_layer(vj, &setup.pools[0].1, &mut bufs);
+                        }
+                    });
+                samples.push(serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"step_total","latency_ms":step_ms,"layers":setup.layers,"bytes_analytical":step_bytes,"achieved_gbps":achieved_gbps(step_bytes, step_ms),"clock_event_reasons":reasons,"rewarm_ms":rewarm_ms,"rewarm_bursts":rewarm_bursts,"rewarm_restored":rewarm_restored}));
             }
         }
         let lb = setup.layer_bytes;
         let layers = setup.layers as u64;
         let fp = &layout.footprint;
-        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"active_lengths":setup.seqs.iter().map(|s| s.active).collect::<Vec<_>>(),"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":lb.c3*layers,"a3pad":lb.a3pad*layers},"bytes_per_layer_analytical":{"c3_accurate":lb.c3,"a3pad":lb.a3pad},"cache_only_minimum_bytes_per_layer":{"c3_accurate":lb.min_c3,"a3pad":lb.min_a3},"footprint_bytes":{"full_kv":fp.full_kv_bytes,"latent":fp.latent_bytes,"device_total":fp.device_bytes,"host_estimate":fp.host_bytes},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted});
+        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"active_lengths":setup.seqs.iter().map(|s| s.active).collect::<Vec<_>>(),"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":lb.c3*layers,"a3pad":lb.a3pad*layers},"bytes_per_layer_analytical":{"c3_accurate":lb.c3,"a3pad":lb.a3pad},"cache_only_minimum_bytes_per_layer":{"c3_accurate":lb.min_c3,"a3pad":lb.min_a3},"footprint_bytes":{"full_kv":fp.full_kv_bytes,"latent":fp.latent_bytes,"device_total":fp.device_bytes,"host_estimate":fp.host_bytes},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"reasons_sampling":"once per step after timing","rewarm_max_ms":ta.rewarm_max_ms});
         let correctness = serde_json::json!({"layer0_all_batch_elements":{"a3pad_max_abs_error":worst[0],"c3_accurate_max_abs_error":worst[1],"atol":ATOL}});
         write_outputs(&ta.dir, &samples, &meta, &correctness);
         if aborted.is_some() {

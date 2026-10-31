@@ -135,6 +135,51 @@ pub fn clock_fields(nvml: Option<&Nvml>, pre: Option<u32>) -> serde_json::Value 
     })
 }
 
+/// Like [`clock_fields`] but without the clock-event-reasons query, which takes ~20 ms under
+/// WSL2 (measured on the RTX 4060 laptop, driver 617.42) and lets the GPU drop to idle clocks
+/// between short timed samples. Callers read the reasons once per step with [`Nvml::reasons`]
+/// after the timed region; `clock_event_reasons` is null on rows built here.
+pub fn clock_fields_fast(nvml: Option<&Nvml>, pre: Option<u32>) -> serde_json::Value {
+    serde_json::json!({
+        "sm_clock_pre_mhz": pre,
+        "sm_clock_post_mhz": nvml.and_then(Nvml::sm_clock),
+        "mem_clock_post_mhz": nvml.and_then(Nvml::mem_clock),
+        "temperature_c": nvml.and_then(Nvml::temperature),
+        "clock_event_reasons": serde_json::Value::Null,
+    })
+}
+
+/// Untimed re-warm after a host-side pause: repeats synchronized `burst`s until the SM clock is
+/// within 95 % of `reference_mhz` or `max_ms` has elapsed. Returns (elapsed ms, bursts,
+/// restored). With no NVML or no reference it does nothing and reports `restored = false`.
+pub fn rewarm<F: FnMut()>(
+    nvml: Option<&Nvml>,
+    st: &Arc<Stream>,
+    reference_mhz: Option<u32>,
+    max_ms: u64,
+    mut burst: F,
+) -> (f64, usize, bool) {
+    let start = std::time::Instant::now();
+    let (Some(nvml), Some(reference)) = (nvml, reference_mhz) else {
+        return (0.0, 0, false);
+    };
+    let threshold = f64::from(reference) * 0.95;
+    let mut bursts = 0;
+    loop {
+        if nvml.sm_clock().is_some_and(|c| f64::from(c) >= threshold) {
+            return (start.elapsed().as_secs_f64() * 1e3, bursts, true);
+        }
+        if start.elapsed().as_millis() >= u128::from(max_ms) {
+            return (start.elapsed().as_secs_f64() * 1e3, bursts, false);
+        }
+        burst();
+        unsafe {
+            st.synchronize().unwrap();
+        }
+        bursts += 1;
+    }
+}
+
 /// Back-to-back untimed work for `warm_ms`, then the reference clock = mode of the second half
 /// of the NVML reads taken after each synchronized burst.
 pub fn clock_warmup<F: FnMut()>(
