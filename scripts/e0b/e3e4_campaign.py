@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """E3/E4 campaign on a stable-clock host: E3 timing (padded A3 vs C3 fast vs C3 accurate at
-N = 1K/8K/32K), the E4 correctness suite once, and E4 timing (B = 1/8/32).
+N = 1K/8K/32K), the E4 correctness suite once per E4 context length, and E4 timing over the
+grid B x N (default B = 1/8/32, N = 1024; labels B{b}_N{n}).
 
 Each timing configuration collects >= --min-cool cool-start processes (same cooldown, 100 ms
 external telemetry and 91 C abort as e0b_campaign.py); hot-start processes are run, tagged and
@@ -21,6 +22,58 @@ BIN = Path(
     os.environ.get("E3_SPLITK_BIN")
     or Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "release/examples/e3_splitk_gpu"
 )
+
+
+BLOCK_SIZE = 16
+
+
+def int_list(text, name, multiple_of=1):
+    """Parses a comma-separated list of positive integers (order kept, duplicates rejected)."""
+    try:
+        values = [int(x) for x in text.split(",") if x.strip()]
+    except ValueError as exc:
+        raise SystemExit(f"{name}: not a comma-separated integer list: {text!r}") from exc
+    if not values:
+        raise SystemExit(f"{name}: empty list")
+    if any(v <= 0 or v % multiple_of for v in values):
+        raise SystemExit(f"{name}: values must be positive multiples of {multiple_of}: {values}")
+    if len(set(values)) != len(values):
+        raise SystemExit(f"{name}: duplicate values: {values}")
+    return values
+
+
+def plan(args):
+    """Returns (e4 correctness runs, timing configs) without running anything.
+
+    Correctness: one `--suite e4 --seq N --batches <e4-batches>` process per N, all before any
+    timing. Timing configs: (kind, config label, harness args).
+    """
+    lengths = int_list(args.e3_lengths, "--e3-lengths", BLOCK_SIZE) if args.e3_lengths else []
+    batches = int_list(args.e4_batches, "--e4-batches") if args.e4_batches else []
+    seqs = int_list(args.e4_seqs, "--e4-seqs", BLOCK_SIZE) if batches else []
+    limit = ["--max-footprint-gib", str(args.max_footprint_gib)]
+    correctness = []
+    if batches and not args.skip_e4_correctness:
+        correctness = [
+            (
+                f"e4_correctness_N{n}",
+                f"N{n}",
+                ["--suite", "e4", "--seq", str(n), "--batches", ",".join(map(str, batches)),
+                 *limit],
+            )
+            for n in seqs
+        ]
+    configs = [("e3_timing", f"N{n}", ["--suite", "timing", "--seq", str(n)]) for n in lengths]
+    configs += [
+        (
+            "e4_timing",
+            f"B{b}_N{n}",
+            ["--suite", "e4-timing", "--batch", str(b), "--seq", str(n), *limit],
+        )
+        for n in seqs
+        for b in batches
+    ]
+    return correctness, configs
 
 
 def run_logged(args, root, label, cmd):
@@ -72,6 +125,8 @@ def main():
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--e3-lengths", default="1024,8192,32768")
     parser.add_argument("--e4-batches", default="1,8,32")
+    parser.add_argument("--e4-seqs", default="1024", help="E4 context lengths N (default 1024)")
+    parser.add_argument("--max-footprint-gib", type=float, default=20.0)
     parser.add_argument("--iterations", type=int, default=50)
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--min-cool", type=int, default=5)
@@ -80,7 +135,14 @@ def main():
     parser.add_argument("--cooldown-s", type=int, default=300)
     parser.add_argument("--abort-c", type=int, default=91)
     parser.add_argument("--skip-e4-correctness", action="store_true")
+    parser.add_argument(
+        "--print-plan", action="store_true", help="print the commands and exit (no GPU)"
+    )
     args = parser.parse_args()
+    correctness, configs = plan(args)
+    if args.print_plan:
+        print(json.dumps({"e4_correctness": correctness, "timing": configs}, indent=1))
+        return
 
     root = Path(args.out_dir).resolve()
     if str(root).startswith("/mnt/"):
@@ -100,23 +162,16 @@ def main():
         (root / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     common = ["--iterations", str(args.iterations), "--warmup", str(args.warmup)]
-    configs = [
-        ("e3_timing", f"N{n}", ["--suite", "timing", "--seq", n])
-        for n in filter(None, args.e3_lengths.split(","))
-    ] + [
-        ("e4_timing", f"B{b}", ["--suite", "e4-timing", "--batch", b])
-        for b in filter(None, args.e4_batches.split(","))
-    ]
 
-    if not args.skip_e4_correctness:
-        label = "e4_correctness"
-        run = run_logged(args, root, label, [str(BIN), "--suite", "e4"])
-        run.update({"kind": "e4_correctness", "config": "all"})
+    # Every E4 context length passes correctness before any timing process starts.
+    for label, config, suite_args in correctness:
+        run = run_logged(args, root, label, [str(BIN), *suite_args])
+        run.update({"kind": "e4_correctness", "config": config})
         manifest["runs"].append(run)
         save()
         print(json.dumps({k: v for k, v in run.items() if k != "cmd"}), flush=True)
         if run["returncode"] != 0:
-            raise SystemExit("E4 correctness suite failed; not timing")
+            raise SystemExit(f"E4 correctness suite failed ({label}); not timing")
 
     for kind, config, suite_args in configs:
         cool, attempts, process = 0, 0, 0

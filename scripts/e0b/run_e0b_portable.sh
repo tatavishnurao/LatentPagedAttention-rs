@@ -17,6 +17,8 @@ usage: scripts/e0b/run_e0b_portable.sh --out-dir DIR [options]
   --lock-sm-mhz MHZ    optional: lock SM clocks (needs root; reset on exit)
   --e3-lengths LIST    E3 timing lengths (default 1024,8192,32768)
   --e4-batches LIST    E4 timing batch sizes (default 1,8,32)
+  --e4-seqs LIST       E4 context lengths N (default 1024); configs are B{b}_N{n}
+  --max-footprint-gib G  refuse E4 configs whose device footprint exceeds G (default 20)
   --e3e4-iterations N  timed iterations per E3/E4 process (default 50)
   --skip-e3e4          run only the E0b (A1 vs C1) stages
   --skip-build         reuse an existing release build
@@ -29,6 +31,7 @@ EOF
 OUT_DIR="" LENGTHS="1024,8192,32768" MIN_COOL=5 MAX_ATTEMPTS=8 COOL_C=80 COOLDOWN_S=300
 ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0
 E3_LENGTHS="1024,8192,32768" E4_BATCHES="1,8,32" E3E4_ITERS=50 SKIP_E3E4=0
+E4_SEQS="1024" MAX_FOOTPRINT_GIB=20
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;
@@ -41,6 +44,8 @@ while [[ $# -gt 0 ]]; do
     --lock-sm-mhz) LOCK_SM="$2"; shift 2 ;;
     --e3-lengths) E3_LENGTHS="$2"; shift 2 ;;
     --e4-batches) E4_BATCHES="$2"; shift 2 ;;
+    --e4-seqs) E4_SEQS="$2"; shift 2 ;;
+    --max-footprint-gib) MAX_FOOTPRINT_GIB="$2"; shift 2 ;;
     --e3e4-iterations) E3E4_ITERS="$2"; shift 2 ;;
     --skip-e3e4) SKIP_E3E4=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
@@ -52,7 +57,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$OUT_DIR" ]] || { usage >&2; exit 2; }
 if [[ "$DRY_RUN" == 1 ]]; then
-  LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1 E3_LENGTHS=1024 E4_BATCHES=1 E3E4_ITERS=5
+  LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1 E3_LENGTHS=1024 E4_BATCHES=1 E4_SEQS=1024 E3E4_ITERS=5
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -170,7 +175,8 @@ if [[ "$SKIP_E3E4" == 0 ]]; then
     grep -q '^E3_SCALE_OK=1$' "$OUT_DIR/e3_scale.log"
   fi
   python3 "$ROOT/scripts/e0b/e3e4_campaign.py" --out-dir "$OUT_DIR/e3e4" \
-    --e3-lengths "$E3_LENGTHS" --e4-batches "$E4_BATCHES" --iterations "$E3E4_ITERS" \
+    --e3-lengths "$E3_LENGTHS" --e4-batches "$E4_BATCHES" --e4-seqs "$E4_SEQS" \
+    --max-footprint-gib "$MAX_FOOTPRINT_GIB" --iterations "$E3E4_ITERS" \
     --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
     --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" \
     $([[ "$DRY_RUN" == 1 ]] && echo --skip-e4-correctness) | tee "$OUT_DIR/e3e4_campaign.log"
@@ -243,12 +249,29 @@ if e3e4.exists():
         corr = json.dumps(json.loads((d / "correctness.json").read_text()))
         if "max_abs_error" not in corr:
             problems.append(f"{kind}: pre-timing correctness record missing")
+        if kind == "e4_timing":
+            import re
+            bad = [r["config"] for r in kr if not re.fullmatch(r"B\d+_N\d+", r["config"])]
+            if bad:
+                problems.append(f"e4_timing: config labels not B{{b}}_N{{n}}: {bad}")
+            steps = [r for r in rows if r.get("component") == "step_total"]
+            if not steps or any(
+                r.get("seq") is None or not r.get("bytes_analytical") or r.get("achieved_gbps") is None
+                for r in steps
+            ):
+                problems.append("e4_timing: step rows missing seq/bytes_analytical/achieved_gbps")
+            meta = json.loads((d / "timing_meta.json").read_text())
+            if "footprint_bytes" not in meta or "bytes_per_layer_analytical" not in meta:
+                problems.append("e4_timing: timing_meta missing footprint or per-layer bytes")
         print(f"dry-run {kind}: {kr[0]['label']} rows={len(rows)} variants={sorted(got)}")
     va = json.loads((e3e4 / "variants_analysis.json").read_text())
     if not any(k.startswith("e3_timing/") for k in va["results"]) or not any(
         k.startswith("e4_timing/") for k in va["results"]
     ):
         problems.append("variants analysis missing E3 or E4 results")
+    for key, res in va["results"].items():
+        if key.startswith("e4_timing/") and (res.get("batch") is None or res.get("seq") is None):
+            problems.append(f"variants analysis {key}: batch/seq not parsed")
 if problems:
     print("DRY_RUN_FAIL: " + "; ".join(problems))
     sys.exit(1)
