@@ -1613,7 +1613,10 @@ mod gpu_impl {
                 }
             }
         }
-        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)"});
+        // Same analytical accounting as E4 (one sequence, model_small shape). C3 fast is not
+        // given a byte count: its query-projection traffic is not separately accounted.
+        let eb = e4_config::e4_bytes(plan, n);
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)"});
         write_outputs(
             &ta.dir,
             &samples,
