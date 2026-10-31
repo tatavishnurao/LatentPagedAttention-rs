@@ -9,6 +9,9 @@ paired iterations, baseline = padded A3 ("a3pad"). E3 uses component "pipeline";
 Policy (2026-10-02, same as analyze_e0b.py):
 - THROTTLED: any in-process SM clock read > 5 % below the process's modal clock, or any
   thermal/HW slowdown reason bit (0x8, 0x20, 0x40, 0x80) in NVML or external telemetry.
+  Added 2026-10-31 (before local data): also THROTTLED if the modal SM clock is > 5 % below the
+  process's own warm-up reference clock. Each run also reports in_band_fraction, the share of
+  SM clock reads >= 95 % of that reference (an instrument check, not a gate).
 - Only cool-start, non-THROTTLED, successful processes are "clean". THROTTLED and hot-start
   processes are reported separately and never enter ratios or CIs.
 - Primary estimate: geometric mean of per-process ratios over clean processes; 95 % CI by
@@ -88,8 +91,32 @@ def mode(values):
     return collections.Counter(values).most_common(1)[0][0]
 
 
-def tag(rows, external_reasons=0):
-    """Returns (throttled, details) for one process from its sample rows."""
+def clock_stats(rows, reference):
+    """{modal, reference, in_band_fraction, temp_max} for one process (reported, not a gate)."""
+    clocks = [
+        c
+        for r in rows
+        for c in (r.get("sm_clock_pre_mhz"), r.get("sm_clock_post_mhz"))
+        if c is not None
+    ]
+    temps = [r["temperature_c"] for r in rows if r.get("temperature_c") is not None]
+    return {
+        "sm_clock_modal_mhz": mode(clocks) if clocks else None,
+        "reference_clock_mhz": reference,
+        "in_band_fraction": (
+            round(sum(1 for c in clocks if c >= 0.95 * reference) / len(clocks), 4)
+            if clocks and reference
+            else None
+        ),
+        "sm_clock_reads": len(clocks),
+        "temp_max_inproc_c": max(temps) if temps else None,
+    }
+
+
+def tag(rows, external_reasons=0, reference=None):
+    """Returns (throttled, details) for one process from its sample rows. `reference` is the
+    process's warm-up reference SM clock (timing_meta.json); the modal clock more than 5 %
+    below it is THROTTLED (runbook section 4, 2026-10-31)."""
     clocks = [
         c
         for r in rows
@@ -101,17 +128,23 @@ def tag(rows, external_reasons=0):
         reasons |= r.get("clock_event_reasons") or 0
     details = []
     low = 0
+    below_reference = False
     if clocks:
         m = mode(clocks)
         low = sum(1 for c in clocks if c < 0.95 * m)
         if low:
             details.append(f"clock: {low}/{len(clocks)} reads <95% of mode {m}")
+        if reference and m < 0.95 * reference:
+            below_reference = True
+            details.append(f"modal clock {m} <95% of warm-up reference {reference}")
+        elif not reference:
+            details.append("no reference clock; reference rule not applied")
     else:
         details.append("no clock telemetry")
     thermal = bool(reasons & THERMAL_BITS)
     if thermal:
         details.append(f"thermal bits {hex(reasons)}")
-    return (bool(low) or thermal or not clocks), details
+    return (bool(low) or below_reference or thermal or not clocks), details
 
 
 def external_reasons(path):
@@ -186,13 +219,19 @@ def analyze(root):
             report["runs"].append(entry)
             continue
         rows = [json.loads(line) for line in samples.open()]
-        throttled, details = tag(rows, external_reasons(root / f"{run['label']}_telemetry.csv"))
-        entry.update({"throttled": throttled, "tags": details})
+        meta_path = root / run["label"] / "timing_meta.json"
+        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        reference = meta.get("reference_clock_mhz")
+        throttled, details = tag(
+            rows, external_reasons(root / f"{run['label']}_telemetry.csv"), reference
+        )
+        entry.update({"throttled": throttled, "tags": details, **clock_stats(rows, reference)})
+        for key in ("start_temp_c", "cooldown_wait_s"):
+            if key in run:
+                entry[key] = run[key]
         clean = run["start_condition"] == "cool-start" and not throttled
         entry["clean"] = clean
         report["runs"].append(entry)
-        meta_path = root / run["label"] / "timing_meta.json"
-        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
         groups[(kind, run["config"])].append((clean, rows, run["label"], meta))
     for (kind, config), procs in sorted(groups.items()):
         component = COMPONENT[kind]

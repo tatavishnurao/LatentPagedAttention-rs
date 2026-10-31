@@ -97,8 +97,11 @@ def test_tag_flags_missing_clocks(tmp_path):
 
 
 def write_meta(root, label, kind, batch, seq, c3_step, a3_step, layers=4):
-    meta = {"suite": kind, "seq": seq, "bytes_per_step_analytical": {
-        "c3_accurate": c3_step, "a3pad": a3_step}}
+    meta = {
+        "suite": kind,
+        "seq": seq,
+        "bytes_per_step_analytical": {"c3_accurate": c3_step, "a3pad": a3_step},
+    }
     if kind == "e4_timing":
         meta.update(
             {
@@ -165,3 +168,28 @@ def test_missing_meta_still_analyzes(tmp_path):
     r = mod.analyze(root)["results"]["e4_timing/B1_N1024"]
     assert "bytes_per_step_analytical" not in r
     assert r["c3_accurate"]["achieved_gbps_clean_median"] == {"a3pad": None, "c3_accurate": None}
+
+
+def test_idle_clock_process_is_throttled_against_reference(tmp_path):
+    """A process whose every read sits at an idle clock passes the modal rule (the mode is the
+    idle clock) but fails the warm-up reference rule (runbook section 4, 2026-10-31)."""
+    mod = load()
+    root = campaign(tmp_path, [("e4_timing", "B1_N1024", 0.9, "cool-start", {"clock": 210})])
+    label = "e4_timing_B1_N1024_p0"
+    (root / label / "timing_meta.json").write_text(json.dumps({"reference_clock_mhz": 1890}))
+    run = mod.analyze(root)["runs"][0]
+    assert run["throttled"] is True and run["clean"] is False
+    assert run["in_band_fraction"] == 0.0
+    assert any("warm-up reference 1890" in t for t in run["tags"])
+
+
+def test_reference_clock_run_reports_in_band_fraction(tmp_path):
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N1024", 0.9, "cool-start", {"clock": 1890})])
+    (root / "e3_timing_N1024_p0" / "timing_meta.json").write_text(
+        json.dumps({"reference_clock_mhz": 1890})
+    )
+    run = mod.analyze(root)["runs"][0]
+    assert run["clean"] is True
+    assert run["in_band_fraction"] == 1.0
+    assert run["sm_clock_modal_mhz"] == 1890
