@@ -97,9 +97,13 @@ Consequences:
    - Each sample is one variant's split + reduce between CUDA events.
    - Variant order rotates by (iteration + process).
    - Plans come from `splitk_plan::plan_bounded`: at most 128 steps per CTA, giving 1 / 2 / 8 splits.
-3. **E4 correctness:** `--suite e4`, one process. B ∈ {1, 8, 32}, every batch element validated against per-sequence references over a shared block pool.
-4. **E4 timing:** `--suite e4-timing` at `--e4-batches` (default 1, 8, 32), with ≥ 5 cool-start processes each.
-   - L = max(4, ceil(64 / B)) resident per-layer pools.
+3. **E4 correctness:** `--suite e4 --seq N --batches <e4-batches>`, one process per N in `--e4-seqs` (default 1024), all before any timing. Every batch element is validated against per-sequence references over a shared block pool. If one fails, the campaign stops.
+4. **E4 timing:** `--suite e4-timing --batch B --seq N` over the grid `--e4-batches` (default 1, 8, 32) × `--e4-seqs` (default 1024), with ≥ 5 cool-start processes each. Configs are labelled `B{b}_N{n}`; older campaigns used `B{b}`, which the analyzer reads as N = 1024.
+   - L = max(4, ceil(65536 / (B·N))) resident per-layer pools. At N = 1024 this is the original max(4, ceil(64 / B)); for any N it keeps the full-KV pools at ≥ 64 MiB.
+   - Active lengths: sequence 0 runs N tokens; sequence b runs 1 + ((b·373) mod 1024)·N / 1024. At N = 1024 this equals the original 1 + (b·373) mod 1024.
+   - Footprint check before allocation: full KV + latent pools + the 64 MiB flush must fit `--max-footprint-gib` (default 20), and the host f32 copies must fit `--max-host-footprint-gib` (default 24). A refused configuration prints `E4_CONFIG_REFUSED` and exits 2 before opening a GPU stream.
+   - Check the grid without a GPU first: `cargo run --release -p plkv-kernels --example e4_plan -- --seq 32768 --batches 1,8,32`, and `python3 scripts/e0b/e3e4_campaign.py --out-dir /tmp/unused --print-plan --e4-seqs 1024,8192,32768`.
+   - Step rows carry `bytes_analytical` and `achieved_gbps`. Bytes are analytical (`e4_config::e4_bytes`), not measured.
    - A 64 MiB L2-flush memset runs before each layer, outside the timed interval.
    - The per-step total is the per-iteration sum of the layer intervals.
 5. **Analysis:** `scripts/e0b/analyze_variants.py` writes `e3e4/variants_analysis.json`.
