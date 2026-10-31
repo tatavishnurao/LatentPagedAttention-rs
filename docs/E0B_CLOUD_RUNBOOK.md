@@ -120,6 +120,9 @@ Consequences:
 ## 4. Analysis rules (fixed before running)
 
 - **THROTTLED**: any in-process SM clock read more than 5 % below the run's modal clock, or any thermal or HW-slowdown reason bit (0x8, 0x20, 0x40, 0x80) in NVML or external telemetry. THROTTLED and hot-start runs are reported separately and never enter ratios or CIs.
+- **THROTTLED (reference clock), added 2026-10-31 before any local Phase 1 data:** a process is also THROTTLED if its modal SM clock is more than 5 % below its own warm-up reference clock (`reference_clock_mhz`, the mode of the second half of the warm-up reads). This applies to E0b, E3 and E4. It only adds an exclusion; no earlier rule is relaxed. Reason: on WSL2 a slow host-side NVML call idled the GPU between samples, the whole process ran at 210 MHz, and the modal-clock rule passed it because the mode was 210 MHz.
+- **In-band fraction (reported, not a gate):** for every process the analyzers report the fraction of in-process SM clock reads within 95 % of that reference clock. It is an instrument check of the harness, not a pass mark for results.
+- **Void output:** the WSL2 dry run `~/runs/dry_20261031_194558` (before the per-step reasons fix, commit `507dea2`) is VOID: its E4 layers ran mostly at idle clocks. It is not evidence of anything.
 - **Primary estimate**: C1/A1 ratio of medians per process, geometric mean across clean processes, hierarchical-bootstrap 95 % CI.
 - **A claim needs ≥5 clean processes per length.** With fewer, results are descriptive only.
 - **Parity**: claim it only with TOST at a ±5 % margin, i.e. the 90 % CI inside [0.95, 1.05]. Otherwise say "not shown".
