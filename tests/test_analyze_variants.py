@@ -94,3 +94,74 @@ def test_tag_flags_missing_clocks(tmp_path):
     mod = load()
     throttled, details = mod.tag([{"latency_ms": 1.0}])
     assert throttled and "no clock telemetry" in details
+
+
+def write_meta(root, label, kind, batch, seq, c3_step, a3_step, layers=4):
+    meta = {"suite": kind, "seq": seq, "bytes_per_step_analytical": {
+        "c3_accurate": c3_step, "a3pad": a3_step}}
+    if kind == "e4_timing":
+        meta.update(
+            {
+                "batch": batch,
+                "layers": layers,
+                "bytes_per_layer_analytical": {
+                    "c3_accurate": c3_step // layers,
+                    "a3pad": a3_step // layers,
+                },
+                "cache_only_minimum_bytes_per_layer": {"c3_accurate": 100, "a3pad": 1600},
+                "footprint_bytes": {"full_kv": 1, "latent": 1, "device_total": 2},
+            }
+        )
+    (root / label / "timing_meta.json").write_text(json.dumps(meta))
+
+
+def test_multi_n_campaign_parses_labels_bytes_and_gbps(tmp_path):
+    """Synthetic B x N grid: per-config ratios, batch/seq parsed, bytes and GB/s attached."""
+    mod = load()
+    grid = {(1, 1024): 1.1, (8, 8192): 0.7, (32, 32768): 0.4}
+    specs = []
+    for (b, n), ratio in grid.items():
+        specs += [("e4_timing", f"B{b}_N{n}", ratio, "cool-start", {})] * 5
+    specs += [("e4_timing", "B8", 0.9, "cool-start", {})] * 2  # legacy label = N 1024
+    specs += [("e3_timing", "N8192", 0.8, "cool-start", {})] * 2
+    root = campaign(tmp_path, specs)
+    runs = json.loads((root / "manifest.json").read_text())["runs"]
+    for run in runs:
+        cfg = mod.parse_config(run["kind"], run["config"])
+        # 1 ms baseline step (synthetic) -> 1e9 bytes => 1000 GB/s for a3pad.
+        write_meta(root, run["label"], run["kind"], cfg["batch"], cfg["seq"], 10**8, 10**9)
+    res = mod.analyze(root)["results"]
+    for (b, n), ratio in grid.items():
+        r = res[f"e4_timing/B{b}_N{n}"]
+        assert (r["batch"], r["seq"]) == (b, n)
+        assert abs(r["c3_accurate"]["geomean_ratio_clean"] - ratio) < 0.01
+        assert r["c3_accurate"]["claim_eligible"] is True
+        lo, hi = r["c3_accurate"]["ci95_hierarchical_bootstrap"]
+        assert lo <= ratio <= hi
+        assert r["byte_ratio_a3pad_over_c3"] == 10.0
+        assert r["cache_only_byte_ratio"] == 16.0
+        assert r["working_set_bytes"] == 10**9 // 4
+        gb = r["c3_accurate"]["achieved_gbps_clean_median"]
+        assert abs(gb["a3pad"] - 1000.0) < 25.0
+        assert abs(gb["c3_accurate"] - 100.0 / ratio) < 0.05 * 100.0 / ratio
+    legacy = res["e4_timing/B8"]
+    assert (legacy["batch"], legacy["seq"]) == (8, 1024)
+    assert legacy["c3_accurate"]["claim_eligible"] is False
+    e3 = res["e3_timing/N8192"]
+    assert (e3["batch"], e3["seq"]) == (1, 8192)
+    assert e3["working_set_bytes"] == 10**9
+
+
+def test_parse_config_rejects_garbage():
+    mod = load()
+    assert mod.parse_config("e4_timing", "X1") == {"batch": None, "seq": None}
+    assert mod.parse_config("e4_timing", "B32_N32768") == {"batch": 32, "seq": 32768}
+    assert mod.parse_config("e3_timing", "N1024") == {"batch": 1, "seq": 1024}
+
+
+def test_missing_meta_still_analyzes(tmp_path):
+    mod = load()
+    root = campaign(tmp_path, [("e4_timing", "B1_N1024", 1.0, "cool-start", {})] * 2)
+    r = mod.analyze(root)["results"]["e4_timing/B1_N1024"]
+    assert "bytes_per_step_analytical" not in r
+    assert r["c3_accurate"]["achieved_gbps_clean_median"] == {"a3pad": None, "c3_accurate": None}
