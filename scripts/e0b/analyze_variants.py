@@ -26,6 +26,7 @@ Standard library only.
 import collections
 import json
 import math
+import os
 import random
 import re
 import statistics
@@ -163,6 +164,8 @@ def analyze(root):
     rng = random.Random(20261002)
     groups = collections.defaultdict(list)
     report = {"campaign": str(root), "runs": [], "results": {}}
+    if os.environ.get("E0B_HOST_LABEL"):
+        report["host_label"] = os.environ["E0B_HOST_LABEL"]
     for run in manifest["runs"]:
         kind = run.get("kind")
         if kind not in COMPONENT:

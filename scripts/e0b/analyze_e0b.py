@@ -17,6 +17,7 @@ Launch-count floor: median 'empty' event span + launches x median C1 projection 
 import collections
 import json
 import math
+import os
 import random
 import statistics
 import sys
@@ -124,6 +125,8 @@ def main(root):
         "runs": [],
         "results": {},
     }
+    if os.environ.get("E0B_HOST_LABEL"):
+        report["host_label"] = os.environ["E0B_HOST_LABEL"]
     for r in runs:
         report["runs"].append(
             {
