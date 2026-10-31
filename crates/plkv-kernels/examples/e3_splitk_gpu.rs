@@ -14,8 +14,7 @@ mod timing_common;
 #[cfg(feature = "gpu-cutile")]
 mod gpu_impl {
     use super::timing_common::{
-        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields, clock_fields_fast, clock_warmup,
-        memset_d32, rewarm,
+        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields_fast, clock_warmup, memset_d32, rewarm,
     };
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
@@ -1587,7 +1586,8 @@ mod gpu_impl {
         'timing: for it in 0..ta.iterations {
             let empty_pre = nvml.as_ref().and_then(Nvml::sm_clock);
             let empty_ms = ev.measure(st, || {});
-            let mut row = clock_fields(nvml.as_ref(), empty_pre);
+            // Reasons are read once per iteration below (~20 ms under WSL2; clock_fields_fast).
+            let mut row = clock_fields_fast(nvml.as_ref(), empty_pre);
             row.as_object_mut().unwrap().extend(
                 serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":0,"variant":"NONE","component":"empty","latency_ms":empty_ms})
                     .as_object()
@@ -1601,7 +1601,7 @@ mod gpu_impl {
                 let ms = ev.measure(st, || {
                     launch_async(dims, dev.views(), n, pl, variants[idx], &mut bufs[idx], st)
                 });
-                let mut row = clock_fields(nvml.as_ref(), pre);
+                let mut row = clock_fields_fast(nvml.as_ref(), pre);
                 let temp = row["temperature_c"].as_u64();
                 row.as_object_mut().unwrap().extend(
                     serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[idx].name(),"component":"pipeline","latency_ms":ms,"t_ms":t0.elapsed().as_secs_f64()*1e3,"splits":plan.splits,"steps_per_split":plan.steps_per_split})
@@ -1615,11 +1615,26 @@ mod gpu_impl {
                     break 'timing;
                 }
             }
+            // After the iteration's timed samples: the reasons bits once (stored on its last
+            // row), then an untimed re-warm before the next iteration.
+            let reasons = nvml.as_ref().and_then(Nvml::reasons);
+            let (rewarm_ms, rewarm_bursts, rewarm_restored) =
+                rewarm(nvml.as_ref(), st, reference_clock, ta.rewarm_max_ms, || {
+                    for (v, b) in variants.iter().zip(bufs.iter_mut()) {
+                        launch_async(dims, dev.views(), n, pl, *v, b, st);
+                    }
+                });
+            if let Some(last) = samples.last_mut().and_then(|r| r.as_object_mut()) {
+                last.insert("clock_event_reasons".into(), serde_json::json!(reasons));
+                last.insert("rewarm_ms".into(), serde_json::json!(rewarm_ms));
+                last.insert("rewarm_bursts".into(), serde_json::json!(rewarm_bursts));
+                last.insert("rewarm_restored".into(), serde_json::json!(rewarm_restored));
+            }
         }
         // Same analytical accounting as E4 (one sequence, model_small shape). C3 fast is not
         // given a byte count: its query-projection traffic is not separately accounted.
         let eb = e4_config::e4_bytes(plan, n);
-        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)"});
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms});
         write_outputs(
             &ta.dir,
             &samples,
