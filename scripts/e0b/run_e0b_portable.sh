@@ -141,7 +141,9 @@ if [[ "$ON_WSL" == 1 ]]; then
 fi
 NVCC_VER="$("$CUDA_TOOLKIT_PATH/bin/nvcc" --version | grep -o 'release [0-9.]*' | cut -d' ' -f2)"
 [[ "$NVCC_VER" == "13.3" ]] || echo "PREFLIGHT_WARN: nvcc $NVCC_VER; validated with 13.3" >&2
-DRV_CUDA="$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | awk '{print $3}')"
+# Older drivers print "CUDA Version: X.Y"; 61x drivers print "CUDA UMD Version: X.Y".
+DRV_CUDA="$(nvidia-smi | grep -oE 'CUDA (UMD )?Version: [0-9.]+' | head -1 | awk '{print $NF}' || true)"
+[[ -n "$DRV_CUDA" ]] || { echo "PREFLIGHT_WARN: could not parse the driver CUDA version" >&2; DRV_CUDA=0.0; }
 # Validated: driver 595.97 reporting CUDA 13.2 with toolkit 13.3 (tileiras emits sm_89 cubins
 # ahead of time; the driver only loads them). Older drivers are unvalidated, not known-bad.
 python3 - "$DRV_CUDA" <<'EOF' || echo "PREFLIGHT_WARN: driver reports CUDA $DRV_CUDA (< 13.2, unvalidated)" >&2
