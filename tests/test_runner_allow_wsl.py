@@ -70,3 +70,9 @@ def test_no_host_label_when_unset(tmp_path, monkeypatch):
     root = campaign(tmp_path, [("e3_timing", "N1024", 0.9, "cool-start", {})])
     monkeypatch.delenv("E0B_HOST_LABEL", raising=False)
     assert "host_label" not in mod.analyze(root)
+
+
+def test_skip_e0b_with_skip_e3e4_is_refused(tmp_path):
+    r = run(tmp_path, "--out-dir", str(tmp_path / "out"), "--skip-e0b", "--skip-e3e4")
+    assert r.returncode == 2
+    assert "leave nothing to run" in r.stderr

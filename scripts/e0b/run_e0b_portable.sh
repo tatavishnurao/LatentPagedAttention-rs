@@ -22,6 +22,7 @@ usage: scripts/e0b/run_e0b_portable.sh --out-dir DIR [options]
   --max-footprint-gib G  refuse E4 configs whose device footprint exceeds G (default 20)
   --e3e4-iterations N  timed iterations per E3/E4 process (default 50)
   --skip-e3e4          run only the E0b (A1 vs C1) stages
+  --skip-e0b           skip the E0b (A1 vs C1) campaign and its analysis; run E3 / E4 only
   --skip-build         reuse an existing release build
   --preflight-only     check the environment and exit
   --allow-wsl          opt in to running under WSL2 (still refuses /mnt); results are labelled
@@ -34,7 +35,7 @@ EOF
 OUT_DIR="" LENGTHS="1024,8192,32768" MIN_COOL=5 MAX_ATTEMPTS=8 COOL_C=80 COOLDOWN_S=300
 ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0 ALLOW_WSL=0
 E3_LENGTHS="1024,8192,32768" E4_BATCHES="1,8,32" E3E4_ITERS=50 SKIP_E3E4=0
-E4_SEQS="1024" MAX_FOOTPRINT_GIB=20
+E4_SEQS="1024" MAX_FOOTPRINT_GIB=20 SKIP_E0B=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;
@@ -51,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --max-footprint-gib) MAX_FOOTPRINT_GIB="$2"; shift 2 ;;
     --e3e4-iterations) E3E4_ITERS="$2"; shift 2 ;;
     --skip-e3e4) SKIP_E3E4=1; shift ;;
+    --skip-e0b) SKIP_E0B=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -60,6 +62,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$OUT_DIR" ]] || { usage >&2; exit 2; }
+[[ "$SKIP_E0B" == 1 && "$SKIP_E3E4" == 1 ]] && { echo "--skip-e0b and --skip-e3e4 leave nothing to run" >&2; exit 2; }
 if [[ "$DRY_RUN" == 1 ]]; then
   LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1 E3_LENGTHS=1024 E4_BATCHES=1 E4_SEQS=1024 E3E4_ITERS=5
 fi
@@ -156,7 +159,8 @@ mkdir -p "$OUT_DIR"
 {
   [[ -n "$HOST_LABEL" ]] && echo "host_label: $HOST_LABEL"
   echo "date_utc: $(date -u +%FT%TZ)"
-  echo "mode: $([[ "$DRY_RUN" == 1 ]] && echo dry-run || echo full) lengths=$LENGTHS min_cool=$MIN_COOL max_attempts=$MAX_ATTEMPTS"
+  echo "mode: $([[ "$DRY_RUN" == 1 ]] && echo dry-run || echo full) lengths=$LENGTHS min_cool=$MIN_COOL max_attempts=$MAX_ATTEMPTS skip_e0b=$SKIP_E0B skip_e3e4=$SKIP_E3E4"
+  echo "e3_lengths=$E3_LENGTHS e4_batches=$E4_BATCHES e4_seqs=$E4_SEQS iterations=$E3E4_ITERS"
   echo "host: $(hostname)"; uname -a
   nvidia-smi --query-gpu=name,compute_cap,driver_version,vbios_version,memory.total,power.limit,power.max_limit,clocks.max.sm,clocks.max.mem,temperature.gpu --format=csv
   echo "driver_cuda: $DRV_CUDA"; echo "CUDA_TOOLKIT_PATH=$CUDA_TOOLKIT_PATH LIBCLANG_PATH=$LIBCLANG_PATH"
@@ -191,9 +195,11 @@ sha256sum "$C1_RTABLE_BIN" "$MMA_PROBE_BIN" "$E3_SPLITK_BIN" \
   | tee "$OUT_DIR/mma_probe.log"
 
 # ---- E0b campaign ----------------------------------------------------------------------------
-python3 "$ROOT/scripts/e0b/e0b_campaign.py" --out-dir "$OUT_DIR/campaign" --lengths "$LENGTHS" \
-  --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
-  --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" | tee "$OUT_DIR/campaign.log"
+if [[ "$SKIP_E0B" == 0 ]]; then
+  python3 "$ROOT/scripts/e0b/e0b_campaign.py" --out-dir "$OUT_DIR/campaign" --lengths "$LENGTHS" \
+    --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
+    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" | tee "$OUT_DIR/campaign.log"
+fi
 
 # ---- E3 correctness gate, then E3 / E4 campaign ----------------------------------------------
 if [[ "$SKIP_E3E4" == 0 ]]; then
@@ -215,22 +221,27 @@ if [[ "$SKIP_E3E4" == 0 ]]; then
 fi
 
 # ---- analysis + package ----------------------------------------------------------------------
-python3 "$ROOT/scripts/e0b/analyze_e0b.py" "$OUT_DIR/campaign" > "$OUT_DIR/analysis_stdout.json"
+if [[ "$SKIP_E0B" == 0 ]]; then
+  python3 "$ROOT/scripts/e0b/analyze_e0b.py" "$OUT_DIR/campaign" > "$OUT_DIR/analysis_stdout.json"
+fi
 tar --exclude='oracle_inputs_outputs.json' -czf "$OUT_DIR.tar.gz" -C "$(dirname "$OUT_DIR")" \
   "$(basename "$OUT_DIR")"
 if [[ "$DRY_RUN" == 1 ]]; then
   # Fail fast on anything a full campaign would need: a finished process, passing correctness,
   # per-sample NVML clocks, telemetry, MMA lowering, and an analysis row.
-  python3 - "$OUT_DIR" <<'EOF'
+  python3 - "$OUT_DIR" "$([[ "$SKIP_E0B" == 1 ]] && echo skip-e0b || echo with-e0b)" <<'EOF'
 import json
 import sys
 from pathlib import Path
 
 out = Path(sys.argv[1])
+skip_e0b = len(sys.argv) > 2 and sys.argv[2] == "skip-e0b"
 problems = []
 camp = out / "campaign"
-runs = json.loads((camp / "manifest.json").read_text())["runs"]
-if not runs or runs[0]["returncode"] != 0:
+runs = [] if skip_e0b else json.loads((camp / "manifest.json").read_text())["runs"]
+if skip_e0b:
+    print("dry-run E0b: skipped (--skip-e0b)")
+elif not runs or runs[0]["returncode"] != 0:
     problems.append(f"campaign process failed: {runs[:1]}")
 else:
     run = camp / runs[0]["label"]
@@ -251,9 +262,10 @@ probe = json.loads((out / "mma_probe" / "mma_probe_summary.json").read_text())
 f16 = [x for x in probe if x["kernel"].endswith("_f16") and "error" not in x]
 if not f16 or any(x["sass_mma_instructions"] == 0 for x in f16):
     problems.append("MMA probe: FP16 kernels missing HMMA")
-analysis = json.loads((camp / "e0b_analysis.json").read_text())
-if "1024" not in analysis["results"]:
-    problems.append("analysis has no 1024 result")
+if not skip_e0b:
+    analysis = json.loads((camp / "e0b_analysis.json").read_text())
+    if "1024" not in analysis["results"]:
+        problems.append("analysis has no 1024 result")
 # E3 / E4 paths: correctness gate, timing samples with clocks, pre-timing correctness, analysis.
 e3e4 = out / "e3e4"
 if e3e4.exists():
@@ -303,6 +315,12 @@ if e3e4.exists():
     for key, res in va["results"].items():
         if key.startswith("e4_timing/") and (res.get("batch") is None or res.get("seq") is None):
             problems.append(f"variants analysis {key}: batch/seq not parsed")
+    # Instrument check (information, not a gate): share of SM clock reads near the reference.
+    for r in va.get("runs", []):
+        if "in_band_fraction" in r:
+            print(f"dry-run clocks {r['label']}: in_band={r['in_band_fraction']} "
+                  f"modal={r.get('sm_clock_modal_mhz')} ref={r.get('reference_clock_mhz')} "
+                  f"throttled={r.get('throttled')}")
 if problems:
     print("DRY_RUN_FAIL: " + "; ".join(problems))
     sys.exit(1)
