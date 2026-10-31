@@ -218,7 +218,7 @@ pub fn e4_layout(
     if batch == 0 {
         return Err(E4ConfigError::ZeroBatch);
     }
-    if seq == 0 || seq % BLOCK_SIZE != 0 {
+    if seq == 0 || !seq.is_multiple_of(BLOCK_SIZE) {
         return Err(E4ConfigError::SeqNotBlockMultiple { seq });
     }
     let footprint = check_footprint(e4_footprint(batch, seq, max_device_gib, max_host_gib))?;
@@ -360,7 +360,7 @@ pub fn parse_e4_args(args: &[String]) -> Result<E4Args, E4ConfigError> {
         Some(v) => parse("--seq", v)?,
         None => DEFAULT_SEQ,
     };
-    if seq == 0 || seq % BLOCK_SIZE != 0 {
+    if seq == 0 || !seq.is_multiple_of(BLOCK_SIZE) {
         return Err(E4ConfigError::SeqNotBlockMultiple { seq });
     }
     let batches = match (arg_value(args, "--batch"), arg_value(args, "--batches")) {
