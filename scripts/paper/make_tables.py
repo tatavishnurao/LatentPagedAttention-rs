@@ -232,10 +232,12 @@ def ratio_cell(reg, entry, src):
 
 
 def timing_table(reg):
+    """Main timing table (ratios) plus the appendix table (bytes, bandwidth, clocks, temperature)."""
     src = LOCAL / "primary_merged_analysis.json"
     data = load(src)
     runs = {r["label"]: r for r in data["runs"]}
-    rows, summary = [], {"eligible": [], "descriptive": [], "byte_ratios": []}
+    rows, extra = [], []
+    summary = {"eligible": [], "descriptive": [], "byte_ratios": [], "byte_ratios_eligible": []}
     for key in sorted(data["results"], key=config_sort_key):
         res = data["results"][key]
         e = res["c3_accurate"]
@@ -244,57 +246,82 @@ def timing_table(reg):
         med = e.get("median_ms_clean")
         med_s = "—"
         if med:
-            a3_us = reg.fmt(med["a3pad"] * 1000, ".1f", src)
-            c3_us = reg.fmt(med["c3_accurate"] * 1000, ".1f", src)
+            a3_us = reg.fmt(med["a3pad"] * 1000, ".0f", src)
+            c3_us = reg.fmt(med["c3_accurate"] * 1000, ".0f", src)
             med_s = f"{a3_us} / {c3_us}"
         ws = reg.fmt(res["working_set_bytes"] / MIB, ".1f", src)
         br = reg.fmt(res["byte_ratio_a3pad_over_c3"], ".1f", src)
         summary["byte_ratios"].append(res["byte_ratio_a3pad_over_c3"])
         if e["claim_eligible"]:
-            status = "claim-eligible"
+            status = "yes"
             summary["eligible"].append((key, e["geomean_ratio_clean"]))
+            summary["byte_ratios_eligible"].append(res["byte_ratio_a3pad_over_c3"])
         else:
-            status = "not enough clean processes"
+            status = "no"
             summary["descriptive"].append(key)
         kind, cfg = key.split("/")
+        name = ("E3 " if kind == "e3_timing" else "E4 ") + cfg
         rows.append(
             (
-                ("E3 " if kind == "e3_timing" else "E4 ") + cfg,
+                name,
                 f"{reg.add(clean, src)} / {reg.add(thr, src)} / {reg.add(hot, src)}",
                 med_s,
                 geo,
                 ci,
                 status,
-                ws,
-                br,
             )
         )
+        gb = e.get("achieved_gbps_clean_median") or {}
+        gb_s = (
+            f"{reg.fmt(gb['a3pad'], '.1f', src)} / {reg.fmt(gb['c3_accurate'], '.1f', src)}"
+            if gb.get("a3pad") and gb.get("c3_accurate")
+            else "—"
+        )
+        procs = [runs[lbl] for lbl in res["clean_processes"] + res["excluded_processes"]]
+        modal = sorted({runs[lbl]["sm_clock_modal_mhz"] for lbl in res["clean_processes"]})
+        modal_s = "—"
+        if modal:
+            lo, hi = reg.add(modal[0], src), reg.add(modal[-1], src)
+            modal_s = lo if lo == hi else f"{lo}–{hi}"
+        peak = max(p["temp_max_inproc_c"] for p in procs)
+        extra.append((name, ws, br, gb_s, modal_s, reg.add(peak, src)))
     tab = table(
-        [
-            "Config",
-            "Clean / THR / hot",
-            "Median µs per step, A3pad / C3acc",
-            "C3acc / A3pad",
-            "95 % CI",
-            "Status",
-            "A3pad MiB per layer",
-            "Byte ratio A3pad / C3",
-        ],
+        ["Config", "Clean / THR / hot", "Median µs, A3pad / C3acc", "C3acc / A3pad", "95 % CI",
+         "Claim"],
         rows,
+    )
+    tab_extra = table(
+        ["Config", "A3pad MiB per layer", "Byte ratio A3pad / C3", "GB/s (analytic), A3pad / C3acc",
+         "Modal SM MHz, clean", "Max °C, all processes"],
+        extra,
     )
     # Derived numbers used in the prose (computed here, never typed).
     reg.add(len(summary["eligible"]), src)
     reg.add(len(summary["descriptive"]), src)
     reg.add(len(data["results"]), src)
-    reg.fmt(min(summary["byte_ratios"]), ".1f", src)
-    reg.fmt(max(summary["byte_ratios"]), ".1f", src)
+    for vals in (summary["byte_ratios"], summary["byte_ratios_eligible"]):
+        reg.fmt(min(vals), ".1f", src)
+        reg.fmt(max(vals), ".1f", src)
     ratios = [r for _, r in summary["eligible"]]
     reg.fmt(min(ratios), ".3f", src)
     reg.fmt(max(ratios), ".3f", src)
     for _, r in summary["eligible"]:
         reg.fmt(abs(1 - r) * 100, ".1f", src)
         reg.fmt(round(abs(1 - r) * 100), ".0f", src)
-    return tab, summary
+    return tab, tab_extra, summary
+
+
+def accurate_cost(reg):
+    """C3 accurate / C3 fast at E3 N=8192 (secondary analysis, baseline c3_fast), both runs."""
+    out = {}
+    for tag, run in (("primary", PRIMARY_RUNS["e3"]), ("sensitivity", PRIMARY_RUNS["sens"])):
+        src = LOCAL / "runs" / run / "variants_analysis_vs_c3_fast.json"
+        res = load(src)["results"]["e3_timing/N8192"]
+        e = res["c3_accurate"]
+        geo, ci = ratio_cell(reg, e, src)
+        out[tag] = {"run": run, "ratio": geo, "ci95": ci, "clean": reg.add(len(res["clean_processes"]), src),
+                    "pct": reg.fmt((e["geomean_ratio_clean"] - 1) * 100, ".1f", src)}
+    return out
 
 
 def sensitivity_table(reg):
@@ -495,13 +522,14 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     reg = Registry()
     scale, emulation, _ = numerics_tables(reg)
-    timing, summary = timing_table(reg)
+    timing, timing_extra, summary = timing_table(reg)
     frags = {
         "tab_setup.md": setup_table(reg),
         "tab_kernels.md": kernel_table(reg),
         "tab_numerics_scale.md": scale,
         "tab_numerics_emulation.md": emulation,
         "tab_timing.md": timing,
+        "tab_timing_appendix.md": timing_extra,
         "tab_sensitivity.md": sensitivity_table(reg),
         "tab_prelim.md": prelim_table(reg),
         "tab_clock_validity.md": clock_table(reg),
@@ -509,6 +537,7 @@ def main(argv=None):
     slow = dryrun_slowdown(reg)
     t1 = t1_slow_output(reg)
     nvml = nvml_latency(reg)
+    acc = accurate_cost(reg)
     for name, text in frags.items():
         (out / name).write_text(
             f"<!-- generated by scripts/paper/make_tables.py; do not edit -->\n{text}"
@@ -520,9 +549,14 @@ def main(argv=None):
                 "claim_eligible": summary["eligible"],
                 "descriptive": summary["descriptive"],
                 "byte_ratio_range": [min(summary["byte_ratios"]), max(summary["byte_ratios"])],
+                "byte_ratio_range_claim_eligible": [
+                    min(summary["byte_ratios_eligible"]),
+                    max(summary["byte_ratios_eligible"]),
+                ],
                 "void_dryrun_slowdown": slow,
                 "t1_slow_output": t1,
                 "t2_nvml_latency": nvml,
+                "c3_accurate_over_fast_e3_n8192": acc,
             },
             indent=1,
         )

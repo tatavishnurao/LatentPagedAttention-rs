@@ -31,6 +31,10 @@
   3.5058,
   13.2418
  ],
+ "byte_ratio_range_claim_eligible": [
+  7.3057,
+  13.2418
+ ],
  "void_dryrun_slowdown": {
   "idle_ms": "378",
   "ref_ms": "24",
@@ -55,5 +59,21 @@
   "other_median_ms_min": "0.03",
   "other_median_ms_max": "0.15",
   "temperature_c": "62"
+ },
+ "c3_accurate_over_fast_e3_n8192": {
+  "primary": {
+   "run": "local4060_b1r_e3_20261101_051132",
+   "ratio": "1.052",
+   "ci95": "[0.999, 1.089]",
+   "clean": "5",
+   "pct": "5.2"
+  },
+  "sensitivity": {
+   "run": "local4060_e3a3sens_20261101_063414",
+   "ratio": "1.017",
+   "ci95": "[0.974, 1.057]",
+   "clean": "5",
+   "pct": "1.7"
+  }
  }
 }

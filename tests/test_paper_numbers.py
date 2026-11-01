@@ -69,4 +69,16 @@ def test_make_tables_reads_committed_results(tmp_path):
     for value in ("0.893", "0.865", "1.030", "0.972", "0.924"):
         assert value in numbers, value
     timing = (tmp_path / "tab_timing.md").read_text()
-    assert "not enough clean processes" in timing and "claim-eligible" in timing
+    assert "| no |" in timing and "| yes |" in timing
+    assert "Byte ratio" in (tmp_path / "tab_timing_appendix.md").read_text()
+    assert summary["byte_ratio_range_claim_eligible"][0] > summary["byte_ratio_range"][0]
+
+
+def test_submission_copy_strips_claim_tags_and_comments():
+    ap = load("assemble_paper")
+    text = "A [M:timing] result; a [S:e4] fact. [H] A guess.\n<!-- note -->\nKeep [1] and [TODO cite: x].\n"
+    out = ap.strip_tags(text)
+    assert out == "A result; a fact. A guess.\nKeep [1] and [TODO cite: x].\n"
+    assert ap.table_width(["| a | b |", "|---|---|", "| " + "x" * 200 + " | y |"]) == 0
+    wide = ["| a | b | c |", "|---|---|---|", "| " + "x" * 40 + " | " + "y" * 40 + " | z |"]
+    assert ap.table_width(wide) > ap.ONE_COLUMN_CHARS
