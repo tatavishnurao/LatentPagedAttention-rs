@@ -149,9 +149,19 @@ pub fn clock_fields_fast(nvml: Option<&Nvml>, pre: Option<u32>) -> serde_json::V
     })
 }
 
-/// Untimed re-warm after a host-side pause: repeats synchronized `burst`s until the SM clock is
-/// within 95 % of `reference_mhz` or `max_ms` has elapsed. Returns (elapsed ms, bursts,
-/// restored). With no NVML or no reference it does nothing and reports `restored = false`.
+/// Written into every E3 / E4 `timing_meta.json` so data from different harness versions is
+/// never pooled (docs/LOCAL_4060_PLAN.md, addendum item 2).
+pub const HARNESS_VERSION: &str = "e3e4-rewarm-saturating-20ms-2026-11-01";
+
+/// GPU time enqueued back to back per re-warm chunk, with no synchronization inside a chunk.
+pub const REWARM_CHUNK_MS: f64 = 20.0;
+
+/// Untimed re-warm after a host-side pause. Enqueues about [`REWARM_CHUNK_MS`] of `burst`s
+/// back to back (no synchronization between them), synchronizes once, reads the SM clock, and
+/// repeats until the clock is within 95 % of `reference_mhz` or `max_ms` has elapsed. One burst
+/// is timed first to size the chunk. A sync after every short burst kept the GPU duty cycle low
+/// and the clock fell instead of recovering (E4 N=1024, 2026-11-01). Returns (elapsed ms,
+/// bursts, restored); with no NVML or no reference it does nothing and reports `false`.
 pub fn rewarm<F: FnMut()>(
     nvml: Option<&Nvml>,
     st: &Arc<Stream>,
@@ -164,19 +174,27 @@ pub fn rewarm<F: FnMut()>(
         return (0.0, 0, false);
     };
     let threshold = f64::from(reference) * 0.95;
-    let mut bursts = 0;
+    let elapsed = |s: std::time::Instant| s.elapsed().as_secs_f64() * 1e3;
+    if nvml.sm_clock().is_some_and(|c| f64::from(c) >= threshold) {
+        return (elapsed(start), 0, true);
+    }
+    let one_ms = Events::new().measure(st, &mut burst).max(1e-3);
+    let per_chunk = ((REWARM_CHUNK_MS / one_ms).ceil() as usize).clamp(1, 100_000);
+    let mut bursts = 1;
     loop {
         if nvml.sm_clock().is_some_and(|c| f64::from(c) >= threshold) {
-            return (start.elapsed().as_secs_f64() * 1e3, bursts, true);
+            return (elapsed(start), bursts, true);
         }
         if start.elapsed().as_millis() >= u128::from(max_ms) {
-            return (start.elapsed().as_secs_f64() * 1e3, bursts, false);
+            return (elapsed(start), bursts, false);
         }
-        burst();
+        for _ in 0..per_chunk {
+            burst();
+        }
         unsafe {
             st.synchronize().unwrap();
         }
-        bursts += 1;
+        bursts += per_chunk;
     }
 }
 

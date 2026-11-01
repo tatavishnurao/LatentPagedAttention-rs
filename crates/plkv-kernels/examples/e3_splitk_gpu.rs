@@ -14,7 +14,8 @@ mod timing_common;
 #[cfg(feature = "gpu-cutile")]
 mod gpu_impl {
     use super::timing_common::{
-        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields_fast, clock_warmup, memset_d32, rewarm,
+        ABORT_TEMPERATURE_C, Events, HARNESS_VERSION, Nvml, clock_fields_fast, clock_warmup,
+        memset_d32, rewarm,
     };
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
@@ -1634,7 +1635,7 @@ mod gpu_impl {
         // Same analytical accounting as E4 (one sequence, model_small shape). C3 fast is not
         // given a byte count: its query-projection traffic is not separately accounted.
         let eb = e4_config::e4_bytes(plan, n);
-        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms});
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":HARNESS_VERSION});
         write_outputs(
             &ta.dir,
             &samples,
@@ -1786,7 +1787,7 @@ mod gpu_impl {
         let lb = setup.layer_bytes;
         let layers = setup.layers as u64;
         let fp = &layout.footprint;
-        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"active_lengths":setup.seqs.iter().map(|s| s.active).collect::<Vec<_>>(),"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":lb.c3*layers,"a3pad":lb.a3pad*layers},"bytes_per_layer_analytical":{"c3_accurate":lb.c3,"a3pad":lb.a3pad},"cache_only_minimum_bytes_per_layer":{"c3_accurate":lb.min_c3,"a3pad":lb.min_a3},"footprint_bytes":{"full_kv":fp.full_kv_bytes,"latent":fp.latent_bytes,"device_total":fp.device_bytes,"host_estimate":fp.host_bytes},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"reasons_sampling":"once per step after timing","rewarm_max_ms":ta.rewarm_max_ms});
+        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"active_lengths":setup.seqs.iter().map(|s| s.active).collect::<Vec<_>>(),"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":lb.c3*layers,"a3pad":lb.a3pad*layers},"bytes_per_layer_analytical":{"c3_accurate":lb.c3,"a3pad":lb.a3pad},"cache_only_minimum_bytes_per_layer":{"c3_accurate":lb.min_c3,"a3pad":lb.min_a3},"footprint_bytes":{"full_kv":fp.full_kv_bytes,"latent":fp.latent_bytes,"device_total":fp.device_bytes,"host_estimate":fp.host_bytes},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"reasons_sampling":"once per step after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":HARNESS_VERSION});
         let correctness = serde_json::json!({"layer0_all_batch_elements":{"a3pad_max_abs_error":worst[0],"c3_accurate_max_abs_error":worst[1],"atol":ATOL}});
         write_outputs(&ta.dir, &samples, &meta, &correctness);
         if aborted.is_some() {
