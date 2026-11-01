@@ -1,0 +1,351 @@
+{
+  "campaign": "/tmp/claude-1000/-home-vishnurao-LatentPagedAttention-rs/d2e64a49-e50e-49ad-98ee-c7641f7a5244/scratchpad/re2_local4060_b1_e3_20261101_043331",
+  "runs": [
+    {
+      "label": "e3_timing_N1024_p0",
+      "kind": "e3_timing",
+      "config": "N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 1890,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 70,
+      "start_temp_c": 67,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N1024_p1",
+      "kind": "e3_timing",
+      "config": "N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 1890,
+      "throttled": true,
+      "tags": [
+        "clock: 88/400 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.78,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 71,
+      "start_temp_c": 69,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e3_timing_N1024_p2",
+      "kind": "e3_timing",
+      "config": "N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 1890,
+      "throttled": true,
+      "tags": [
+        "clock: 69/400 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.8275,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 71,
+      "start_temp_c": 69,
+      "cooldown_wait_s": 0.1,
+      "clean": false
+    },
+    {
+      "label": "e3_timing_N1024_p3",
+      "kind": "e3_timing",
+      "config": "N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 1890,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 72,
+      "start_temp_c": 71,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N1024_p4",
+      "kind": "e3_timing",
+      "config": "N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 1890,
+      "throttled": true,
+      "tags": [
+        "clock: 168/400 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.58,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 73,
+      "start_temp_c": 72,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e3_timing_N8192_p0",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 76,
+      "start_temp_c": 73,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p1",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 76,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p2",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 76,
+      "cooldown_wait_s": 0.1,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p3",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 77,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p4",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "pre-2026-11-01",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 400,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 77,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    }
+  ],
+  "results": {
+    "e3_timing/N1024": {
+      "component": "pipeline",
+      "baseline": "a3pad",
+      "harness_version": "pre-2026-11-01",
+      "batch": 1,
+      "seq": 1024,
+      "bytes_per_step_analytical": {
+        "a3pad": 1103104,
+        "c3_accurate": 143872
+      },
+      "working_set_bytes": 1103104,
+      "working_set_bytes_c3_accurate": 143872,
+      "layers": 1,
+      "byte_ratio_a3pad_over_c3": 7.6673,
+      "cache_only_byte_ratio": 16.0,
+      "clean_processes": [
+        "e3_timing_N1024_p0",
+        "e3_timing_N1024_p3"
+      ],
+      "excluded_processes": [
+        "e3_timing_N1024_p1",
+        "e3_timing_N1024_p2",
+        "e3_timing_N1024_p4"
+      ],
+      "c3_accurate": {
+        "per_process_ratio_clean": [
+          1.2105,
+          0.9867
+        ],
+        "per_process_ratio_excluded_descriptive": [
+          1.0861,
+          0.9581,
+          0.9782
+        ],
+        "geomean_ratio_clean": 1.0929,
+        "median_ms_clean": {
+          "a3pad": 0.0758,
+          "c3_accurate": 0.0819
+        },
+        "achieved_gbps_clean_median": {
+          "a3pad": 14.561,
+          "c3_accurate": 1.756
+        },
+        "ci95_hierarchical_bootstrap": [
+          0.8728,
+          1.4798
+        ],
+        "claim_eligible": false
+      },
+      "c3_fast": {
+        "per_process_ratio_clean": [
+          1.2684,
+          0.9385
+        ],
+        "per_process_ratio_excluded_descriptive": [
+          0.9571,
+          0.9016,
+          0.961
+        ],
+        "geomean_ratio_clean": 1.0911,
+        "median_ms_clean": {
+          "a3pad": 0.0758,
+          "c3_fast": 0.085
+        },
+        "achieved_gbps_clean_median": {
+          "a3pad": 14.561,
+          "c3_fast": null
+        },
+        "ci95_hierarchical_bootstrap": [
+          0.8584,
+          1.5307
+        ],
+        "claim_eligible": false
+      }
+    },
+    "e3_timing/N8192": {
+      "component": "pipeline",
+      "baseline": "a3pad",
+      "harness_version": "pre-2026-11-01",
+      "batch": 1,
+      "seq": 8192,
+      "bytes_per_step_analytical": {
+        "a3pad": 8495104,
+        "c3_accurate": 641536
+      },
+      "working_set_bytes": 8495104,
+      "working_set_bytes_c3_accurate": 641536,
+      "layers": 1,
+      "byte_ratio_a3pad_over_c3": 13.2418,
+      "cache_only_byte_ratio": 16.0,
+      "clean_processes": [
+        "e3_timing_N8192_p0",
+        "e3_timing_N8192_p1",
+        "e3_timing_N8192_p2",
+        "e3_timing_N8192_p3",
+        "e3_timing_N8192_p4"
+      ],
+      "excluded_processes": [],
+      "c3_accurate": {
+        "per_process_ratio_clean": [
+          0.8912,
+          0.8527,
+          0.8843,
+          0.904,
+          0.9097
+        ],
+        "per_process_ratio_excluded_descriptive": [],
+        "geomean_ratio_clean": 0.8882,
+        "median_ms_clean": {
+          "a3pad": 0.1245,
+          "c3_accurate": 0.1113
+        },
+        "achieved_gbps_clean_median": {
+          "a3pad": 68.227,
+          "c3_accurate": 5.763
+        },
+        "ci95_hierarchical_bootstrap": [
+          0.8686,
+          0.9144
+        ],
+        "claim_eligible": true
+      },
+      "c3_fast": {
+        "per_process_ratio_clean": [
+          0.8992,
+          0.8683,
+          0.8623,
+          0.8822,
+          0.8792
+        ],
+        "per_process_ratio_excluded_descriptive": [],
+        "geomean_ratio_clean": 0.8782,
+        "median_ms_clean": {
+          "a3pad": 0.1245,
+          "c3_fast": 0.1092
+        },
+        "achieved_gbps_clean_median": {
+          "a3pad": 68.227,
+          "c3_fast": null
+        },
+        "ci95_hierarchical_bootstrap": [
+          0.8641,
+          0.8971
+        ],
+        "claim_eligible": true
+      }
+    }
+  },
+  "host_label": "laptop RTX 4060, WSL2, not a cloud result"
+}

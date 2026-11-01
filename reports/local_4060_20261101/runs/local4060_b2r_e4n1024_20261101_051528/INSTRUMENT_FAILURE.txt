@@ -1,0 +1,1 @@
+INSTRUMENT FAILURE (2026-11-01): SM clock collapsed under the pre-2026-11-01 harness re-warm; not re-analysed. See docs/LOCAL_4060_PLAN.md addendum.

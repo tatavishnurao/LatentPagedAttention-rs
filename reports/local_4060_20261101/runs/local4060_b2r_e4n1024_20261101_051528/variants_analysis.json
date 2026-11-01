@@ -1,0 +1,425 @@
+{
+  "campaign": "/home/vishnurao/runs/local4060_b2r_e4n1024_20261101_051528/e3e4",
+  "runs": [
+    {
+      "label": "e4_correctness_N1024",
+      "kind": "e4_correctness",
+      "returncode": 0
+    },
+    {
+      "label": "e4_timing_B1_N1024_p0",
+      "kind": "e4_timing",
+      "config": "B1_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 11567/12800 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0963,
+      "sm_clock_reads": 12800,
+      "temp_max_inproc_c": 75,
+      "start_temp_c": 71,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B1_N1024_p1",
+      "kind": "e4_timing",
+      "config": "B1_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 2389/12800 reads <95% of mode 450",
+        "modal clock 450 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 450,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0136,
+      "sm_clock_reads": 12800,
+      "temp_max_inproc_c": 76,
+      "start_temp_c": 74,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B1_N1024_p2",
+      "kind": "e4_timing",
+      "config": "B1_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 8794/12800 reads <95% of mode 1110",
+        "modal clock 1110 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 1110,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0715,
+      "sm_clock_reads": 12800,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 75,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B1_N1024_p3",
+      "kind": "e4_timing",
+      "config": "B1_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 3376/12800 reads <95% of mode 540",
+        "modal clock 540 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 540,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0016,
+      "sm_clock_reads": 12800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 77,
+      "cooldown_wait_s": 0.1,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B1_N1024_p4",
+      "kind": "e4_timing",
+      "config": "B1_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 1932/12800 reads <95% of mode 465",
+        "modal clock 465 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 465,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0016,
+      "sm_clock_reads": 12800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 77,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B8_N1024_p0",
+      "kind": "e4_timing",
+      "config": "B8_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 576/1600 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.64,
+      "sm_clock_reads": 1600,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 77,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B8_N1024_p1",
+      "kind": "e4_timing",
+      "config": "B8_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 704/1600 reads <95% of mode 1035",
+        "modal clock 1035 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 1035,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.03,
+      "sm_clock_reads": 1600,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 78,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B8_N1024_p2",
+      "kind": "e4_timing",
+      "config": "B8_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 617/1600 reads <95% of mode 1080"
+      ],
+      "sm_clock_modal_mhz": 1080,
+      "reference_clock_mhz": 915,
+      "in_band_fraction": 0.9575,
+      "sm_clock_reads": 1600,
+      "temp_max_inproc_c": 75,
+      "start_temp_c": 76,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B8_N1024_p3",
+      "kind": "e4_timing",
+      "config": "B8_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 240/1600 reads <95% of mode 990",
+        "modal clock 990 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 990,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.035,
+      "sm_clock_reads": 1600,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 75,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B8_N1024_p4",
+      "kind": "e4_timing",
+      "config": "B8_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 48/1600 reads <95% of mode 1275"
+      ],
+      "sm_clock_modal_mhz": 1275,
+      "reference_clock_mhz": 1185,
+      "in_band_fraction": 0.97,
+      "sm_clock_reads": 1600,
+      "temp_max_inproc_c": 76,
+      "start_temp_c": 76,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B32_N1024_p0",
+      "kind": "e4_timing",
+      "config": "B32_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 312/800 reads <95% of mode 1800"
+      ],
+      "sm_clock_modal_mhz": 1800,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.38,
+      "sm_clock_reads": 800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 76,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B32_N1024_p1",
+      "kind": "e4_timing",
+      "config": "B32_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 360/800 reads <95% of mode 1575",
+        "modal clock 1575 <95% of warm-up reference 1890"
+      ],
+      "sm_clock_modal_mhz": 1575,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.0,
+      "sm_clock_reads": 800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 78,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B32_N1024_p2",
+      "kind": "e4_timing",
+      "config": "B32_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 120/800 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1875,
+      "in_band_fraction": 0.85,
+      "sm_clock_reads": 800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 78,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B32_N1024_p3",
+      "kind": "e4_timing",
+      "config": "B32_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 175/800 reads <95% of mode 1890"
+      ],
+      "sm_clock_modal_mhz": 1890,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.7812,
+      "sm_clock_reads": 800,
+      "temp_max_inproc_c": 78,
+      "start_temp_c": 78,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    },
+    {
+      "label": "e4_timing_B32_N1024_p4",
+      "kind": "e4_timing",
+      "config": "B32_N1024",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "throttled": true,
+      "tags": [
+        "clock: 208/800 reads <95% of mode 1830"
+      ],
+      "sm_clock_modal_mhz": 1830,
+      "reference_clock_mhz": 1890,
+      "in_band_fraction": 0.66,
+      "sm_clock_reads": 800,
+      "temp_max_inproc_c": 77,
+      "start_temp_c": 78,
+      "cooldown_wait_s": 0.0,
+      "clean": false
+    }
+  ],
+  "results": {
+    "e4_timing/B1_N1024": {
+      "component": "step_total",
+      "baseline": "a3pad",
+      "batch": 1,
+      "seq": 1024,
+      "bytes_per_step_analytical": {
+        "a3pad": 80232448,
+        "c3_accurate": 16334848
+      },
+      "working_set_bytes": 1253632,
+      "working_set_bytes_c3_accurate": 255232,
+      "layers": 64,
+      "byte_ratio_a3pad_over_c3": 4.9117,
+      "cache_only_byte_ratio": 16.0,
+      "footprint_bytes": {
+        "device_total": 138412032,
+        "full_kv": 67108864,
+        "host_estimate": 145948672,
+        "latent": 4194304
+      },
+      "clean_processes": [],
+      "excluded_processes": [
+        "e4_timing_B1_N1024_p0",
+        "e4_timing_B1_N1024_p1",
+        "e4_timing_B1_N1024_p2",
+        "e4_timing_B1_N1024_p3",
+        "e4_timing_B1_N1024_p4"
+      ],
+      "c3_accurate": {
+        "per_process_ratio_clean": [],
+        "per_process_ratio_excluded_descriptive": [
+          1.0376,
+          0.9773,
+          0.983,
+          1.0136,
+          1.0357
+        ],
+        "claim_eligible": false
+      }
+    },
+    "e4_timing/B32_N1024": {
+      "component": "step_total",
+      "baseline": "a3pad",
+      "batch": 32,
+      "seq": 1024,
+      "bytes_per_step_analytical": {
+        "a3pad": 97309984,
+        "c3_accurate": 27756832
+      },
+      "working_set_bytes": 24327496,
+      "working_set_bytes_c3_accurate": 6939208,
+      "layers": 4,
+      "byte_ratio_a3pad_over_c3": 3.5058,
+      "cache_only_byte_ratio": 16.0,
+      "footprint_bytes": {
+        "device_total": 209715200,
+        "full_kv": 134217728,
+        "host_estimate": 392167424,
+        "latent": 8388608
+      },
+      "clean_processes": [],
+      "excluded_processes": [
+        "e4_timing_B32_N1024_p0",
+        "e4_timing_B32_N1024_p1",
+        "e4_timing_B32_N1024_p2",
+        "e4_timing_B32_N1024_p3",
+        "e4_timing_B32_N1024_p4"
+      ],
+      "c3_accurate": {
+        "per_process_ratio_clean": [],
+        "per_process_ratio_excluded_descriptive": [
+          1.0404,
+          1.0351,
+          0.9463,
+          0.9816,
+          1.0337
+        ],
+        "claim_eligible": false
+      }
+    },
+    "e4_timing/B8_N1024": {
+      "component": "step_total",
+      "baseline": "a3pad",
+      "batch": 8,
+      "seq": 1024,
+      "bytes_per_step_analytical": {
+        "a3pad": 50201536,
+        "c3_accurate": 14179264
+      },
+      "working_set_bytes": 6275192,
+      "working_set_bytes_c3_accurate": 1772408,
+      "layers": 8,
+      "byte_ratio_a3pad_over_c3": 3.5405,
+      "cache_only_byte_ratio": 16.0,
+      "footprint_bytes": {
+        "device_total": 138412032,
+        "full_kv": 67108864,
+        "host_estimate": 169345024,
+        "latent": 4194304
+      },
+      "clean_processes": [],
+      "excluded_processes": [
+        "e4_timing_B8_N1024_p0",
+        "e4_timing_B8_N1024_p1",
+        "e4_timing_B8_N1024_p2",
+        "e4_timing_B8_N1024_p3",
+        "e4_timing_B8_N1024_p4"
+      ],
+      "c3_accurate": {
+        "per_process_ratio_clean": [],
+        "per_process_ratio_excluded_descriptive": [
+          1.131,
+          0.639,
+          0.991,
+          0.884,
+          0.9484
+        ],
+        "claim_eligible": false
+      }
+    }
+  },
+  "host_label": "laptop RTX 4060, WSL2, not a cloud result"
+}

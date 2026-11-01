@@ -97,8 +97,11 @@ def test_tag_flags_missing_clocks(tmp_path):
 
 
 def write_meta(root, label, kind, batch, seq, c3_step, a3_step, layers=4):
-    meta = {"suite": kind, "seq": seq, "bytes_per_step_analytical": {
-        "c3_accurate": c3_step, "a3pad": a3_step}}
+    meta = {
+        "suite": kind,
+        "seq": seq,
+        "bytes_per_step_analytical": {"c3_accurate": c3_step, "a3pad": a3_step},
+    }
     if kind == "e4_timing":
         meta.update(
             {
@@ -165,3 +168,89 @@ def test_missing_meta_still_analyzes(tmp_path):
     r = mod.analyze(root)["results"]["e4_timing/B1_N1024"]
     assert "bytes_per_step_analytical" not in r
     assert r["c3_accurate"]["achieved_gbps_clean_median"] == {"a3pad": None, "c3_accurate": None}
+
+
+def test_idle_clock_process_is_throttled_against_reference(tmp_path):
+    """A process whose every read sits at an idle clock passes the modal rule (the mode is the
+    idle clock) but fails the warm-up reference rule (runbook section 4, 2026-10-31)."""
+    mod = load()
+    root = campaign(tmp_path, [("e4_timing", "B1_N1024", 0.9, "cool-start", {"clock": 210})])
+    label = "e4_timing_B1_N1024_p0"
+    (root / label / "timing_meta.json").write_text(json.dumps({"reference_clock_mhz": 1890}))
+    run = mod.analyze(root)["runs"][0]
+    assert run["throttled"] is True and run["clean"] is False
+    assert run["in_band_fraction"] == 0.0
+    assert any("warm-up reference 1890" in t for t in run["tags"])
+
+
+def test_reference_clock_run_reports_in_band_fraction(tmp_path):
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N1024", 0.9, "cool-start", {"clock": 1890})])
+    (root / "e3_timing_N1024_p0" / "timing_meta.json").write_text(
+        json.dumps({"reference_clock_mhz": 1890})
+    )
+    run = mod.analyze(root)["runs"][0]
+    assert run["clean"] is True
+    assert run["in_band_fraction"] == 1.0
+    assert run["sm_clock_modal_mhz"] == 1890
+
+
+def _meta(root, label, **kw):
+    (root / label / "timing_meta.json").write_text(json.dumps(kw))
+
+
+def test_absolute_reference_guard_excludes_low_warmup(tmp_path):
+    """A process that warmed up far below the configuration's best reference is THROTTLED even
+    though its own clocks match its own (low) reference."""
+    mod = load()
+    specs = [("e4_timing", "B8_N1024", 0.9, "cool-start", {"clock": c}) for c in (1890, 915)]
+    root = campaign(tmp_path, specs)
+    _meta(root, "e4_timing_B8_N1024_p0", reference_clock_mhz=1890)
+    _meta(root, "e4_timing_B8_N1024_p1", reference_clock_mhz=915)
+    runs = {r["label"]: r for r in mod.analyze(root)["runs"]}
+    assert runs["e4_timing_B8_N1024_p0"]["clean"] is True
+    low = runs["e4_timing_B8_N1024_p1"]
+    assert low["clean"] is False and low["in_band_fraction"] == 1.0
+    assert any("best in config 1890" in t for t in low["tags"])
+
+
+def test_mixed_harness_versions_are_refused(tmp_path):
+    import pytest
+
+    mod = load()
+    specs = [("e3_timing", "N8192", 0.9, "cool-start", {})] * 2
+    root = campaign(tmp_path, specs)
+    _meta(root, "e3_timing_N8192_p0", reference_clock_mhz=1890, harness_version="v-new")
+    _meta(root, "e3_timing_N8192_p1", reference_clock_mhz=1890)
+    with pytest.raises(SystemExit, match="different harness versions"):
+        mod.analyze(root)
+
+
+def test_legacy_runs_are_labelled(tmp_path):
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N1024", 0.9, "cool-start", {})])
+    report = mod.analyze(root)
+    assert report["runs"][0]["harness_version"] == "pre-2026-11-01"
+    assert report["results"]["e3_timing/N1024"]["harness_version"] == "pre-2026-11-01"
+
+
+def test_secondary_baseline_writes_its_own_file(tmp_path):
+    """--baseline a3: ratios against unpadded A3, written beside (not over) the primary file."""
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N8192", 0.8, "cool-start", {})] * 5)
+    for i in range(5):
+        path = root / f"e3_timing_N8192_p{i}" / "samples.jsonl"
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        extra = [
+            {**r, "variant": "a3", "latency_ms": r["latency_ms"] * 0.5}
+            for r in rows
+            if r["variant"] == "a3pad"
+        ]
+        path.write_text("\n".join(json.dumps(r) for r in rows + extra) + "\n")
+    primary = mod.analyze(root)["results"]["e3_timing/N8192"]
+    secondary = mod.analyze(root, "a3")["results"]["e3_timing/N8192"]
+    assert primary["baseline"] == "a3pad" and secondary["baseline"] == "a3"
+    assert abs(primary["c3_accurate"]["geomean_ratio_clean"] - 0.8) < 0.01
+    assert abs(secondary["c3_accurate"]["geomean_ratio_clean"] - 1.6) < 0.03
+    assert (root / "variants_analysis.json").exists()
+    assert (root / "variants_analysis_vs_a3.json").exists()

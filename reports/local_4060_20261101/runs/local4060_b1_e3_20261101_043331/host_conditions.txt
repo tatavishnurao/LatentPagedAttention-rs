@@ -1,0 +1,1 @@
+host conditions at start (2026-11-01): AC power; Windows plan High performance (set via powercfg /setactive SCHEME_MIN); EA Desktop closed; Brave open but 0% GPU engine use over 5 s; surface/cooling/room reported by user, not verified.

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Portable E0b runner for a native-Linux sm_89 GPU host (validated target: cloud L4).
 # Preflight -> build -> MMA compile probe (CPU only) -> E0b campaign -> analysis -> tarball.
-# See docs/E0B_CLOUD_RUNBOOK.md. Refuses /mnt paths and WSL.
+# See docs/E0B_CLOUD_RUNBOOK.md. Refuses /mnt paths, and WSL unless --allow-wsl is given
+# (then every output is labelled as laptop / WSL2 data, never a cloud result).
 set -euo pipefail
 
 usage() {
@@ -21,17 +22,22 @@ usage: scripts/e0b/run_e0b_portable.sh --out-dir DIR [options]
   --max-footprint-gib G  refuse E4 configs whose device footprint exceeds G (default 20)
   --e3e4-iterations N  timed iterations per E3/E4 process (default 50)
   --skip-e3e4          run only the E0b (A1 vs C1) stages
+  --e3-a3-unpadded     add unpadded A3 as a fourth E3 timing variant (sensitivity run; it gets
+                       its own harness version and a secondary analysis vs unpadded A3)
+  --skip-e0b           skip the E0b (A1 vs C1) campaign and its analysis; run E3 / E4 only
   --skip-build         reuse an existing release build
   --preflight-only     check the environment and exit
+  --allow-wsl          opt in to running under WSL2 (still refuses /mnt); results are labelled
+                       "laptop ..., WSL2, not a cloud result" in environment.txt and analysis JSON
   --dry-run            fail-fast smoke test: every stage, but 1K only, 1 process, 1 attempt;
                        then verifies the outputs (correctness, per-sample clocks, analysis)
 EOF
 }
 
 OUT_DIR="" LENGTHS="1024,8192,32768" MIN_COOL=5 MAX_ATTEMPTS=8 COOL_C=80 COOLDOWN_S=300
-ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0
+ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0 ALLOW_WSL=0
 E3_LENGTHS="1024,8192,32768" E4_BATCHES="1,8,32" E3E4_ITERS=50 SKIP_E3E4=0
-E4_SEQS="1024" MAX_FOOTPRINT_GIB=20
+E4_SEQS="1024" MAX_FOOTPRINT_GIB=20 SKIP_E0B=0 E3_A3_UNPADDED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;
@@ -48,14 +54,18 @@ while [[ $# -gt 0 ]]; do
     --max-footprint-gib) MAX_FOOTPRINT_GIB="$2"; shift 2 ;;
     --e3e4-iterations) E3E4_ITERS="$2"; shift 2 ;;
     --skip-e3e4) SKIP_E3E4=1; shift ;;
+    --skip-e0b) SKIP_E0B=1; shift ;;
+    --e3-a3-unpadded) E3_A3_UNPADDED=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
+    --allow-wsl) ALLOW_WSL=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 [[ -n "$OUT_DIR" ]] || { usage >&2; exit 2; }
+[[ "$SKIP_E0B" == 1 && "$SKIP_E3E4" == 1 ]] && { echo "--skip-e0b and --skip-e3e4 leave nothing to run" >&2; exit 2; }
 if [[ "$DRY_RUN" == 1 ]]; then
   LENGTHS=1024 MIN_COOL=1 MAX_ATTEMPTS=1 E3_LENGTHS=1024 E4_BATCHES=1 E4_SEQS=1024 E3E4_ITERS=5
 fi
@@ -68,7 +78,22 @@ fail() { echo "PREFLIGHT_FAIL: $*" >&2; exit 1; }
 [[ "$ROOT" != /mnt/* ]] || fail "repository is under /mnt ($ROOT); clone onto a native filesystem"
 [[ "$OUT_DIR" != /mnt/* ]] || fail "--out-dir is under /mnt ($OUT_DIR)"
 [[ ! -e "$OUT_DIR" ]] || fail "--out-dir already exists ($OUT_DIR); results directories are immutable"
-grep -qi microsoft /proc/version 2>/dev/null && fail "WSL detected; this runner is for native Linux"
+# E0B_PROC_VERSION exists only so tests can simulate a WSL kernel; it defaults to /proc/version.
+HOST_LABEL="" ON_WSL=0 CLOCKS_LOCKED=0
+grep -qi microsoft "${E0B_PROC_VERSION:-/proc/version}" 2>/dev/null && ON_WSL=1
+if [[ "$ON_WSL" == 1 && "$ALLOW_WSL" == 0 ]]; then
+  fail "WSL detected; this runner is for native Linux (pass --allow-wsl for labelled laptop data)"
+fi
+wsl_warning() {
+  echo "WARNING: --allow-wsl: WSL2 host. Results are ${HOST_LABEL:-laptop / WSL2 data, not a cloud result}." >&2
+}
+on_exit() {
+  [[ "$CLOCKS_LOCKED" == 1 ]] && { nvidia-smi -rgc >/dev/null 2>&1 || true; }
+  [[ "$ON_WSL" == 1 ]] && wsl_warning
+  return 0
+}
+trap on_exit EXIT
+[[ "$ON_WSL" == 1 ]] && wsl_warning
 
 # Tool resolution: explicit environment first, then discovery, then documented defaults.
 CARGO_BIN="${CARGO_HOME:-$HOME/.cargo}/bin"
@@ -111,9 +136,23 @@ python3 -c 'import ctypes; ctypes.CDLL("libnvidia-ml.so.1")' 2>/dev/null \
 
 CC="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d ' ')"
 [[ "$CC" == "8.9" ]] || fail "compute capability $CC; kernels and the probe target sm_89 (L4 / RTX 40xx)"
+if [[ "$ON_WSL" == 1 ]]; then
+  GPU_NAME="$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+  if [[ "$GPU_NAME" == *"RTX 4060 Laptop"* ]]; then
+    HOST_LABEL="laptop RTX 4060, WSL2, not a cloud result"
+  else
+    HOST_LABEL="WSL2 ($GPU_NAME), not a cloud result"
+  fi
+  export E0B_HOST_LABEL="$HOST_LABEL"  # copied into the analysis JSON by the analyzers
+fi
+# Under WSL the Windows-side app check runs before every E3/E4 process (LOCAL_4060_PLAN.md).
+HOST_CHECK=""
+[[ "$ON_WSL" == 1 ]] && HOST_CHECK="$ROOT/scripts/e0b/wsl_host_check.sh"
 NVCC_VER="$("$CUDA_TOOLKIT_PATH/bin/nvcc" --version | grep -o 'release [0-9.]*' | cut -d' ' -f2)"
 [[ "$NVCC_VER" == "13.3" ]] || echo "PREFLIGHT_WARN: nvcc $NVCC_VER; validated with 13.3" >&2
-DRV_CUDA="$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | awk '{print $3}')"
+# Older drivers print "CUDA Version: X.Y"; 61x drivers print "CUDA UMD Version: X.Y".
+DRV_CUDA="$(nvidia-smi | grep -oE 'CUDA (UMD )?Version: [0-9.]+' | head -1 | awk '{print $NF}' || true)"
+[[ -n "$DRV_CUDA" ]] || { echo "PREFLIGHT_WARN: could not parse the driver CUDA version" >&2; DRV_CUDA=0.0; }
 # Validated: driver 595.97 reporting CUDA 13.2 with toolkit 13.3 (tileiras emits sm_89 cubins
 # ahead of time; the driver only loads them). Older drivers are unvalidated, not known-bad.
 python3 - "$DRV_CUDA" <<'EOF' || echo "PREFLIGHT_WARN: driver reports CUDA $DRV_CUDA (< 13.2, unvalidated)" >&2
@@ -124,8 +163,11 @@ EOF
 
 mkdir -p "$OUT_DIR"
 {
+  [[ -n "$HOST_LABEL" ]] && echo "host_label: $HOST_LABEL"
+  [[ -n "$HOST_CHECK" ]] && echo "host_check_per_process: $HOST_CHECK"
   echo "date_utc: $(date -u +%FT%TZ)"
-  echo "mode: $([[ "$DRY_RUN" == 1 ]] && echo dry-run || echo full) lengths=$LENGTHS min_cool=$MIN_COOL max_attempts=$MAX_ATTEMPTS"
+  echo "mode: $([[ "$DRY_RUN" == 1 ]] && echo dry-run || echo full) lengths=$LENGTHS min_cool=$MIN_COOL max_attempts=$MAX_ATTEMPTS skip_e0b=$SKIP_E0B skip_e3e4=$SKIP_E3E4"
+  echo "e3_lengths=$E3_LENGTHS e4_batches=$E4_BATCHES e4_seqs=$E4_SEQS iterations=$E3E4_ITERS"
   echo "host: $(hostname)"; uname -a
   nvidia-smi --query-gpu=name,compute_cap,driver_version,vbios_version,memory.total,power.limit,power.max_limit,clocks.max.sm,clocks.max.mem,temperature.gpu --format=csv
   echo "driver_cuda: $DRV_CUDA"; echo "CUDA_TOOLKIT_PATH=$CUDA_TOOLKIT_PATH LIBCLANG_PATH=$LIBCLANG_PATH"
@@ -142,7 +184,7 @@ echo "PREFLIGHT_OK (environment in $OUT_DIR/environment.txt)"
 # ---- optional clock lock ---------------------------------------------------------------------
 if [[ -n "$LOCK_SM" ]]; then
   [[ "$(id -u)" == 0 ]] || fail "--lock-sm-mhz needs root"
-  trap 'nvidia-smi -rgc >/dev/null 2>&1 || true' EXIT
+  CLOCKS_LOCKED=1
   nvidia-smi -lgc "$LOCK_SM,$LOCK_SM" | tee -a "$OUT_DIR/environment.txt"
 fi
 
@@ -160,9 +202,11 @@ sha256sum "$C1_RTABLE_BIN" "$MMA_PROBE_BIN" "$E3_SPLITK_BIN" \
   | tee "$OUT_DIR/mma_probe.log"
 
 # ---- E0b campaign ----------------------------------------------------------------------------
-python3 "$ROOT/scripts/e0b/e0b_campaign.py" --out-dir "$OUT_DIR/campaign" --lengths "$LENGTHS" \
-  --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
-  --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" | tee "$OUT_DIR/campaign.log"
+if [[ "$SKIP_E0B" == 0 ]]; then
+  python3 "$ROOT/scripts/e0b/e0b_campaign.py" --out-dir "$OUT_DIR/campaign" --lengths "$LENGTHS" \
+    --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
+    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" | tee "$OUT_DIR/campaign.log"
+fi
 
 # ---- E3 correctness gate, then E3 / E4 campaign ----------------------------------------------
 if [[ "$SKIP_E3E4" == 0 ]]; then
@@ -178,28 +222,38 @@ if [[ "$SKIP_E3E4" == 0 ]]; then
     --e3-lengths "$E3_LENGTHS" --e4-batches "$E4_BATCHES" --e4-seqs "$E4_SEQS" \
     --max-footprint-gib "$MAX_FOOTPRINT_GIB" --iterations "$E3E4_ITERS" \
     --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
-    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" \
+    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" --host-check "$HOST_CHECK" \
+    $([[ "$E3_A3_UNPADDED" == 1 ]] && echo --e3-a3-unpadded) \
     $([[ "$DRY_RUN" == 1 ]] && echo --skip-e4-correctness) | tee "$OUT_DIR/e3e4_campaign.log"
   python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" > "$OUT_DIR/e3e4_analysis_stdout.json"
+  if [[ "$E3_A3_UNPADDED" == 1 ]]; then  # secondary analysis (LOCAL_4060_PLAN.md addendum 2)
+    python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" --baseline a3 \
+      > "$OUT_DIR/e3e4_analysis_vs_a3_stdout.json"
+  fi
 fi
 
 # ---- analysis + package ----------------------------------------------------------------------
-python3 "$ROOT/scripts/e0b/analyze_e0b.py" "$OUT_DIR/campaign" > "$OUT_DIR/analysis_stdout.json"
+if [[ "$SKIP_E0B" == 0 ]]; then
+  python3 "$ROOT/scripts/e0b/analyze_e0b.py" "$OUT_DIR/campaign" > "$OUT_DIR/analysis_stdout.json"
+fi
 tar --exclude='oracle_inputs_outputs.json' -czf "$OUT_DIR.tar.gz" -C "$(dirname "$OUT_DIR")" \
   "$(basename "$OUT_DIR")"
 if [[ "$DRY_RUN" == 1 ]]; then
   # Fail fast on anything a full campaign would need: a finished process, passing correctness,
   # per-sample NVML clocks, telemetry, MMA lowering, and an analysis row.
-  python3 - "$OUT_DIR" <<'EOF'
+  python3 - "$OUT_DIR" "$([[ "$SKIP_E0B" == 1 ]] && echo skip-e0b || echo with-e0b)" <<'EOF'
 import json
 import sys
 from pathlib import Path
 
 out = Path(sys.argv[1])
+skip_e0b = len(sys.argv) > 2 and sys.argv[2] == "skip-e0b"
 problems = []
 camp = out / "campaign"
-runs = json.loads((camp / "manifest.json").read_text())["runs"]
-if not runs or runs[0]["returncode"] != 0:
+runs = [] if skip_e0b else json.loads((camp / "manifest.json").read_text())["runs"]
+if skip_e0b:
+    print("dry-run E0b: skipped (--skip-e0b)")
+elif not runs or runs[0]["returncode"] != 0:
     problems.append(f"campaign process failed: {runs[:1]}")
 else:
     run = camp / runs[0]["label"]
@@ -220,9 +274,10 @@ probe = json.loads((out / "mma_probe" / "mma_probe_summary.json").read_text())
 f16 = [x for x in probe if x["kernel"].endswith("_f16") and "error" not in x]
 if not f16 or any(x["sass_mma_instructions"] == 0 for x in f16):
     problems.append("MMA probe: FP16 kernels missing HMMA")
-analysis = json.loads((camp / "e0b_analysis.json").read_text())
-if "1024" not in analysis["results"]:
-    problems.append("analysis has no 1024 result")
+if not skip_e0b:
+    analysis = json.loads((camp / "e0b_analysis.json").read_text())
+    if "1024" not in analysis["results"]:
+        problems.append("analysis has no 1024 result")
 # E3 / E4 paths: correctness gate, timing samples with clocks, pre-timing correctness, analysis.
 e3e4 = out / "e3e4"
 if e3e4.exists():
@@ -272,6 +327,12 @@ if e3e4.exists():
     for key, res in va["results"].items():
         if key.startswith("e4_timing/") and (res.get("batch") is None or res.get("seq") is None):
             problems.append(f"variants analysis {key}: batch/seq not parsed")
+    # Instrument check (information, not a gate): share of SM clock reads near the reference.
+    for r in va.get("runs", []):
+        if "in_band_fraction" in r:
+            print(f"dry-run clocks {r['label']}: in_band={r['in_band_fraction']} "
+                  f"modal={r.get('sm_clock_modal_mhz')} ref={r.get('reference_clock_mhz')} "
+                  f"throttled={r.get('throttled')}")
 if problems:
     print("DRY_RUN_FAIL: " + "; ".join(problems))
     sys.exit(1)

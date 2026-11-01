@@ -1,0 +1,1 @@
+ABORTED (2026-11-01): stopped deliberately mid-run because host conditions changed (Brave was open at start and closed during the run). Mixed conditions; not part of the primary dataset. Partial processes kept, descriptive only.

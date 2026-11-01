@@ -9,6 +9,13 @@ paired iterations, baseline = padded A3 ("a3pad"). E3 uses component "pipeline";
 Policy (2026-10-02, same as analyze_e0b.py):
 - THROTTLED: any in-process SM clock read > 5 % below the process's modal clock, or any
   thermal/HW slowdown reason bit (0x8, 0x20, 0x40, 0x80) in NVML or external telemetry.
+  Added 2026-10-31 (before local data): also THROTTLED if the modal SM clock is > 5 % below the
+  process's own warm-up reference clock. Each run also reports in_band_fraction, the share of
+  SM clock reads >= 95 % of that reference (an instrument check, not a gate).
+  Added 2026-11-01 (docs/LOCAL_4060_PLAN.md addendum, before data): also THROTTLED if the warm-up
+  reference is < 95 % of the highest reference among the processes of the same configuration in
+  the same campaign. Processes with different harness_version values (timing_meta.json; missing
+  = "pre-2026-11-01") are never pooled: the analysis refuses such a configuration.
 - Only cool-start, non-THROTTLED, successful processes are "clean". THROTTLED and hot-start
   processes are reported separately and never enter ratios or CIs.
 - Primary estimate: geometric mean of per-process ratios over clean processes; 95 % CI by
@@ -26,10 +33,10 @@ Standard library only.
 import collections
 import json
 import math
+import os
 import random
 import re
 import statistics
-import sys
 from pathlib import Path
 
 THERMAL_BITS = 0x8 | 0x20 | 0x40 | 0x80
@@ -40,6 +47,25 @@ B = 10000
 
 
 DEFAULT_E4_SEQ = 1024
+LEGACY_HARNESS = "pre-2026-11-01"
+
+
+def load_meta(root, label):
+    path = root / label / "timing_meta.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def best_references(root, runs):
+    """{(kind, config): highest warm-up reference clock} over processes that produced samples."""
+    best = {}
+    for run in runs:
+        if run.get("kind") not in COMPONENT or run["returncode"] != 0:
+            continue
+        ref = load_meta(root, run["label"]).get("reference_clock_mhz")
+        if ref:
+            key = (run["kind"], run["config"])
+            best[key] = max(best.get(key, 0), ref)
+    return best
 
 
 def parse_config(kind, config):
@@ -87,8 +113,32 @@ def mode(values):
     return collections.Counter(values).most_common(1)[0][0]
 
 
-def tag(rows, external_reasons=0):
-    """Returns (throttled, details) for one process from its sample rows."""
+def clock_stats(rows, reference):
+    """{modal, reference, in_band_fraction, temp_max} for one process (reported, not a gate)."""
+    clocks = [
+        c
+        for r in rows
+        for c in (r.get("sm_clock_pre_mhz"), r.get("sm_clock_post_mhz"))
+        if c is not None
+    ]
+    temps = [r["temperature_c"] for r in rows if r.get("temperature_c") is not None]
+    return {
+        "sm_clock_modal_mhz": mode(clocks) if clocks else None,
+        "reference_clock_mhz": reference,
+        "in_band_fraction": (
+            round(sum(1 for c in clocks if c >= 0.95 * reference) / len(clocks), 4)
+            if clocks and reference
+            else None
+        ),
+        "sm_clock_reads": len(clocks),
+        "temp_max_inproc_c": max(temps) if temps else None,
+    }
+
+
+def tag(rows, external_reasons=0, reference=None):
+    """Returns (throttled, details) for one process from its sample rows. `reference` is the
+    process's warm-up reference SM clock (timing_meta.json); the modal clock more than 5 %
+    below it is THROTTLED (runbook section 4, 2026-10-31)."""
     clocks = [
         c
         for r in rows
@@ -100,17 +150,23 @@ def tag(rows, external_reasons=0):
         reasons |= r.get("clock_event_reasons") or 0
     details = []
     low = 0
+    below_reference = False
     if clocks:
         m = mode(clocks)
         low = sum(1 for c in clocks if c < 0.95 * m)
         if low:
             details.append(f"clock: {low}/{len(clocks)} reads <95% of mode {m}")
+        if reference and m < 0.95 * reference:
+            below_reference = True
+            details.append(f"modal clock {m} <95% of warm-up reference {reference}")
+        elif not reference:
+            details.append("no reference clock; reference rule not applied")
     else:
         details.append("no clock telemetry")
     thermal = bool(reasons & THERMAL_BITS)
     if thermal:
         details.append(f"thermal bits {hex(reasons)}")
-    return (bool(low) or thermal or not clocks), details
+    return (bool(low) or below_reference or thermal or not clocks), details
 
 
 def external_reasons(path):
@@ -126,16 +182,16 @@ def external_reasons(path):
     return reasons
 
 
-def paired(rows, component, variant):
+def paired(rows, component, variant, baseline=BASELINE):
     """[(baseline_ms, variant_ms)] for iterations that have both."""
     by_it = collections.defaultdict(dict)
     for r in rows:
-        if r.get("component") == component and r.get("variant") in (BASELINE, variant):
+        if r.get("component") == component and r.get("variant") in (baseline, variant):
             by_it[r["iteration"]][r["variant"]] = r["latency_ms"]
     return [
-        (v[BASELINE], v[variant])
+        (v[baseline], v[variant])
         for _, v in sorted(by_it.items())
-        if BASELINE in v and variant in v
+        if baseline in v and variant in v
     ]
 
 
@@ -157,12 +213,15 @@ def bootstrap_ci(per_process_pairs, rng, replicates=B):
     return stats[int(0.025 * replicates)], stats[int(0.975 * replicates) - 1]
 
 
-def analyze(root):
+def analyze(root, baseline=BASELINE):
     root = Path(root)
     manifest = json.loads((root / "manifest.json").read_text())
     rng = random.Random(20261002)
     groups = collections.defaultdict(list)
     report = {"campaign": str(root), "runs": [], "results": {}}
+    best_ref = best_references(root, manifest["runs"])
+    if os.environ.get("E0B_HOST_LABEL"):
+        report["host_label"] = os.environ["E0B_HOST_LABEL"]
     for run in manifest["runs"]:
         kind = run.get("kind")
         if kind not in COMPONENT:
@@ -183,13 +242,24 @@ def analyze(root):
             report["runs"].append(entry)
             continue
         rows = [json.loads(line) for line in samples.open()]
-        throttled, details = tag(rows, external_reasons(root / f"{run['label']}_telemetry.csv"))
-        entry.update({"throttled": throttled, "tags": details})
+        meta = load_meta(root, run["label"])
+        reference = meta.get("reference_clock_mhz")
+        throttled, details = tag(
+            rows, external_reasons(root / f"{run['label']}_telemetry.csv"), reference
+        )
+        best = best_ref.get((kind, run["config"]))
+        if reference and best and reference < 0.95 * best:
+            throttled = True
+            details.append(f"warm-up reference {reference} <95% of best in config {best}")
+        entry["harness_version"] = meta.get("harness_version", LEGACY_HARNESS)
+        entry["best_reference_clock_mhz_in_config"] = best
+        entry.update({"throttled": throttled, "tags": details, **clock_stats(rows, reference)})
+        for key in ("start_temp_c", "cooldown_wait_s"):
+            if key in run:
+                entry[key] = run[key]
         clean = run["start_condition"] == "cool-start" and not throttled
         entry["clean"] = clean
         report["runs"].append(entry)
-        meta_path = root / run["label"] / "timing_meta.json"
-        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
         groups[(kind, run["config"])].append((clean, rows, run["label"], meta))
     for (kind, config), procs in sorted(groups.items()):
         component = COMPONENT[kind]
@@ -200,12 +270,19 @@ def analyze(root):
                 for r in rows
                 if r.get("component") == component
             }
-            - {BASELINE}
+            - {baseline}
         )
+        versions = {m.get("harness_version", LEGACY_HARNESS) for _, _, _, m in procs}
+        if len(versions) > 1:
+            raise SystemExit(
+                f"{kind}/{config}: processes from different harness versions {sorted(versions)}; "
+                "refusing to pool them"
+            )
         info = bytes_info(kind, [m for _, _, _, m in procs])
         res = {
             "component": component,
-            "baseline": BASELINE,
+            "baseline": baseline,
+            "harness_version": versions.pop(),
             **parse_config(kind, config),
             **info,
             "clean_processes": [lbl for c, _, lbl, _ in procs if c],
@@ -213,9 +290,13 @@ def analyze(root):
         }
         step_bytes = info.get("bytes_per_step_analytical", {})
         for variant in variants:
-            clean_pairs = [paired(rows, component, variant) for c, rows, _, _ in procs if c]
+            clean_pairs = [
+                paired(rows, component, variant, baseline) for c, rows, _, _ in procs if c
+            ]
             clean_pairs = [p for p in clean_pairs if p]
-            other_pairs = [paired(rows, component, variant) for c, rows, _, _ in procs if not c]
+            other_pairs = [
+                paired(rows, component, variant, baseline) for c, rows, _, _ in procs if not c
+            ]
             other_pairs = [p for p in other_pairs if p]
             entry = {
                 "per_process_ratio_clean": [round(ratio_of_medians(p), 4) for p in clean_pairs],
@@ -228,7 +309,7 @@ def analyze(root):
                     geomean([ratio_of_medians(p) for p in clean_pairs]), 4
                 )
                 med = {
-                    BASELINE: statistics.median(b for p in clean_pairs for b, _ in p),
+                    baseline: statistics.median(b for p in clean_pairs for b, _ in p),
                     variant: statistics.median(x for p in clean_pairs for _, x in p),
                 }
                 entry["median_ms_clean"] = {k: round(v, 4) for k, v in med.items()}
@@ -241,9 +322,24 @@ def analyze(root):
             entry["claim_eligible"] = len(clean_pairs) >= MIN_CLEAN_FOR_CLAIM
             res[variant] = entry
         report["results"][f"{kind}/{config}"] = res
-    (root / "variants_analysis.json").write_text(json.dumps(report, indent=2))
+    name = (
+        "variants_analysis.json"
+        if baseline == BASELINE
+        else f"variants_analysis_vs_{baseline}.json"
+    )
+    (root / name).write_text(json.dumps(report, indent=2))
     return report
 
 
 if __name__ == "__main__":
-    print(json.dumps(analyze(sys.argv[1]), indent=1))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="E3/E4 variant analysis")
+    parser.add_argument("campaign")
+    parser.add_argument(
+        "--baseline",
+        default=BASELINE,
+        help="baseline variant (default a3pad, the pre-declared one); others are secondary",
+    )
+    cli = parser.parse_args()
+    print(json.dumps(analyze(cli.campaign, cli.baseline), indent=1))
