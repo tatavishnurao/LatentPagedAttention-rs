@@ -18,8 +18,15 @@ def run(tmp_path, *args, wsl=True):
     proc_version = tmp_path / "proc_version"
     kernel = "Linux version 6.6 (microsoft-standard-WSL2)" if wsl else "Linux version 6.8"
     proc_version.write_text(kernel + "\n")
+    # A stub nvidia-smi so the preflight reaches the toolchain checks on hosts without a driver
+    # (CI); the runner only tests that the command exists before it checks nvcc.
+    stub_bin = tmp_path / "stub_bin"
+    stub_bin.mkdir(exist_ok=True)
+    (stub_bin / "nvidia-smi").write_text("#!/usr/bin/env bash\nexit 0\n")
+    (stub_bin / "nvidia-smi").chmod(0o755)
     env = {
         **os.environ,
+        "PATH": f"{stub_bin}:{os.environ['PATH']}",
         "E0B_PROC_VERSION": str(proc_version),
         "CUDA_TOOLKIT_PATH": str(tmp_path / "no_cuda"),
     }
