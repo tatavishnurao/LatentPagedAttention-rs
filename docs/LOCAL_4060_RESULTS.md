@@ -1,5 +1,7 @@
 # Local RTX 4060 results: latent paged decode vs padded full-KV (E3 / E4)
 
+> **Correction, 2026-11-01.** Instrument finding 1 below says "80 % of E4 layers ran at 210 MHz" in the first dry run. The committed samples (`reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/`, counted by `scripts/paper/make_tables.py`) give **73 %** of E4 layer reads exactly at 210 MHz, and an in-band fraction of 0.09. The text below is left as written; the paper uses 73 %. The same "80 %" appears in the message of commit `507dea2` and in the description of PR #10; neither is rewritten. All corrections are listed in the paper's corrections ledger (`paper/paper.md`, Appendix A).
+
 **Host: laptop RTX 4060 (8 GB, sm_89), WSL2. Not a cloud result, not an L4 result.** Data: `reports/local_4060_20261101/`. Run selection fixed in advance: `docs/LOCAL_4060_PLAN.md`. Rules: `docs/E0B_CLOUD_RUNBOOK.md` section 4. Every number below is MEASURED from the files named, unless marked SOURCE (read in code) or HYPOTHESIS.
 
 ## Verdict
