@@ -23,10 +23,10 @@ We asked a narrow question: on one consumer GPU, with both kernels written in th
 
 **Contributions.**
 
-1. *A clock-validity failure mode, and an exclusion protocol for hosts where clocks cannot be locked* (Section 3). That idle clocks distort short kernels is known [10, 11]; the specifics below we have not found reported (Section 7). Under WSL2 the GPU idles between short kernels whenever the host pauses. In the E3/E4 harness the pause was a 20.8 ms NVML call (measured idle, on one driver): in one process 73 % of layer samples ran at 210 MHz, about 16 times slower, and a modal-clock rule passed it. A 10-iteration check of the first fix passed; the 50-iteration campaign then collapsed. An older A1/C1 harness had idle clocks from slow output writes, which never affected E3/E4.
-2. *Numerics* (Section 4). On one heavy-tailed dataset, the large latent-kernel error comes from FP16 rounding of the projected query, not from accumulation. A hi/lo split fixes it; it doubles the score MMAs (+50 % total MMAs per step) and, at the one size where both modes were timed, costs 1.7 to 5.2 % (CIs include 1.0).
-3. *A fair baseline under cuTile's tensor-core rules* (Section 5). In our probes (4 and 16 rows, 256 and 512 outputs) only 16-row tiles with at least 512 outputs got HMMA, so GQA needs query-head padding. At one configuration (E3 N=8192, warm L2), unpadded A3 is only about 3.6 % faster than padded A3, and the latent win holds against both.
-4. *A mixed, bounded result* (Section 5). Faster at E3 N=8192 (0.893) and E4 B8_N8192 (0.865), slower at E4 B32_N4096 (1.030), not shown at E4 B32_N8192 (0.972); seven configurations are descriptive only. E4 flushes L2 before every layer, so L2 size is not an axis of E4.
+1. *A clock-validity failure mode, and an exclusion protocol for hosts where clocks cannot be locked* (Section 3): under WSL2 a 20.8 ms NVML call (measured idle, one driver) left 73 % of one process's layer samples at 210 MHz, about 16 times slower, a modal-clock rule passed it, and a 10-iteration check of the first fix passed where the 50-iteration run collapsed; idle clocks distorting short kernels is known [10, 11], these specifics we have not found reported (Section 7).
+2. *Numerics* (Section 4): on one heavy-tailed dataset the large latent-kernel error comes from FP16 rounding of the projected query, not accumulation, and a hi/lo split fixes it at double the score MMAs and, at the one size where both modes were timed, 1.7 to 5.2 % more time (CIs include 1.0).
+3. *A fair baseline under cuTile's tensor-core rules* (Section 5): in our probes (4 and 16 rows, 256 and 512 outputs) only 16-row tiles with at least 512 outputs got HMMA, so GQA needs query-head padding, and at one configuration (E3 N=8192, warm L2) unpadded A3 is only about 3.6 % faster and the latent win holds against both.
+4. *A mixed, bounded result* (Section 5): of 11 configurations the latent kernel is faster in two, slower in one, not shown to differ in one, and seven are descriptive only; L2 size is not an axis of E4.
 
 # Setup
 
@@ -54,7 +54,7 @@ An E4 layer at B=1, N=1024 takes about 24 µs at the reference clock [M:void]. A
 
 ## Trap 1: slow output writes (older A1/C1 harness only)
 
-In an earlier campaign on this laptop, the A1/C1 harness wrote oracle and correctness files to a OneDrive-backed Windows path during the run [M:t1]. One 1K run took 122 s of wall time against 5 s with output on ext4; its modal SM clock was 210 MHz and 79 % of its samples were low-clock. The A1 context kernel took a median 321.5 µs at idle clock against 43.0 µs in a clean boost-clock run, about 7.5 times slower. Those ratios were declared void, and output now happens after timing. This trap affected the A1/C1 harness only; the E3/E4 harness used for every ratio in this paper never wrote output during timing [S:harness].
+An earlier A1/C1 harness wrote oracle and correctness files to a slow OneDrive-backed Windows path during timing, so the GPU idled at low clocks [M:t1]. That voided the A1/C1 ratios of 2026-10-02. The E3/E4 harness used for every ratio in this paper never wrote output during timing [S:harness].
 
 ## Trap 2: a 20 ms telemetry call
 
@@ -68,7 +68,7 @@ Fix 1 read the reasons bits once per step and added an untimed re-warm of short 
 
 ## The protocol that came out of it
 
-Each rule below was written down before the data it applies to and only adds exclusions [S:rules]. A process is **THROTTLED** if any SM clock read is more than 5 % below its modal clock or any thermal or hardware-slowdown bit is set; if its modal clock is more than 5 % below its own warm-up reference (this closes the Trap 2 gap); or if that reference is below 0.95 times the best reference in the configuration. The **in-band fraction** is reported for every process as an instrument check, not a gate. Output from a harness state later shown to be broken is labelled **VOID** or **instrument failure** and never used for ratios. Every harness change gets a **full-length instrument check** with no ratios computed. A **host check** precedes every process, and each block runs **once**: a configuration with too few clean processes is reported, not re-run until it passes.
+Beyond the timing protocol in Section 2 [S:rules], a process is **THROTTLED** if any SM clock read is more than 5 % below its modal clock or any thermal or hardware-slowdown bit is set; if its modal clock is more than 5 % below its own warm-up reference (this closes the Trap 2 gap); or if that reference is below 0.95 times the best reference in the configuration. The **in-band fraction** is reported for every process as an instrument check, not a gate. Output from a broken harness state is **VOID** (or an **instrument failure**), and every harness change gets a full-length check first. Each block runs **once**: a configuration with too few clean processes is reported, not re-run until it passes.
 
 # Numerics
 
@@ -111,7 +111,7 @@ Is padded A3 a strawman? A secondary run declared before its data [S:rules] adde
 
 ## What E4 can and cannot show
 
-E4 writes a 64 MiB buffer before every layer, and each KV or latent block is read once per layer; only queries, projections, block tables and partial results are reused [S:e4]. Every E4 layer therefore reads its cache from DRAM whatever its size, and *L2 size is not an axis of E4*. The hypothesis that the latent cache wins once the working set outgrows L2 is not tested by E4. E3 is not flushed, so E3 vs E4 contrasts warm and cold caches, not sizes. With three claim-eligible E4 points, no trend in B or N can be established; the crossing of 1.0 lies somewhere between B8_N8192 and B32_N4096, which differ in both B and N.
+Because E4 flushes L2 before every layer (Section 2) [S:e4], *L2 size is not an axis of E4*, and the hypothesis that the latent cache wins once the working set outgrows L2 is not tested. E3 vs E4 contrasts warm and cold caches, not sizes. With three claim-eligible E4 points, no trend in B or N can be established.
 
 # Limitations and what we do not claim
 
@@ -124,7 +124,7 @@ E4 writes a 64 MiB buffer before every layer, and each KV or latent block is rea
 
 # Related work
 
-PagedAttention and vLLM [1] page the KV cache to reduce memory waste from fragmentation and duplication; paging does not reduce bytes per token, and our kernels inherit its block-table indirection. Grouped-query attention [3] shares each key/value head among several query heads, which is why our full-KV baseline has 4 query rows per KV head and needs padding to reach tensor cores. Multi-head latent attention was introduced with DeepSeek-V2 [2], whose abstract describes compressing the KV cache into a latent vector and reports a 93.3 % KV-cache reduction for that model; MHA2MLA [5] and TransMLA [6] study converting existing multi-head models to MLA. KIVI [4] shrinks the cache by 2-bit quantization instead, a direction we did not evaluate. FlashAttention-2 [8] and FlashInfer [7] are optimized attention kernels; split-K decode with a log-sum-exp merge follows the same structure as FlashDecoding [TODO cite: Flash-Decoding, verify source]. Our kernels are written with cuTile [TODO cite: cuTile / cutile-rs, verify source]. The clock-event-reasons call is part of NVML [TODO cite: NVML API reference, verify source].
+PagedAttention and vLLM [1] page the KV cache to cut memory waste; paging does not reduce bytes per token. Grouped-query attention [3] shares each key/value head among several query heads, which is why our baseline needs padding. DeepSeek-V2 [2] introduced multi-head latent attention, reporting a 93.3 % KV-cache reduction for that model. MHA2MLA [5] and TransMLA [6] convert multi-head models to MLA. KIVI [4] shrinks the cache by 2-bit quantization, which we did not evaluate. FlashAttention-2 [8] and FlashInfer [7] are optimized attention kernels; our split-K decode follows FlashDecoding [TODO cite: Flash-Decoding, verify source]. Our kernels use cuTile [TODO cite: cuTile / cutile-rs, verify source], and the clock-event-reasons call is part of NVML [TODO cite: NVML API reference, verify source].
 
 **Measurement methodology.** Innocuous-looking details of an experimental setup can bias systems measurements enough to change a conclusion [9]; our three traps are GPU instances of that hazard. That GPU clock state changes performance substantially is well known: the DVFS literature models core and memory frequency as a variable, for example for energy [10], and frequency switching itself takes measurable time [11], which is why a GPU left idle between short kernels does not return to its reference clock at once. The standard answer is a fixed clock; Nsight Compute, for instance, locks GPC and memory clocks during profiling by default [12]. Under WSL2 we could not lock clocks, so we exclude processes by measured clock instead (Section 3). That a short warm-up can look settled while a longer run never reaches a steady state is documented for language virtual machines [13]; Trap 3 has the same shape on a GPU. In a bounded, non-exhaustive search we did not find reports of three specifics: an NVML query costing about 20 ms under WSL2 and idling the GPU between timed samples (we did not measure it on native Linux); a modal-clock validity rule that passes a process whose mode is the idle clock; and a 10-iteration instrument check passing where the 50-iteration run collapsed. We present these as observations we have not seen reported, not as established novelty.
 
@@ -191,7 +191,7 @@ Claims made earlier in this repository or in the paper brief that the evidence d
 | M:void | `reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/` |
 | M:checks | `reports/local_4060_20261101/instrument_checks/`; `reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/` |
 | M:nvml | `reports/nvml_latency_20261101/nvml_latency.json` (separate micro-measurement, not campaign data) |
-| M:t1 | `reports/diagnosis_20261002/e0/` (`seq1024_run1`, `seq1024_cool2`); `docs/DIAGNOSIS_2026-10-02.md` |
+| M:t1 | `reports/diagnosis_20261002/e0/` (`seq1024_run1`, `seq1024_cool2`); `docs/DIAGNOSIS_2026-10-02.md` (Trap 1: one 1K run took 122 s of wall time against 5 s with output on ext4, modal SM clock 210 MHz, 79 % of samples low-clock; A1 context kernel 321.5 µs at idle clock against 43.0 µs at boost) |
 | M:sass | `reports/e3_splitk_20261002/sass/`, `sass_a3_equal_treatment/`, `sass_c3_modes/`; `docs/E3_RESULTS.md`; `docs/E3_SPLITK_DESIGN.md` (b) for the 256-output tile |
 | M:scale | `reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log` |
 | M:emu | `reports/e3_splitk_20261002/scale/emulate_c3_numerics.out` |
