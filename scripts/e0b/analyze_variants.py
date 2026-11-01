@@ -37,7 +37,6 @@ import os
 import random
 import re
 import statistics
-import sys
 from pathlib import Path
 
 THERMAL_BITS = 0x8 | 0x20 | 0x40 | 0x80
@@ -183,16 +182,16 @@ def external_reasons(path):
     return reasons
 
 
-def paired(rows, component, variant):
+def paired(rows, component, variant, baseline=BASELINE):
     """[(baseline_ms, variant_ms)] for iterations that have both."""
     by_it = collections.defaultdict(dict)
     for r in rows:
-        if r.get("component") == component and r.get("variant") in (BASELINE, variant):
+        if r.get("component") == component and r.get("variant") in (baseline, variant):
             by_it[r["iteration"]][r["variant"]] = r["latency_ms"]
     return [
-        (v[BASELINE], v[variant])
+        (v[baseline], v[variant])
         for _, v in sorted(by_it.items())
-        if BASELINE in v and variant in v
+        if baseline in v and variant in v
     ]
 
 
@@ -214,7 +213,7 @@ def bootstrap_ci(per_process_pairs, rng, replicates=B):
     return stats[int(0.025 * replicates)], stats[int(0.975 * replicates) - 1]
 
 
-def analyze(root):
+def analyze(root, baseline=BASELINE):
     root = Path(root)
     manifest = json.loads((root / "manifest.json").read_text())
     rng = random.Random(20261002)
@@ -271,7 +270,7 @@ def analyze(root):
                 for r in rows
                 if r.get("component") == component
             }
-            - {BASELINE}
+            - {baseline}
         )
         versions = {m.get("harness_version", LEGACY_HARNESS) for _, _, _, m in procs}
         if len(versions) > 1:
@@ -282,7 +281,7 @@ def analyze(root):
         info = bytes_info(kind, [m for _, _, _, m in procs])
         res = {
             "component": component,
-            "baseline": BASELINE,
+            "baseline": baseline,
             "harness_version": versions.pop(),
             **parse_config(kind, config),
             **info,
@@ -291,9 +290,13 @@ def analyze(root):
         }
         step_bytes = info.get("bytes_per_step_analytical", {})
         for variant in variants:
-            clean_pairs = [paired(rows, component, variant) for c, rows, _, _ in procs if c]
+            clean_pairs = [
+                paired(rows, component, variant, baseline) for c, rows, _, _ in procs if c
+            ]
             clean_pairs = [p for p in clean_pairs if p]
-            other_pairs = [paired(rows, component, variant) for c, rows, _, _ in procs if not c]
+            other_pairs = [
+                paired(rows, component, variant, baseline) for c, rows, _, _ in procs if not c
+            ]
             other_pairs = [p for p in other_pairs if p]
             entry = {
                 "per_process_ratio_clean": [round(ratio_of_medians(p), 4) for p in clean_pairs],
@@ -306,7 +309,7 @@ def analyze(root):
                     geomean([ratio_of_medians(p) for p in clean_pairs]), 4
                 )
                 med = {
-                    BASELINE: statistics.median(b for p in clean_pairs for b, _ in p),
+                    baseline: statistics.median(b for p in clean_pairs for b, _ in p),
                     variant: statistics.median(x for p in clean_pairs for _, x in p),
                 }
                 entry["median_ms_clean"] = {k: round(v, 4) for k, v in med.items()}
@@ -319,9 +322,24 @@ def analyze(root):
             entry["claim_eligible"] = len(clean_pairs) >= MIN_CLEAN_FOR_CLAIM
             res[variant] = entry
         report["results"][f"{kind}/{config}"] = res
-    (root / "variants_analysis.json").write_text(json.dumps(report, indent=2))
+    name = (
+        "variants_analysis.json"
+        if baseline == BASELINE
+        else f"variants_analysis_vs_{baseline}.json"
+    )
+    (root / name).write_text(json.dumps(report, indent=2))
     return report
 
 
 if __name__ == "__main__":
-    print(json.dumps(analyze(sys.argv[1]), indent=1))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="E3/E4 variant analysis")
+    parser.add_argument("campaign")
+    parser.add_argument(
+        "--baseline",
+        default=BASELINE,
+        help="baseline variant (default a3pad, the pre-declared one); others are secondary",
+    )
+    cli = parser.parse_args()
+    print(json.dumps(analyze(cli.campaign, cli.baseline), indent=1))

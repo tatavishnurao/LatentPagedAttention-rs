@@ -70,7 +70,10 @@ def plan(args):
             )
             for n in seqs
         ]
-    configs = [("e3_timing", f"N{n}", ["--suite", "timing", "--seq", str(n)]) for n in lengths]
+    e3_extra = ["--with-a3-unpadded"] if getattr(args, "e3_a3_unpadded", False) else []
+    configs = [
+        ("e3_timing", f"N{n}", ["--suite", "timing", "--seq", str(n), *e3_extra]) for n in lengths
+    ]
     configs += [
         (
             "e4_timing",
@@ -160,6 +163,11 @@ def main():
     parser.add_argument("--cooldown-s", type=int, default=300)
     parser.add_argument("--abort-c", type=int, default=91)
     parser.add_argument("--skip-e4-correctness", action="store_true")
+    parser.add_argument(
+        "--e3-a3-unpadded",
+        action="store_true",
+        help="add unpadded A3 as a fourth E3 variant (sensitivity run; own harness version)",
+    )
     parser.add_argument(
         "--host-check",
         default="",

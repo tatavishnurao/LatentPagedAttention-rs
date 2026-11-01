@@ -126,3 +126,13 @@ def test_wsl_host_check_script(tmp_path, running, code, needle):
     )
     assert r.returncode == code, r.stdout + r.stderr
     assert needle in r.stdout
+
+
+def test_e3_a3_unpadded_flag_adds_variant_arg():
+    mod = load()
+    _, configs = mod.plan(ns(e3_lengths="8192", e4_batches="", e3_a3_unpadded=True))
+    assert configs == [
+        ("e3_timing", "N8192", ["--suite", "timing", "--seq", "8192", "--with-a3-unpadded"])
+    ]
+    _, plain = mod.plan(ns(e3_lengths="8192", e4_batches=""))
+    assert "--with-a3-unpadded" not in plain[0][2]

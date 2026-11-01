@@ -1310,6 +1310,9 @@ mod gpu_impl {
     #[derive(Clone, Copy, PartialEq, Debug)]
     enum Variant {
         A3Pad,
+        /// Unpadded A3 (no zero query rows). E3 timing only, behind --with-a3-unpadded
+        /// (sensitivity run, docs/LOCAL_4060_PLAN.md addendum 2).
+        A3,
         C3Fast,
         C3Accurate,
     }
@@ -1318,6 +1321,7 @@ mod gpu_impl {
         fn name(self) -> &'static str {
             match self {
                 Self::A3Pad => "a3pad",
+                Self::A3 => "a3",
                 Self::C3Fast => "c3_fast",
                 Self::C3Accurate => "c3_accurate",
             }
@@ -1335,6 +1339,7 @@ mod gpu_impl {
     fn tbuf(dims: Dims, variant: Variant, splits: usize, st: &Arc<Stream>) -> TBuf {
         let (rows, width) = match variant {
             Variant::A3Pad => (dims.hkv * 16, dims.d),
+            Variant::A3 => (dims.hq, dims.d),
             _ => (dims.hq, dims.l),
         };
         TBuf {
@@ -1394,6 +1399,33 @@ mod gpu_impl {
                         .generics(gens(&[g, d, MP]))
                         .async_on(st)
                         .expect("a3_reduce_pad launch")
+                };
+                (acc, m, lsum, out.unpartition())
+            }
+            Variant::A3 => {
+                let (acc, m, lsum, _, _, _, _, _, _, _) = unsafe {
+                    e3_kernels::a3_split(
+                        acc.partition([1, g, d]),
+                        m.partition([1, g, 1]),
+                        lsum.partition([1, g, 1]),
+                        dev.q_full,
+                        dev.k_full,
+                        dev.v_full,
+                        dev.table,
+                        active as i32,
+                        sps as i32,
+                        dims.scale(),
+                    )
+                    .generics(gens(&[hq, hkv, g, d, dims.blk, 2 * dims.blk]))
+                    .async_on(st)
+                    .expect("a3_split launch")
+                };
+                let (acc, m, lsum) = (acc.unpartition(), m.unpartition(), lsum.unpartition());
+                let (out, _, _, _, _) = unsafe {
+                    e3_kernels::a3_reduce(out.partition([g, d]), &acc, &m, &lsum, splits as i32)
+                        .generics(gens(&[hq, g, d]))
+                        .async_on(st)
+                        .expect("a3_reduce launch")
                 };
                 (acc, m, lsum, out.unpartition())
             }
@@ -1544,7 +1576,16 @@ mod gpu_impl {
         validate_launch(dims, &dev, &case.table, n);
         let plan = plan_bounded(n, dims.blk, nb, 1).expect("plan");
         let pl = (plan.splits, plan.steps_per_split);
-        let variants = [Variant::A3Pad, Variant::C3Fast, Variant::C3Accurate];
+        let with_a3 = args.iter().any(|a| a == "--with-a3-unpadded");
+        let mut variants = vec![Variant::A3Pad, Variant::C3Fast, Variant::C3Accurate];
+        if with_a3 {
+            variants.push(Variant::A3);
+        }
+        let harness_version = if with_a3 {
+            format!("{HARNESS_VERSION}+a3unpad")
+        } else {
+            HARNESS_VERSION.to_string()
+        };
         let mut bufs: Vec<TBuf> = variants
             .iter()
             .map(|&v| tbuf(dims, v, plan.splits, st))
@@ -1555,7 +1596,7 @@ mod gpu_impl {
         for (v, b) in variants.iter().zip(bufs.iter_mut()) {
             launch_async(dims, dev.views(), n, pl, *v, b, st);
             let out = readback(b, st);
-            let reference = if *v == Variant::A3Pad {
+            let reference = if matches!(*v, Variant::A3Pad | Variant::A3) {
                 &full_ref.context
             } else {
                 &latent_ref.context
@@ -1635,7 +1676,7 @@ mod gpu_impl {
         // Same analytical accounting as E4 (one sequence, model_small shape). C3 fast is not
         // given a byte count: its query-projection traffic is not separately accounted.
         let eb = e4_config::e4_bytes(plan, n);
-        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":HARNESS_VERSION});
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":harness_version});
         write_outputs(
             &ta.dir,
             &samples,

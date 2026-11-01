@@ -22,6 +22,8 @@ usage: scripts/e0b/run_e0b_portable.sh --out-dir DIR [options]
   --max-footprint-gib G  refuse E4 configs whose device footprint exceeds G (default 20)
   --e3e4-iterations N  timed iterations per E3/E4 process (default 50)
   --skip-e3e4          run only the E0b (A1 vs C1) stages
+  --e3-a3-unpadded     add unpadded A3 as a fourth E3 timing variant (sensitivity run; it gets
+                       its own harness version and a secondary analysis vs unpadded A3)
   --skip-e0b           skip the E0b (A1 vs C1) campaign and its analysis; run E3 / E4 only
   --skip-build         reuse an existing release build
   --preflight-only     check the environment and exit
@@ -35,7 +37,7 @@ EOF
 OUT_DIR="" LENGTHS="1024,8192,32768" MIN_COOL=5 MAX_ATTEMPTS=8 COOL_C=80 COOLDOWN_S=300
 ABORT_C=91 LOCK_SM="" SKIP_BUILD=0 PREFLIGHT_ONLY=0 DRY_RUN=0 ALLOW_WSL=0
 E3_LENGTHS="1024,8192,32768" E4_BATCHES="1,8,32" E3E4_ITERS=50 SKIP_E3E4=0
-E4_SEQS="1024" MAX_FOOTPRINT_GIB=20 SKIP_E0B=0
+E4_SEQS="1024" MAX_FOOTPRINT_GIB=20 SKIP_E0B=0 E3_A3_UNPADDED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;
@@ -53,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --e3e4-iterations) E3E4_ITERS="$2"; shift 2 ;;
     --skip-e3e4) SKIP_E3E4=1; shift ;;
     --skip-e0b) SKIP_E0B=1; shift ;;
+    --e3-a3-unpadded) E3_A3_UNPADDED=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -220,8 +223,13 @@ if [[ "$SKIP_E3E4" == 0 ]]; then
     --max-footprint-gib "$MAX_FOOTPRINT_GIB" --iterations "$E3E4_ITERS" \
     --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
     --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" --host-check "$HOST_CHECK" \
+    $([[ "$E3_A3_UNPADDED" == 1 ]] && echo --e3-a3-unpadded) \
     $([[ "$DRY_RUN" == 1 ]] && echo --skip-e4-correctness) | tee "$OUT_DIR/e3e4_campaign.log"
   python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" > "$OUT_DIR/e3e4_analysis_stdout.json"
+  if [[ "$E3_A3_UNPADDED" == 1 ]]; then  # secondary analysis (LOCAL_4060_PLAN.md addendum 2)
+    python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" --baseline a3 \
+      > "$OUT_DIR/e3e4_analysis_vs_a3_stdout.json"
+  fi
 fi
 
 # ---- analysis + package ----------------------------------------------------------------------

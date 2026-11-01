@@ -232,3 +232,25 @@ def test_legacy_runs_are_labelled(tmp_path):
     report = mod.analyze(root)
     assert report["runs"][0]["harness_version"] == "pre-2026-11-01"
     assert report["results"]["e3_timing/N1024"]["harness_version"] == "pre-2026-11-01"
+
+
+def test_secondary_baseline_writes_its_own_file(tmp_path):
+    """--baseline a3: ratios against unpadded A3, written beside (not over) the primary file."""
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N8192", 0.8, "cool-start", {})] * 5)
+    for i in range(5):
+        path = root / f"e3_timing_N8192_p{i}" / "samples.jsonl"
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        extra = [
+            {**r, "variant": "a3", "latency_ms": r["latency_ms"] * 0.5}
+            for r in rows
+            if r["variant"] == "a3pad"
+        ]
+        path.write_text("\n".join(json.dumps(r) for r in rows + extra) + "\n")
+    primary = mod.analyze(root)["results"]["e3_timing/N8192"]
+    secondary = mod.analyze(root, "a3")["results"]["e3_timing/N8192"]
+    assert primary["baseline"] == "a3pad" and secondary["baseline"] == "a3"
+    assert abs(primary["c3_accurate"]["geomean_ratio_clean"] - 0.8) < 0.01
+    assert abs(secondary["c3_accurate"]["geomean_ratio_clean"] - 1.6) < 0.03
+    assert (root / "variants_analysis.json").exists()
+    assert (root / "variants_analysis_vs_a3.json").exists()
