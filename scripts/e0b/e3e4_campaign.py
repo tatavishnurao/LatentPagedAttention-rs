@@ -58,8 +58,15 @@ def plan(args):
             (
                 f"e4_correctness_N{n}",
                 f"N{n}",
-                ["--suite", "e4", "--seq", str(n), "--batches", ",".join(map(str, batches)),
-                 *limit],
+                [
+                    "--suite",
+                    "e4",
+                    "--seq",
+                    str(n),
+                    "--batches",
+                    ",".join(map(str, batches)),
+                    *limit,
+                ],
             )
             for n in seqs
         ]
@@ -76,9 +83,26 @@ def plan(args):
     return correctness, configs
 
 
+class HostCheckFailed(Exception):
+    pass
+
+
+def host_check(command):
+    """Runs the --host-check command; returns its output, raises HostCheckFailed on non-zero."""
+    if not command:
+        return None
+    r = subprocess.run(command, shell=True, capture_output=True, text=True)
+    out = (r.stdout + r.stderr).strip()
+    if r.returncode != 0:
+        raise HostCheckFailed(out or f"host check exited {r.returncode}")
+    return out
+
+
 def run_logged(args, root, label, cmd):
-    """Runs one harness process with telemetry and the thermal watcher; returns a run record."""
+    """Runs one harness process with telemetry and the thermal watcher; returns a run record.
+    The host check runs after the cooldown, immediately before the process starts."""
     condition, start_temp, waited = cooldown(args.cool_c, args.cooldown_s)
+    checked = host_check(args.host_check)
     tele = (root / f"{label}_telemetry.csv").open("w")
     logger = subprocess.Popen(
         ["nvidia-smi", f"--query-gpu={FIELDS}", "--format=csv,noheader,nounits", "-lms", "100"],
@@ -116,6 +140,7 @@ def run_logged(args, root, label, cmd):
         "returncode": rc,
         "external_thermal_kill": killed["value"],
         "wall_s": round(time.time() - t0, 2),
+        "host_check": checked,
         "cmd": cmd,
     }
 
@@ -135,6 +160,11 @@ def main():
     parser.add_argument("--cooldown-s", type=int, default=300)
     parser.add_argument("--abort-c", type=int, default=91)
     parser.add_argument("--skip-e4-correctness", action="store_true")
+    parser.add_argument(
+        "--host-check",
+        default="",
+        help="shell command run before every process; non-zero stops the campaign",
+    )
     parser.add_argument(
         "--print-plan", action="store_true", help="print the commands and exit (no GPU)"
     )
@@ -162,7 +192,16 @@ def main():
         (root / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     common = ["--iterations", str(args.iterations), "--warmup", str(args.warmup)]
+    try:
+        run_all(args, root, manifest, save, correctness, configs, common)
+    except HostCheckFailed as exc:
+        manifest["host_check_failed"] = str(exc)
+        save()
+        print(f"HOST_CHECK_FAILED: stopping campaign before the next process ({exc})", flush=True)
+    print("E3E4_CAMPAIGN_DIR", root, flush=True)
 
+
+def run_all(args, root, manifest, save, correctness, configs, common):
     # Every E4 context length passes correctness before any timing process starts.
     for label, config, suite_args in correctness:
         run = run_logged(args, root, label, [str(BIN), *suite_args])
@@ -198,7 +237,6 @@ def main():
             if run["external_thermal_kill"] or run["returncode"] == 3:
                 print("THERMAL ABORT: stopping campaign", flush=True)
                 return
-    print("E3E4_CAMPAIGN_DIR", root, flush=True)
 
 
 if __name__ == "__main__":

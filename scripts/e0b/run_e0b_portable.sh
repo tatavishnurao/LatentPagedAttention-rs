@@ -142,6 +142,9 @@ if [[ "$ON_WSL" == 1 ]]; then
   fi
   export E0B_HOST_LABEL="$HOST_LABEL"  # copied into the analysis JSON by the analyzers
 fi
+# Under WSL the Windows-side app check runs before every E3/E4 process (LOCAL_4060_PLAN.md).
+HOST_CHECK=""
+[[ "$ON_WSL" == 1 ]] && HOST_CHECK="$ROOT/scripts/e0b/wsl_host_check.sh"
 NVCC_VER="$("$CUDA_TOOLKIT_PATH/bin/nvcc" --version | grep -o 'release [0-9.]*' | cut -d' ' -f2)"
 [[ "$NVCC_VER" == "13.3" ]] || echo "PREFLIGHT_WARN: nvcc $NVCC_VER; validated with 13.3" >&2
 # Older drivers print "CUDA Version: X.Y"; 61x drivers print "CUDA UMD Version: X.Y".
@@ -158,6 +161,7 @@ EOF
 mkdir -p "$OUT_DIR"
 {
   [[ -n "$HOST_LABEL" ]] && echo "host_label: $HOST_LABEL"
+  [[ -n "$HOST_CHECK" ]] && echo "host_check_per_process: $HOST_CHECK"
   echo "date_utc: $(date -u +%FT%TZ)"
   echo "mode: $([[ "$DRY_RUN" == 1 ]] && echo dry-run || echo full) lengths=$LENGTHS min_cool=$MIN_COOL max_attempts=$MAX_ATTEMPTS skip_e0b=$SKIP_E0B skip_e3e4=$SKIP_E3E4"
   echo "e3_lengths=$E3_LENGTHS e4_batches=$E4_BATCHES e4_seqs=$E4_SEQS iterations=$E3E4_ITERS"
@@ -215,7 +219,7 @@ if [[ "$SKIP_E3E4" == 0 ]]; then
     --e3-lengths "$E3_LENGTHS" --e4-batches "$E4_BATCHES" --e4-seqs "$E4_SEQS" \
     --max-footprint-gib "$MAX_FOOTPRINT_GIB" --iterations "$E3E4_ITERS" \
     --min-cool "$MIN_COOL" --max-attempts "$MAX_ATTEMPTS" --cool-c "$COOL_C" \
-    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" \
+    --cooldown-s "$COOLDOWN_S" --abort-c "$ABORT_C" --host-check "$HOST_CHECK" \
     $([[ "$DRY_RUN" == 1 ]] && echo --skip-e4-correctness) | tee "$OUT_DIR/e3e4_campaign.log"
   python3 "$ROOT/scripts/e0b/analyze_variants.py" "$OUT_DIR/e3e4" > "$OUT_DIR/e3e4_analysis_stdout.json"
 fi

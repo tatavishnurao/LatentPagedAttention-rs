@@ -82,8 +82,17 @@ def test_rejects_bad_lists(kw):
 
 def test_print_plan_cli_needs_no_gpu_or_binary(tmp_path):
     out = subprocess.run(
-        [sys.executable, str(SCRIPT), "--out-dir", str(tmp_path / "never"), "--print-plan",
-         "--e4-seqs", "1024,8192", "--e4-batches", "8"],
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--out-dir",
+            str(tmp_path / "never"),
+            "--print-plan",
+            "--e4-seqs",
+            "1024,8192",
+            "--e4-batches",
+            "8",
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -91,3 +100,29 @@ def test_print_plan_cli_needs_no_gpu_or_binary(tmp_path):
     plan = json.loads(out.stdout)
     assert [c[1] for c in plan["timing"] if c[0] == "e4_timing"] == ["B8_N1024", "B8_N8192"]
     assert not (tmp_path / "never").exists()
+
+
+def test_host_check_passes_and_fails():
+    mod = load()
+    assert mod.host_check("") is None
+    assert mod.host_check("echo HOST_CHECK_OK") == "HOST_CHECK_OK"
+    with pytest.raises(mod.HostCheckFailed, match="running: brave"):
+        mod.host_check("echo 'HOST_CHECK_FAILED: running: brave'; exit 1")
+
+
+@pytest.mark.parametrize(
+    "running, code, needle", [("", 0, "HOST_CHECK_OK"), ("brave\r\nbrave\r\n", 1, "running: brave")]
+)
+def test_wsl_host_check_script(tmp_path, running, code, needle):
+    fake = tmp_path / "powershell.exe"
+    fake.write_text(f"#!/usr/bin/env bash\nprintf '{running}'\n")
+    fake.chmod(0o755)
+    env = {"PATH": f"{tmp_path}:/usr/bin:/bin"}
+    r = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "e0b" / "wsl_host_check.sh")],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert r.returncode == code, r.stdout + r.stderr
+    assert needle in r.stdout
