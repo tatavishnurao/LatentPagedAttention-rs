@@ -1,0 +1,1 @@
+variants_analysis.json regenerated 2026-11-01 with the current analyzer (adds harness_version, in_band_fraction, absolute reference guard); clean sets and ratios are identical to the analysis written at run time.

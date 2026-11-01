@@ -1,0 +1,1 @@
+host conditions at start (2026-11-01): AC power; Windows plan High performance; EA Desktop and Brave closed (checked via powershell Get-Process); surface/cooling/room reported by user, not verified. Primary-dataset run per docs/LOCAL_4060_PLAN.md.

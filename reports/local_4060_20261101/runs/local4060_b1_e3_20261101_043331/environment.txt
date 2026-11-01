@@ -1,0 +1,133 @@
+host_label: laptop RTX 4060, WSL2, not a cloud result
+date_utc: 2026-11-01T04:33:32Z
+mode: full lengths=1024,8192,32768 min_cool=5 max_attempts=8 skip_e0b=1 skip_e3e4=0
+e3_lengths=1024,8192 e4_batches= e4_seqs=1024 iterations=50
+host: DESKTOP-37459PM
+Linux DESKTOP-37459PM 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+name, compute_cap, driver_version, vbios_version, memory.total [MiB], power.limit [W], power.max_limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], temperature.gpu
+NVIDIA GeForce RTX 4060 Laptop GPU, 8.9, 617.42, 95.07.40.00.61, 8188 MiB, [N/A], 140.00 W, 3105 MHz, 8001 MHz, 66
+driver_cuda: 13.4
+CUDA_TOOLKIT_PATH=/usr/local/cuda-13.3 LIBCLANG_PATH=/usr/lib/llvm-18/lib
+cargo: /home/vishnurao/.cargo/bin/cargo
+Cuda compilation tools, release 13.3, V13.3.73
+Build cuda_13.3.r13.3/compiler.38244171_0
+tileiras: NVIDIA (R) Cuda Tile IR optimizing assembler
+Copyright (c) 2005-2026 NVIDIA Corporation
+Built on Fri_May__1_20:03:54_PDT_2026
+rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo 1.96.0 (30a34c682 2026-05-25)
+Python 3.12.3
+git_head: 92e1411d95f03d2541f2ebfbaa76fd7832ea17cd
+
+==============NVSMI LOG==============
+
+Timestamp                                              : Sun Nov  1 04:33:32 2026
+Driver Version                                         : 617.42 [Deprecated; will be removed in CUDA 14.0. Use KMD Version instead]
+CUDA Version                                           : 13.4 [Deprecated; will be removed in CUDA 14.0. Use CUDA UMD Version instead]
+KMD Version                                            : 617.42
+CUDA UMD Version                                       : 13.4
+
+Attached GPUs                                          : 1
+GPU 00000000:01:00.0
+    Performance State                                  : P8
+    Clocks Event Reasons
+        Idle                                           : Active
+        Applications Clocks Setting                    : Not Active
+        SW Power Cap                                   : Not Active
+        HW Slowdown                                    : Not Active
+            HW Thermal Slowdown                        : Not Active
+            HW Power Brake Slowdown                    : Not Active
+        Sync Boost                                     : Not Active
+        SW Thermal Slowdown                            : Not Active
+        Display Clock Setting                          : Not Active
+        Board Limit                                    : Not Active
+        Reliability                                    : Not Active
+    Clocks Event Reasons Counters
+        SW Power Capping                               : 1482447587 us
+        Sync Boost                                     : 0 us
+        SW Thermal Slowdown                            : 1482437494 us
+        HW Thermal Slowdown                            : 0 us
+        HW Power Braking                               : 2458446 us
+    Sparse Operation Mode                              : N/A
+    Temperature
+        GPU Current Temp                               : 66 C
+        GPU Current Max Temp                           : N/A
+        GPU Current T.Limit Temp                       : 21 C
+        GPU Shutdown T.Limit Temp Specification        : -12 C
+        GPU Slowdown T.Limit Temp Specification        : -2 C
+        GPU Max Operating T.Limit Temp Specification   : 0 C
+        GPU Target Temperature Specification           : 87 C
+        Memory Current Temp                            : N/A
+        Memory Max Operating T.Limit Temp Specification: N/A
+    GPU Power Readings
+        Average Power Draw                             : 3.88 W
+        Instantaneous Power Draw                       : 3.75 W
+        GPU Ceiling Power Limit
+            Current Power Limit                        : 80.00 W
+            Requested Power Limit                      : N/A
+            Default Power Limit                        : 55.00 W
+        GPU Base Power
+            Current Base Power                         : N/A
+            Requested Base Power                       : N/A
+            Default Base Power                         : N/A
+            Adaptive TGP Adjusted Base Power           : N/A
+        Min Power Limit                                : 5.00 W
+        Max Power Limit                                : 140.00 W
+    Power Samples
+        Duration                                       : Not Found
+        Number of Samples                              : Not Found
+        Max                                            : Not Found
+        Min                                            : Not Found
+        Avg                                            : Not Found
+    GPU Memory Power Readings 
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+    Module Power Readings
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+        Current Power Limit                            : N/A
+        Requested Power Limit                          : N/A
+        Default Power Limit                            : N/A
+        Min Power Limit                                : N/A
+        Max Power Limit                                : N/A
+    EDPp Multiplier                                    : N/A
+    Clocks
+        Graphics                                       : 210 MHz
+        SM                                             : 210 MHz
+        Memory                                         : 405 MHz
+        Video                                          : 765 MHz
+    Applications Clocks
+        Graphics                                       : Requested functionality has been deprecated
+        Memory                                         : Requested functionality has been deprecated
+    Default Applications Clocks
+        Graphics                                       : Requested functionality has been deprecated
+        Memory                                         : Requested functionality has been deprecated
+    Deferred Clocks
+        Memory                                         : N/A
+    Max Clocks
+        Graphics                                       : 3105 MHz
+        SM                                             : 3105 MHz
+        Memory                                         : 8001 MHz
+        Video                                          : 2415 MHz
+    Max Customer Boost Clocks
+        Graphics                                       : N/A
+    SM Clock Samples
+        Duration                                       : Not Found
+        Number of Samples                              : Not Found
+        Max                                            : Not Found
+        Min                                            : Not Found
+        Avg                                            : Not Found
+    Memory Clock Samples
+        Duration                                       : Not Found
+        Number of Samples                              : Not Found
+        Max                                            : Not Found
+        Min                                            : Not Found
+        Avg                                            : Not Found
+    Clock Policy
+        Auto Boost                                     : N/A
+        Auto Boost Default                             : N/A
+    DLA Clocks
+        Engine                                         : N/A
+        Max Engine                                     : N/A
+
+pid, process_name, used_gpu_memory [MiB]

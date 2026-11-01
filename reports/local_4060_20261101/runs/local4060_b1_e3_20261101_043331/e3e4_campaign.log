@@ -1,0 +1,11 @@
+{"label": "e3_timing_N1024_p0", "start_condition": "cool-start", "start_temp_c": 67, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 9.1, "kind": "e3_timing", "config": "N1024", "process": 0}
+{"label": "e3_timing_N1024_p1", "start_condition": "cool-start", "start_temp_c": 69, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 12.38, "kind": "e3_timing", "config": "N1024", "process": 1}
+{"label": "e3_timing_N1024_p2", "start_condition": "cool-start", "start_temp_c": 69, "cooldown_wait_s": 0.1, "returncode": 0, "external_thermal_kill": false, "wall_s": 11.77, "kind": "e3_timing", "config": "N1024", "process": 2}
+{"label": "e3_timing_N1024_p3", "start_condition": "cool-start", "start_temp_c": 71, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 8.77, "kind": "e3_timing", "config": "N1024", "process": 3}
+{"label": "e3_timing_N1024_p4", "start_condition": "cool-start", "start_temp_c": 72, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 18.14, "kind": "e3_timing", "config": "N1024", "process": 4}
+{"label": "e3_timing_N8192_p0", "start_condition": "cool-start", "start_temp_c": 73, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 6.47, "kind": "e3_timing", "config": "N8192", "process": 0}
+{"label": "e3_timing_N8192_p1", "start_condition": "cool-start", "start_temp_c": 76, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 8.9, "kind": "e3_timing", "config": "N8192", "process": 1}
+{"label": "e3_timing_N8192_p2", "start_condition": "cool-start", "start_temp_c": 76, "cooldown_wait_s": 0.1, "returncode": 0, "external_thermal_kill": false, "wall_s": 6.43, "kind": "e3_timing", "config": "N8192", "process": 2}
+{"label": "e3_timing_N8192_p3", "start_condition": "cool-start", "start_temp_c": 77, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 6.47, "kind": "e3_timing", "config": "N8192", "process": 3}
+{"label": "e3_timing_N8192_p4", "start_condition": "cool-start", "start_temp_c": 77, "cooldown_wait_s": 0.0, "returncode": 0, "external_thermal_kill": false, "wall_s": 6.54, "kind": "e3_timing", "config": "N8192", "process": 4}
+E3E4_CAMPAIGN_DIR /home/vishnurao/runs/local4060_b1_e3_20261101_043331/e3e4
