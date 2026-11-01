@@ -72,7 +72,9 @@ def test_make_tables_reads_committed_results(tmp_path):
     for value in ("0.893", "0.865", "1.030", "0.972", "0.924"):
         assert value in numbers, value
     timing = (tmp_path / "tab_timing.md").read_text()
-    assert "| no |" in timing and "| yes |" in timing
+    claims = [ln.rsplit("|", 2)[1].strip() for ln in timing.splitlines()[3:]]
+    assert claims.count("shown") == 3 and claims.count("not shown") == 1
+    assert claims.count("descriptive") == 7
     assert "Byte ratio" in (tmp_path / "tab_timing_appendix.md").read_text()
     assert summary["byte_ratio_range_claim_eligible"][0] > summary["byte_ratio_range"][0]
 
@@ -88,3 +90,33 @@ def test_submission_copy_strips_claim_tags_and_comments():
     assert ap.table_width(["| a | b |", "|---|---|", "| " + "x" * 200 + " | y |"]) == 0
     wide = ["| a | b | c |", "|---|---|---|", "| " + "x" * 40 + " | " + "y" * 40 + " | z |"]
     assert ap.table_width(wide) > ap.ONE_COLUMN_CHARS
+
+
+def test_submission_evidence_list_drops_keys_and_groups_by_topic():
+    ap = load("assemble_paper")
+    text = (
+        "# Appendix B\n\n**Evidence keys.** All paths are relative to the repository root.\n\n"
+        "| Key | Files |\n|---|---|\n| M:timing | `a.json` |\n| S:e4 | `b.rs` |\n"
+        "| M:scale | `c.log` |\n\n**Regenerating.**\n"
+    )
+    out = ap.evidence_list(text)
+    assert "| Key |" not in out and "M:timing" not in out and "S:e4" not in out
+    assert "- *Timing:* `a.json`\n- *Numerics:* `c.log`\n- *Sources" in out
+    assert out.endswith("\n**Regenerating.**\n")
+    with pytest.raises(SystemExit, match="without a topic"):
+        ap.evidence_list(text.replace("M:scale", "M:new"))
+
+
+def test_image_check_fails_on_missing_file(tmp_path):
+    ap = load("assemble_paper")
+    (tmp_path / "fig.png").write_bytes(b"")
+    assert ap.check_images("![a](fig.png)", tmp_path) == ["fig.png"]
+    with pytest.raises(SystemExit, match="missing image"):
+        ap.check_images("![a](fig.png) ![b](nope.png)", tmp_path)
+
+
+def test_paper_images_resolve_from_repo_root_in_builds():
+    ap = load("assemble_paper")
+    full = ap.assemble(ROOT / "paper" / "paper.md")
+    links = ap.check_images(full, ROOT)
+    assert links and all(p.startswith("reports/") for p in links)
