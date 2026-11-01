@@ -24,3 +24,5 @@
 512  # 512-output tile threshold observed for HMMA (E3_SPLITK_DESIGN.md)
 2026  # year in dates
 0.2  # cuTile version 0.2 (SOURCE Cargo.lock: cutile 0.2.0)
+3e-3  # correctness gate for C3 accurate total error (SOURCE crates/plkv-kernels/examples/e3_splitk_gpu.rs, const GATE)
+93.3  # KV-cache reduction quoted from the abstract of cited work [2] (arXiv:2405.04434); not our result

@@ -33,6 +33,13 @@ def test_literal_extraction_skips_code_labels_and_hashes():
     assert lits == ["0.893", "8192", "13.2", "11"]
 
 
+def test_bibliography_section_is_skipped():
+    cn = load("check_numbers")
+    text = "# Related work\nsee [1]\n# References\n[1] A. B. Title. arXiv:2309.06180, 2023.\n# Appendix\nratio 0.893\n"
+    lits = [lit for _, line in cn.strip_prose(text) for lit in cn.literals(line)]
+    assert lits == ["1", "0.893"]
+
+
 def test_check_flags_untraceable_and_accepts_registered(tmp_path):
     cn = load("check_numbers")
     doc = tmp_path / "p.md"

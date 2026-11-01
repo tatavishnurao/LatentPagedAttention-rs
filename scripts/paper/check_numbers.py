@@ -5,7 +5,8 @@ A literal passes if it is (a) in paper/generated/numbers.json (written by make_t
 (b) in paper/numbers_whitelist.txt (each entry with a written reason), or (c) a numeric token in
 a results file under reports/ (.json, .log, .out, .csv, .txt; never prose Markdown, to avoid
 circular evidence; xz-compressed samples are read too). Skipped: fenced code blocks, inline code,
-HTML comments, link targets, and the leading section number of a heading. A digit followed by
+HTML comments, link targets, the leading section number of a heading, and the bibliography (a
+top-level "# References" section, up to the next top-level heading). A digit followed by
 "x" or "×" is checked as the number alone.
 
 Exit status 1 lists every offending line as path:line: literal.
@@ -28,8 +29,12 @@ RESULT_SUFFIXES = {".json", ".log", ".out", ".csv", ".txt"}
 def strip_prose(text):
     """Returns [(line_no, cleaned_line)] with code, comments and link targets removed."""
     text = re.sub(r"<!--.*?-->", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
-    out, fenced = [], False
+    out, fenced, biblio = [], False, False
     for no, line in enumerate(text.splitlines(), 1):
+        if re.match(r"#\s", line):
+            biblio = line[1:].strip().lower() == "references"
+        if biblio:
+            continue
         if line.lstrip().startswith("```"):
             fenced = not fenced
             continue
