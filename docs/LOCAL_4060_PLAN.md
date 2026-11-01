@@ -30,3 +30,14 @@ Fixed before the harness change and before any data from it.
 7. **New exclusion, absolute reference guard:** a process is THROTTLED if its warm-up reference clock is more than 5 % below the highest warm-up reference among the processes of the same configuration in the same campaign (`reference < 0.95 x max reference`). This closes the gap where two processes warmed up at 915 and 1185 MHz and passed the reference rule against their own low reference. It applies to E3 and E4 and only adds an exclusion. It is also applied to the E3 data already reported; any change that causes is reported.
 8. **Host check before every process, not every block:** before each process the campaign checks (through `powershell.exe Get-Process`) that Brave, EA Desktop and EALocalHostSvc are not running. If one is, the campaign stops with `HOST_CHECK_FAILED` before starting that process. No process starts under a failed check.
 9. **Optional sensitivity run afterwards:** unpadded A3 as a fourth E3 variant at N=8192. It is a sensitivity analysis against a stronger baseline (padded A3 spends about 4x the multiply-adds on zero rows). It does not replace padded A3 as the pre-declared baseline and is reported whatever it shows.
+
+## Addendum 2: unpadded-A3 sensitivity run (2026-11-01, before any data from it)
+
+Written after the primary E3 and E4 results were seen (E3 N=8192: C3 accurate / padded A3 = 0.893 [0.860, 0.936]).
+
+1. **Secondary analysis, never primary.** It does not replace padded A3 as the pre-declared baseline and is reported separately from the primary runs, whatever it shows.
+2. **What runs:** E3 timing at N=8192 only, with a fourth variant, unpadded A3 (`a3`: the `a3_split` / `a3_reduce` kernels the correctness suite already checks, no zero query rows). Same campaign rules: >= 5 cool-start processes, `--max-attempts 8`, all exclusion rules unchanged, host check before every process, one run.
+3. **Own harness version:** `e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad`. It is never pooled with the primary E3 data (the analyzer refuses mixed versions).
+4. **What is reported:** C3 accurate / unpadded A3 and C3 fast / unpadded A3 (geomean, 95 % hierarchical-bootstrap CI, claim eligibility), plus C3 / padded A3 within the same run for comparison.
+5. **Interpretation fixed now:** if C3 beats padded A3 but its CI against unpadded A3 includes or exceeds 1.0, the E3 "about 11 % faster" result depends on the baseline, and the write-up says so in the verdict paragraph. If C3 also beats unpadded A3, the write-up says the result holds against both baselines on this laptop at N=8192 only.
+6. **Bytes:** unpadded A3 reads the same KV bytes as padded A3 (padding is in the query rows only); no separate byte count is reported for it.
