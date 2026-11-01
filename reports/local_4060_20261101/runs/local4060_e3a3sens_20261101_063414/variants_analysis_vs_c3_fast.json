@@ -1,0 +1,198 @@
+{
+  "campaign": "/tmp/claude-1000/-home-vishnurao-LatentPagedAttention-rs/e24fdeb4-8d21-4dac-a910-1e19d857ae3e/scratchpad/raw/local4060_e3a3sens_20261101_063414/e3e4",
+  "runs": [
+    {
+      "label": "e3_timing_N8192_p0",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 500,
+      "temp_max_inproc_c": 68,
+      "start_temp_c": 63,
+      "cooldown_wait_s": 0.1,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p1",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 500,
+      "temp_max_inproc_c": 69,
+      "start_temp_c": 68,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p2",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 500,
+      "temp_max_inproc_c": 70,
+      "start_temp_c": 69,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p3",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 500,
+      "temp_max_inproc_c": 71,
+      "start_temp_c": 69,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    },
+    {
+      "label": "e3_timing_N8192_p4",
+      "kind": "e3_timing",
+      "config": "N8192",
+      "start_condition": "cool-start",
+      "returncode": 0,
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "best_reference_clock_mhz_in_config": 2595,
+      "throttled": false,
+      "tags": [],
+      "sm_clock_modal_mhz": 2595,
+      "reference_clock_mhz": 2595,
+      "in_band_fraction": 1.0,
+      "sm_clock_reads": 500,
+      "temp_max_inproc_c": 72,
+      "start_temp_c": 71,
+      "cooldown_wait_s": 0.0,
+      "clean": true
+    }
+  ],
+  "results": {
+    "e3_timing/N8192": {
+      "component": "pipeline",
+      "baseline": "c3_fast",
+      "harness_version": "e3e4-rewarm-saturating-20ms-2026-11-01+a3unpad",
+      "batch": 1,
+      "seq": 8192,
+      "bytes_per_step_analytical": {
+        "a3pad": 8495104,
+        "c3_accurate": 641536
+      },
+      "working_set_bytes": 8495104,
+      "working_set_bytes_c3_accurate": 641536,
+      "layers": 1,
+      "byte_ratio_a3pad_over_c3": 13.2418,
+      "cache_only_byte_ratio": 16.0,
+      "clean_processes": [
+        "e3_timing_N8192_p0",
+        "e3_timing_N8192_p1",
+        "e3_timing_N8192_p2",
+        "e3_timing_N8192_p3",
+        "e3_timing_N8192_p4"
+      ],
+      "excluded_processes": [],
+      "a3": {
+        "per_process_ratio_clean": [
+          1.0654,
+          1.0842,
+          1.0984,
+          1.0845,
+          1.1717
+        ],
+        "per_process_ratio_excluded_descriptive": [],
+        "geomean_ratio_clean": 1.1002,
+        "median_ms_clean": {
+          "c3_fast": 0.1126,
+          "a3": 0.1228
+        },
+        "achieved_gbps_clean_median": {
+          "c3_fast": null,
+          "a3": null
+        },
+        "ci95_hierarchical_bootstrap": [
+          1.0594,
+          1.1304
+        ],
+        "claim_eligible": true
+      },
+      "a3pad": {
+        "per_process_ratio_clean": [
+          1.1041,
+          1.1436,
+          1.1391,
+          1.1703,
+          1.1522
+        ],
+        "per_process_ratio_excluded_descriptive": [],
+        "geomean_ratio_clean": 1.1417,
+        "median_ms_clean": {
+          "c3_fast": 0.1126,
+          "a3pad": 0.128
+        },
+        "achieved_gbps_clean_median": {
+          "c3_fast": null,
+          "a3pad": 66.368
+        },
+        "ci95_hierarchical_bootstrap": [
+          1.0999,
+          1.181
+        ],
+        "claim_eligible": true
+      },
+      "c3_accurate": {
+        "per_process_ratio_clean": [
+          0.9923,
+          1.011,
+          1.0331,
+          1.0547,
+          0.9951
+        ],
+        "per_process_ratio_excluded_descriptive": [],
+        "geomean_ratio_clean": 1.017,
+        "median_ms_clean": {
+          "c3_fast": 0.1126,
+          "c3_accurate": 0.1166
+        },
+        "achieved_gbps_clean_median": {
+          "c3_fast": null,
+          "c3_accurate": 5.504
+        },
+        "ci95_hierarchical_bootstrap": [
+          0.9742,
+          1.0572
+        ],
+        "claim_eligible": true
+      }
+    }
+  }
+}

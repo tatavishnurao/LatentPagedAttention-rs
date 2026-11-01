@@ -18,7 +18,7 @@ from paper_data import COLORS, INK, load_analysis, regime_points, synthetic_anal
 MARKERS = {"e3_timing": "s", "e4_timing": "o"}
 
 
-def render(points, l2_mib, out, title):
+def render(points, l2_mib, out, title, l2_label=None):
     from plotstyle import setup
 
     plt = setup()
@@ -62,9 +62,9 @@ def render(points, l2_mib, out, title):
     ax.axhline(1.0, color=INK["primary"], lw=0.8)
     ax.axvline(l2_mib, color=INK["secondary"], lw=0.8, ls="--")
     ax.annotate(
-        f"L2 {l2_mib:g} MiB",
-        (l2_mib, ax.get_ylim()[1]),
-        xytext=(3, -10),
+        l2_label or f"L2 {l2_mib:g} MiB",
+        (l2_mib, ax.get_ylim()[0] + 0.3 * (ax.get_ylim()[1] - ax.get_ylim()[0])),
+        xytext=(3, 0),
         textcoords="offset points",
         fontsize=8,
         color=INK["secondary"],
@@ -73,7 +73,7 @@ def render(points, l2_mib, out, title):
     ax.set_xlabel("working set per layer, padded A3 (MiB, log scale)")
     ax.set_ylabel("time ratio C3 accurate / padded A3")
     ax.set_title(title, fontsize=9, loc="left")
-    ax.legend(fontsize=7, loc="best")
+    ax.legend(fontsize=7, loc="center right", bbox_to_anchor=(1.0, 0.62))
     fig.tight_layout()
     fig.savefig(out)
     plt.close(fig)
@@ -86,6 +86,7 @@ def main(argv=None):
     ap.add_argument("--l2-mib", type=float)
     ap.add_argument("--out", required=True)
     ap.add_argument("--title", default="")
+    ap.add_argument("--l2-label", help="text next to the L2 line (default: 'L2 <size> MiB')")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args(argv)
     if a.self_test:
@@ -98,7 +99,7 @@ def main(argv=None):
         title, l2 = a.title, a.l2_mib
     if not points:
         raise SystemExit("no configurations with a ratio and analytic bytes")
-    print(render(points, l2, a.out, title))
+    print(render(points, l2, a.out, title, a.l2_label))
 
 
 if __name__ == "__main__":
