@@ -232,7 +232,7 @@ def ratio_cell(reg, entry, src):
 
 
 def timing_table(reg):
-    """Main timing table (ratios) plus the appendix table (bytes, bandwidth, clocks, temperature)."""
+    """Main timing table (ratios) and appendix table (bytes, bandwidth, clocks, temperature)."""
     src = LOCAL / "primary_merged_analysis.json"
     data = load(src)
     runs = {r["label"]: r for r in data["runs"]}
@@ -286,13 +286,25 @@ def timing_table(reg):
         peak = max(p["temp_max_inproc_c"] for p in procs)
         extra.append((name, ws, br, gb_s, modal_s, reg.add(peak, src)))
     tab = table(
-        ["Config", "Clean / THR / hot", "Median µs, A3pad / C3acc", "C3acc / A3pad", "95 % CI",
-         "Claim"],
+        [
+            "Config",
+            "Clean / THR / hot",
+            "Median µs, A3pad / C3acc",
+            "C3acc / A3pad",
+            "95 % CI",
+            "Claim",
+        ],
         rows,
     )
     tab_extra = table(
-        ["Config", "A3pad MiB per layer", "Byte ratio A3pad / C3", "GB/s (analytic), A3pad / C3acc",
-         "Modal SM MHz, clean", "Max °C, all processes"],
+        [
+            "Config",
+            "A3pad MiB per layer",
+            "Byte ratio A3pad / C3",
+            "GB/s (analytic), A3pad / C3acc",
+            "Modal SM MHz, clean",
+            "Max °C, all processes",
+        ],
         extra,
     )
     # Derived numbers used in the prose (computed here, never typed).
@@ -319,8 +331,13 @@ def accurate_cost(reg):
         res = load(src)["results"]["e3_timing/N8192"]
         e = res["c3_accurate"]
         geo, ci = ratio_cell(reg, e, src)
-        out[tag] = {"run": run, "ratio": geo, "ci95": ci, "clean": reg.add(len(res["clean_processes"]), src),
-                    "pct": reg.fmt((e["geomean_ratio_clean"] - 1) * 100, ".1f", src)}
+        out[tag] = {
+            "run": run,
+            "ratio": geo,
+            "ci95": ci,
+            "clean": reg.add(len(res["clean_processes"]), src),
+            "pct": reg.fmt((e["geomean_ratio_clean"] - 1) * 100, ".1f", src),
+        }
     return out
 
 
@@ -497,7 +514,7 @@ def t1_slow_output(reg):
 
 
 def nvml_latency(reg):
-    """Trap 2: NVML host-call latency (separate micro-measurement, reports/nvml_latency_20261101)."""
+    """Trap 2: NVML host-call latency (separate micro-measurement, not campaign data)."""
     src = ROOT / "reports" / "nvml_latency_20261101" / "nvml_latency.json"
     data = load(src)
     calls = data["calls"]

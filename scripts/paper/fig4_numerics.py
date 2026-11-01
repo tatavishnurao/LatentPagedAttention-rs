@@ -35,35 +35,66 @@ def render(rows, emu, out):
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(7.0, 3.0), dpi=200, width_ratios=[1.25, 1])
     for inputs, marker, alpha in (("heavy_tailed", "o", 1.0), ("uniform", "s", 0.45)):
         for v in VARIANTS:
-            sel = sorted((r for r in rows if r["inputs"] == inputs and r["variant"] == v),
-                         key=lambda r: r["n"])
+            sel = sorted(
+                (r for r in rows if r["inputs"] == inputs and r["variant"] == v),
+                key=lambda r: r["n"],
+            )
             ns = [r["n"] for r in sel]
             label = f"{NAMES[v]}" if inputs == "heavy_tailed" else None
-            ax.plot(ns, [r["total"] for r in sel], marker=marker, ms=4, color=COLORS[v],
-                    alpha=alpha, label=label)
-            ax.plot(ns, [r["kernel"] for r in sel], ls=":", marker=marker, ms=3,
-                    color=COLORS[v], alpha=alpha)
+            ax.plot(
+                ns,
+                [r["total"] for r in sel],
+                marker=marker,
+                ms=4,
+                color=COLORS[v],
+                alpha=alpha,
+                label=label,
+            )
+            ax.plot(
+                ns,
+                [r["kernel"] for r in sel],
+                ls=":",
+                marker=marker,
+                ms=3,
+                color=COLORS[v],
+                alpha=alpha,
+            )
     ax.axhline(3e-3, color=INK["secondary"], lw=0.8, ls="--")
     ax.text(4096, 3.15e-3, "3e-3 gate", fontsize=7, color=INK["secondary"])
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("context length N")
     ax.set_ylabel("max |error| vs exact reference")
-    ax.set_title("(a) solid: total, dotted: kernel-attributable\n"
-                 "circles: heavy-tailed, faded squares: uniform", fontsize=7.5)
-    fig.legend(*ax.get_legend_handles_labels(), loc="lower left", ncol=3, fontsize=7,
-               bbox_to_anchor=(0.01, 0.0))
+    ax.set_title(
+        "(a) solid: total, dotted: kernel-attributable\n"
+        "circles: heavy-tailed, faded squares: uniform",
+        fontsize=7.5,
+    )
+    fig.legend(
+        *ax.get_legend_handles_labels(),
+        loc="lower left",
+        ncol=3,
+        fontsize=7,
+        bbox_to_anchor=(0.01, 0.0),
+    )
 
-    labels = [lab.replace(" (online softmax only)", "").replace(" (C3 numerics)", "")
-              for lab, _ in emu]
+    labels = [
+        lab.replace(" (online softmax only)", "").replace(" (C3 numerics)", "") for lab, _ in emu
+    ]
     bx.barh(range(len(emu)), [v for _, v in emu], color=COLORS["c3_fast"])
     bx.set_yticks(range(len(emu)), labels, fontsize=7)
     bx.invert_yaxis()
     bx.set_xscale("log")
     bx.set_xlabel("max |error| (CPU emulation)")
     bx.set_title("(b) heavy-tailed, N=8192: which rounding", fontsize=7.5)
-    fig.text(0.99, 0.02, "laptop RTX 4060, WSL2, not a cloud result; no timing",
-             ha="right", fontsize=6, color=INK["secondary"])
+    fig.text(
+        0.99,
+        0.02,
+        "laptop RTX 4060, WSL2, not a cloud result; no timing",
+        ha="right",
+        fontsize=6,
+        color=INK["secondary"],
+    )
     fig.tight_layout(rect=(0, 0.09, 1, 1))
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)

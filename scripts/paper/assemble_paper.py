@@ -10,8 +10,9 @@ Figure paths are rewritten relative to paper/build/.
 
 The page estimate is ROUGH and is computed on the submission copy: body words / WORDS_PER_PAGE,
 plus each table at its row count (doubled when it must span both columns: more than two columns
-and data cells wider than ONE_COLUMN_CHARS in total; headers and two-column tables can wrap), plus each figure at a fixed fraction of a page, for an ACM-style
-two-column page. It is a planning number, not a typeset page count.
+and data cells wider than ONE_COLUMN_CHARS in total; headers and two-column tables can wrap),
+plus each figure at a fixed fraction of a page, for an ACM-style two-column page. It is a
+planning number, not a typeset page count.
 
 usage: assemble_paper.py [--src paper/paper.md] [--out paper/build/paper.md]
 """
@@ -26,7 +27,9 @@ WORDS_PER_PAGE = 900  # dense two-column text page, rough
 ROW_PAGE = 0.012  # one table row in a single column (~1/80 page), rough
 TABLE_OVERHEAD = 0.03  # caption, header and rules per table, rough
 FIGURE_PAGE = 0.25  # one single-column figure with caption, rough
-ONE_COLUMN_CHARS = 75  # summed data-cell width (+2 per column) above which a table spans both columns
+ONE_COLUMN_CHARS = (
+    75  # summed data-cell width (+2 per column) above which a table spans both columns
+)
 TAG = re.compile(r"\s?\[(?:[MS]:[\w-]+(?:\s*,\s*[MS]:[\w-]+)*|H)\]")
 APPENDIX_HEADINGS = ("appendix",)
 
@@ -52,7 +55,7 @@ def strip_tags(text):
 def split_body(text):
     """(body, appendix): the body ends at the first 'Appendix' top-level heading."""
     m = re.search(r"^# (?:%s)" % "|".join(APPENDIX_HEADINGS), text, flags=re.M | re.I)
-    return (text[: m.start()], text[m.start():]) if m else (text, "")
+    return (text[: m.start()], text[m.start() :]) if m else (text, "")
 
 
 def table_width(lines):
@@ -66,8 +69,9 @@ def table_width(lines):
 
 
 def estimate(text):
-    text = re.sub(r"\A---\n.*?\n---\n", lambda m: m.group(0).split("abstract:", 1)[-1], text,
-                  flags=re.S)
+    text = re.sub(
+        r"\A---\n.*?\n---\n", lambda m: m.group(0).split("abstract:", 1)[-1], text, flags=re.S
+    )
     text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
     blocks = re.findall(r"(?:^\|.*\n)+", text, flags=re.M)
     tables = len(blocks)
@@ -80,13 +84,20 @@ def estimate(text):
         rows += max(0, len(lines) - 2) * span
     figures = len(re.findall(r"^!\[", text, flags=re.M))
     prose = "\n".join(
-        ln for ln in text.splitlines() if not ln.lstrip().startswith("|") and not ln.startswith("![")
+        ln
+        for ln in text.splitlines()
+        if not ln.lstrip().startswith("|") and not ln.startswith("![")
     )
     words = len(re.findall(r"\S+", prose))
     pages = words / WORDS_PER_PAGE + rows * ROW_PAGE + tables * TABLE_OVERHEAD
     pages += figures * FIGURE_PAGE
-    return {"words": words, "tables": tables, "full_width_tables": wide, "figures": figures,
-            "pages": round(pages, 1)}
+    return {
+        "words": words,
+        "tables": tables,
+        "full_width_tables": wide,
+        "figures": figures,
+        "pages": round(pages, 1),
+    }
 
 
 def main(argv=None):

@@ -35,7 +35,10 @@ def test_literal_extraction_skips_code_labels_and_hashes():
 
 def test_bibliography_section_is_skipped():
     cn = load("check_numbers")
-    text = "# Related work\nsee [1]\n# References\n[1] A. B. Title. arXiv:2309.06180, 2023.\n# Appendix\nratio 0.893\n"
+    text = (
+        "# Related work\nsee [1]\n# References\n[1] A. B. Title. arXiv:2309.06180, 2023.\n"
+        "# Appendix\nratio 0.893\n"
+    )
     lits = [lit for _, line in cn.strip_prose(text) for lit in cn.literals(line)]
     assert lits == ["1", "0.893"]
 
@@ -76,7 +79,10 @@ def test_make_tables_reads_committed_results(tmp_path):
 
 def test_submission_copy_strips_claim_tags_and_comments():
     ap = load("assemble_paper")
-    text = "A [M:timing] result; a [S:e4] fact. [H] A guess.\n<!-- note -->\nKeep [1] and [TODO cite: x].\n"
+    text = (
+        "A [M:timing] result; a [S:e4] fact. [H] A guess.\n<!-- note -->\n"
+        "Keep [1] and [TODO cite: x].\n"
+    )
     out = ap.strip_tags(text)
     assert out == "A result; a fact. A guess.\nKeep [1] and [TODO cite: x].\n"
     assert ap.table_width(["| a | b |", "|---|---|", "| " + "x" * 200 + " | y |"]) == 0
