@@ -45,5 +45,15 @@
   "a1_context_idle_us": "321.5",
   "a1_context_boost_us": "43.0",
   "idle_factor": "7.5"
+ },
+ "t2_nvml_latency": {
+  "date_utc": "2026-11-01T08:55:25+00:00",
+  "driver": "617.42",
+  "reps": "50",
+  "reasons_median_ms": "20.8",
+  "reasons_max_ms": "29.0",
+  "other_median_ms_min": "0.03",
+  "other_median_ms_max": "0.15",
+  "temperature_c": "62"
  }
 }

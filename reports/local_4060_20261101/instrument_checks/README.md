@@ -15,3 +15,5 @@ Each directory has the harness's `timing_meta.json`, `correctness.json` (where w
 The full-length failure of fix 1 is the campaign run `runs/local4060_b2r_e4n1024_20261101_051528` (instrument failure).
 
 Not here: the ~20 ms latency of `nvmlDeviceGetCurrentClocksEventReasons` was measured interactively (a ctypes loop, 50 calls) and its output was not saved to a file.
+
+Added 2026-11-01: the latency was re-measured into a committed file as a separate micro-measurement (not campaign data): `../../nvml_latency_20261101/`.

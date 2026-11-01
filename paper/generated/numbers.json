@@ -9,11 +9,17 @@
  "0.002": [
   "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json"
  ],
+ "0.03": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
  "0.09": [
   "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
  ],
  "0.096": [
   "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json"
+ ],
+ "0.15": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
  ],
  "0.29": [
   "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/samples.jsonl.xz"
@@ -275,6 +281,9 @@
  "20": [
   "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
  ],
+ "20.8": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
  "210": [
   "reports/diagnosis_20261002/e0/seq1024_run1/run_summary.json",
   "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
@@ -301,6 +310,9 @@
   "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/samples.jsonl.xz",
   "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/samples.jsonl.xz",
   "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/timing_meta.json"
+ ],
+ "29.0": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
  ],
  "3": [
   "reports/local_4060_20261101/primary_merged_analysis.json",
@@ -427,7 +439,8 @@
   "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/timing_meta.json",
   "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/timing_meta.json",
   "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/manifest.json",
-  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json",
+  "reports/nvml_latency_20261101/nvml_latency.json"
  ],
  "50.0": [
   "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
@@ -460,7 +473,11 @@
   "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
  ],
  "617.42": [
-  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt",
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "62": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
  ],
  "7": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
