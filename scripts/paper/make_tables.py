@@ -253,11 +253,12 @@ def timing_table(reg):
         br = reg.fmt(res["byte_ratio_a3pad_over_c3"], ".1f", src)
         summary["byte_ratios"].append(res["byte_ratio_a3pad_over_c3"])
         if e["claim_eligible"]:
-            status = "yes"
+            ci95 = e.get("ci95_hierarchical_bootstrap") or [None, None]
+            status = "shown" if ci95[0] > 1.0 or ci95[1] < 1.0 else "not shown"
             summary["eligible"].append((key, e["geomean_ratio_clean"]))
             summary["byte_ratios_eligible"].append(res["byte_ratio_a3pad_over_c3"])
         else:
-            status = "no"
+            status = "descriptive"
             summary["descriptive"].append(key)
         kind, cfg = key.split("/")
         name = ("E3 " if kind == "e3_timing" else "E4 ") + cfg
