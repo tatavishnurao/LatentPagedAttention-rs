@@ -1,0 +1,49 @@
+{
+ "label": "laptop RTX 4060, WSL2, not a cloud result",
+ "claim_eligible": [
+  [
+   "e3_timing/N8192",
+   0.8926
+  ],
+  [
+   "e4_timing/B32_N4096",
+   1.0297
+  ],
+  [
+   "e4_timing/B8_N8192",
+   0.8649
+  ],
+  [
+   "e4_timing/B32_N8192",
+   0.9715
+  ]
+ ],
+ "descriptive": [
+  "e3_timing/N1024",
+  "e4_timing/B1_N1024",
+  "e4_timing/B8_N1024",
+  "e4_timing/B32_N1024",
+  "e4_timing/B1_N4096",
+  "e4_timing/B8_N4096",
+  "e4_timing/B1_N8192"
+ ],
+ "byte_ratio_range": [
+  3.5058,
+  13.2418
+ ],
+ "void_dryrun_slowdown": {
+  "idle_ms": "378",
+  "ref_ms": "24",
+  "ratio": "16",
+  "idle_share_pct": "73"
+ },
+ "t1_slow_output": {
+  "slow_wall_s": "122",
+  "ext4_wall_s": "5",
+  "slow_mode_mhz": "210",
+  "low_share_pct": "79",
+  "a1_context_idle_us": "321.5",
+  "a1_context_boost_us": "43.0",
+  "idle_factor": "7.5"
+ }
+}
