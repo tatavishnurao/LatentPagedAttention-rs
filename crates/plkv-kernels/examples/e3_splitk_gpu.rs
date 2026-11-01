@@ -14,7 +14,8 @@ mod timing_common;
 #[cfg(feature = "gpu-cutile")]
 mod gpu_impl {
     use super::timing_common::{
-        ABORT_TEMPERATURE_C, Events, Nvml, clock_fields, clock_warmup, memset_d32,
+        ABORT_TEMPERATURE_C, Events, HARNESS_VERSION, Nvml, clock_fields_fast, clock_warmup,
+        memset_d32, rewarm,
     };
     use cutile::api;
     use cutile::cuda_async::device_context::with_default_device_policy;
@@ -32,6 +33,9 @@ mod gpu_impl {
     use plkv_kernels::alignment::{TensorLayout, VECTOR_ALIGN_BYTES, check_layouts};
     use plkv_kernels::block_table::validate_block_table;
     use plkv_kernels::cutile::e3_splitk::e3_kernels;
+    use plkv_kernels::e4_config::{
+        self, E4Bytes, E4Layout, achieved_gbps, e4_layer_bytes, e4_layouts, parse_e4_args,
+    };
     use plkv_kernels::splitk_plan::{MAX_STEPS_PER_CTA, SplitPlan, plan_bounded};
     use serde_json::Value;
     use std::sync::Arc;
@@ -1134,39 +1138,59 @@ mod gpu_impl {
         pool_blocks: usize,
         pools: Vec<(Case, Device)>,
         seqs: Vec<E4Seq>,
+        /// Analytical bytes of one layer of the whole batch.
+        layer_bytes: E4Bytes,
     }
 
-    /// E4 configuration: L = max(4, ceil(64 / B)) layers of resident per-layer pools (1 MiB of
-    /// K+V per sequence per layer, so A3 pools total >= 64 MiB); every sequence has its own
-    /// non-identity table into the pool, its own query and active length (b = 0 runs the full
-    /// 1024 tokens). Tables and plans are validated on the host here, before any launch.
-    fn e4_setup(batch: usize, st: &Arc<Stream>) -> E4Setup {
-        const MIN_SPLITS: usize = 4;
+    /// FP16 copies of one layer's pool for the CPU references, quantized once per layer (not
+    /// once per sequence: at B = 32, N = 32K a pool is 1 Mi tokens).
+    struct QuantPool {
+        latent: Vec<f16>,
+        k: Vec<f16>,
+        v: Vec<f16>,
+    }
+
+    fn quant_pool(case: &Case) -> QuantPool {
+        QuantPool {
+            latent: quantize_f32_to_f16_storage(&case.latent_physical).unwrap(),
+            k: quantize_f32_to_f16_storage(&case.k_physical_head_major).unwrap(),
+            v: quantize_f32_to_f16_storage(&case.v_physical_head_major).unwrap(),
+        }
+    }
+
+    /// E4 configuration from the host-validated `e4_config::e4_layout` (footprint, non-identity
+    /// pool table, active lengths, `plan_bounded` plans and block tables are all checked there,
+    /// before this allocates anything): `layout.layers` resident per-layer pools of B * N tokens,
+    /// every sequence with its own table into the pool, query and active length (b = 0 runs the
+    /// full N tokens).
+    fn e4_setup(layout: &E4Layout, st: &Arc<Stream>) -> E4Setup {
+        let batch = layout.batch;
         let seq_dims = Dims {
-            hq: 16,
-            hkv: 4,
-            d: 64,
-            l: 32,
-            blk: 16,
-            seq: 1024,
+            hq: e4_config::HQ,
+            hkv: e4_config::HKV,
+            d: e4_config::HEAD_DIM,
+            l: e4_config::LATENT_RANK,
+            blk: e4_config::BLOCK_SIZE,
+            seq: layout.seq,
             dc: 16,
         };
-        let nb = seq_dims.nb();
-        let layers = 4usize.max(64usize.div_ceil(batch));
-        let pool_blocks = batch * nb;
         let pool_dims = Dims {
             seq: batch * seq_dims.seq,
             ..seq_dims
         };
-        let pool_table: Vec<usize> = (0..pool_blocks)
-            .map(|lb| (lb * 1021 + 11) % pool_blocks)
-            .collect();
-        let pools: Vec<(Case, Device)> = (0..layers)
+        let n = layout.seq;
+        let pools: Vec<(Case, Device)> = (0..layout.layers)
             .map(|layer| {
+                // N = 1024 keeps the original case names (E3/E4 results stay comparable).
+                let name = if n == e4_config::DEFAULT_SEQ {
+                    format!("e4/B{batch}/L{layer}")
+                } else {
+                    format!("e4/B{batch}/N{n}/L{layer}")
+                };
                 let case = model_case_with(
                     pool_dims,
-                    pool_table.clone(),
-                    &format!("e4/B{batch}/L{layer}"),
+                    layout.pool_table.clone(),
+                    &name,
                     Inputs::Uniform,
                     layer as u64 + 1,
                 );
@@ -1174,43 +1198,30 @@ mod gpu_impl {
                 (case, dev)
             })
             .collect();
-        let seqs = (0..batch)
-            .map(|b| {
-                let active = if b == 0 {
-                    seq_dims.seq
-                } else {
-                    1 + (b * 373) % seq_dims.seq
-                };
-                let table: Vec<usize> = pool_table[b * nb..(b + 1) * nb].to_vec();
-                let plan = plan_bounded(active, seq_dims.blk, nb, MIN_SPLITS)
-                    .unwrap_or_else(|e| panic!("E4 plan rejected: {e}"));
-                let table_i32: Vec<i32> = table.iter().map(|&v| v as i32).collect();
-                validate_block_table(
-                    &table_i32,
-                    active,
-                    seq_dims.blk,
-                    plan.blocks_read,
-                    pool_blocks,
-                )
-                .unwrap_or_else(|e| panic!("E4 table rejected: {e}"));
+        let seqs = layout
+            .seqs
+            .iter()
+            .enumerate()
+            .map(|(b, s)| {
                 let q =
                     deterministic_values(seq_dims.hq * seq_dims.d, 0.011, -0.4 + 0.13 * b as f32);
                 E4Seq {
                     q_dev: upload_f32(&q, &[seq_dims.hq, seq_dims.d], st),
-                    t_dev: upload_table(&table, st),
+                    t_dev: upload_table(&s.table, st),
                     q,
-                    table,
-                    active,
-                    plan,
+                    table: s.table.clone(),
+                    active: s.active,
+                    plan: s.plan,
                 }
             })
             .collect();
         E4Setup {
             seq_dims,
-            layers,
-            pool_blocks,
+            layers: layout.layers,
+            pool_blocks: layout.pool_blocks,
             pools,
             seqs,
+            layer_bytes: e4_layer_bytes(layout),
         }
     }
 
@@ -1223,108 +1234,65 @@ mod gpu_impl {
         }
     }
 
-    /// Analytical bytes one sequence's launch pair reads or writes, per variant:
-    /// (c3, a3pad, cache-only minimum c3, cache-only minimum a3).
-    fn e4_bytes(plan: SplitPlan, active: usize) -> (u64, u64, u64, u64) {
-        let (hq, hkv, d, l, blk) = (16u64, 4u64, 64u64, 32u64, 16u64);
-        let (s, br) = (plan.splits as u64, plan.blocks_read as u64);
-        let table_bytes = br * 4;
-        let c3_partials = 2 * s * hq * (l + 2) * 4; // written by the split kernel, read by reduce
-        let c3 = br * blk * l * 2
-            + hq * d * 4
-            + s * hkv * l * d * 4
-            + hkv * l * d * 4
-            + c3_partials
-            + table_bytes
-            + hq * d * 4;
-        let a3_partials = 2 * s * hkv * 16 * (d + 2) * 4;
-        let a3 = br * blk * hkv * d * 2 * 2
-            + s * hkv * hq * d * 4
-            + a3_partials
-            + table_bytes
-            + hq * d * 4;
-        let active_blocks = active.div_ceil(16) as u64;
-        (
-            c3,
-            a3,
-            active_blocks * blk * l * 2,
-            active_blocks * blk * hkv * d * 2 * 2,
-        )
-    }
-
-    /// Step 4 (E4, correctness only): B in {1, 8, 32}, rotating per-layer pools (see
-    /// `e4_setup`); the latent pools are smaller than 64 MiB, so a 64 MiB L2-flush memset runs
+    /// Step 4 (E4, correctness only): B in `--batches` (default 1, 8, 32) at context `--seq`
+    /// (default 1024), rotating per-layer pools (see `e4_setup`); a 64 MiB L2-flush memset runs
     /// before every layer. Every batch element is validated against per-sequence references over
     /// the shared pool (C3 accurate and padded A3). Bytes are analytical, not timing.
-    fn e4_suite(st: &Arc<Stream>) {
+    fn e4_suite(layouts: &[E4Layout], st: &Arc<Stream>) {
         let flush = api::zeros::<f32>(&[L2_FLUSH_WORDS]).sync_on(st).unwrap();
-        for batch in [1usize, 8, 32] {
-            let setup = e4_setup(batch, st);
-            let (mut c3_b, mut a3_b, mut min_c3, mut min_a3) = (0u64, 0u64, 0u64, 0u64);
+        for layout in layouts {
+            let batch = layout.batch;
+            let n = layout.seq;
+            println!("E4_FOOTPRINT {}", layout.footprint.describe());
+            let setup = e4_setup(layout, st);
             let (mut worst_c3, mut worst_a3) = (0.0f64, 0.0f64);
             for (case, dev) in &setup.pools {
                 thermal_guard();
+                let qp = quant_pool(case);
                 memset_d32(flush.device_pointer().cu_deviceptr(), L2_FLUSH_WORDS, st);
                 for seq in &setup.seqs {
                     let views = e4_views(dev, seq);
                     let pl = (seq.plan.splits, seq.plan.steps_per_split);
                     let c3 = run_c3(setup.seq_dims, views, seq.active, pl, Mode::Accurate, st);
                     let a3 = run_a3_pad(setup.seq_dims, views, seq.active, pl, st);
-                    let seq_case = e4_seq_case(case, seq);
                     let (latent_ref, full_ref) =
-                        cpu_refs_pool(setup.seq_dims, &seq_case, seq.active, setup.pool_blocks);
+                        cpu_refs_pool(setup.seq_dims, case, &qp, seq, setup.pool_blocks);
                     let (e_c3, e_a3) = (
                         max_abs(&c3, &latent_ref.context),
                         max_abs(&a3, &full_ref.context),
                     );
-                    assert!(e_c3 <= ATOL, "E4 C3 B={batch} err {e_c3}");
-                    assert!(e_a3 <= ATOL, "E4 A3 B={batch} err {e_a3}");
+                    assert!(e_c3 <= ATOL, "E4 C3 B={batch} N={n} err {e_c3}");
+                    assert!(e_a3 <= ATOL, "E4 A3 B={batch} N={n} err {e_a3}");
                     worst_c3 = worst_c3.max(e_c3);
                     worst_a3 = worst_a3.max(e_a3);
-                    let (c, a, mc, ma) = e4_bytes(seq.plan, seq.active);
-                    c3_b += c;
-                    a3_b += a;
-                    min_c3 += mc;
-                    min_a3 += ma;
                 }
             }
+            let step = {
+                let mut b = E4Bytes::default();
+                for _ in 0..setup.layers {
+                    b += setup.layer_bytes;
+                }
+                b
+            };
             let mib = |x: u64| x as f64 / (1u64 << 20) as f64;
             let pools = (setup.layers * setup.pool_blocks) as u64;
             println!(
-                "E4 B={batch} layers={} pools_resident: a3={:.1}MiB c3={:.1}MiB (+64MiB L2 flush per layer) worst_err c3_accurate={worst_c3:.3e} a3pad={worst_a3:.3e}",
+                "E4 B={batch} N={n} layers={} pools_resident: a3={:.1}MiB c3={:.1}MiB (+64MiB L2 flush per layer) worst_err c3_accurate={worst_c3:.3e} a3pad={worst_a3:.3e}",
                 setup.layers,
                 mib(pools * 4 * 16 * 64 * 2 * 2),
                 mib(pools * 16 * 32 * 2)
             );
             println!(
-                "E4_BYTES B={batch} per_decode_step(all layers): c3={:.2}MiB a3pad={:.2}MiB ratio_a3_over_c3={:.2} | cache-only minimum: c3={:.2}MiB a3={:.2}MiB ratio={:.2}",
-                mib(c3_b),
-                mib(a3_b),
-                a3_b as f64 / c3_b as f64,
-                mib(min_c3),
-                mib(min_a3),
-                min_a3 as f64 / min_c3 as f64
+                "E4_BYTES B={batch} N={n} per_decode_step(all layers): c3={:.2}MiB a3pad={:.2}MiB ratio_a3_over_c3={:.2} | cache-only minimum: c3={:.2}MiB a3={:.2}MiB ratio={:.2}",
+                mib(step.c3),
+                mib(step.a3pad),
+                step.a3pad as f64 / step.c3 as f64,
+                mib(step.min_c3),
+                mib(step.min_a3),
+                step.min_a3 as f64 / step.min_c3 as f64
             );
         }
         println!("E4_BATCH_LAYERS_OK=1");
-    }
-
-    fn e4_seq_case(case: &Case, seq: &E4Seq) -> Case {
-        Case {
-            name: case.name.clone(),
-            q: seq.q.clone(),
-            q_full: seq.q.clone(),
-            latent_physical: case.latent_physical.clone(),
-            k_projection: case.k_projection.clone(),
-            v_projection: case.v_projection.clone(),
-            kp_head_major: Vec::new(),
-            vp_head_major: Vec::new(),
-            k_physical_head_major: case.k_physical_head_major.clone(),
-            v_physical_head_major: case.v_physical_head_major.clone(),
-            table: seq.table.clone(),
-            oracle_latent_context: None,
-            oracle_full_context: None,
-        }
     }
 
     /// 64 MiB of 32-bit words: larger than the 32 MiB (RTX 4060 Laptop) and 48 MB (L4) L2.
@@ -1342,6 +1310,9 @@ mod gpu_impl {
     #[derive(Clone, Copy, PartialEq, Debug)]
     enum Variant {
         A3Pad,
+        /// Unpadded A3 (no zero query rows). E3 timing only, behind --with-a3-unpadded
+        /// (sensitivity run, docs/LOCAL_4060_PLAN.md addendum 2).
+        A3,
         C3Fast,
         C3Accurate,
     }
@@ -1350,6 +1321,7 @@ mod gpu_impl {
         fn name(self) -> &'static str {
             match self {
                 Self::A3Pad => "a3pad",
+                Self::A3 => "a3",
                 Self::C3Fast => "c3_fast",
                 Self::C3Accurate => "c3_accurate",
             }
@@ -1367,6 +1339,7 @@ mod gpu_impl {
     fn tbuf(dims: Dims, variant: Variant, splits: usize, st: &Arc<Stream>) -> TBuf {
         let (rows, width) = match variant {
             Variant::A3Pad => (dims.hkv * 16, dims.d),
+            Variant::A3 => (dims.hq, dims.d),
             _ => (dims.hq, dims.l),
         };
         TBuf {
@@ -1426,6 +1399,33 @@ mod gpu_impl {
                         .generics(gens(&[g, d, MP]))
                         .async_on(st)
                         .expect("a3_reduce_pad launch")
+                };
+                (acc, m, lsum, out.unpartition())
+            }
+            Variant::A3 => {
+                let (acc, m, lsum, _, _, _, _, _, _, _) = unsafe {
+                    e3_kernels::a3_split(
+                        acc.partition([1, g, d]),
+                        m.partition([1, g, 1]),
+                        lsum.partition([1, g, 1]),
+                        dev.q_full,
+                        dev.k_full,
+                        dev.v_full,
+                        dev.table,
+                        active as i32,
+                        sps as i32,
+                        dims.scale(),
+                    )
+                    .generics(gens(&[hq, hkv, g, d, dims.blk, 2 * dims.blk]))
+                    .async_on(st)
+                    .expect("a3_split launch")
+                };
+                let (acc, m, lsum) = (acc.unpartition(), m.unpartition(), lsum.unpartition());
+                let (out, _, _, _, _) = unsafe {
+                    e3_kernels::a3_reduce(out.partition([g, d]), &acc, &m, &lsum, splits as i32)
+                        .generics(gens(&[hq, g, d]))
+                        .async_on(st)
+                        .expect("a3_reduce launch")
                 };
                 (acc, m, lsum, out.unpartition())
             }
@@ -1493,6 +1493,7 @@ mod gpu_impl {
         iterations: usize,
         warmup: usize,
         clock_warm_ms: u64,
+        rewarm_max_ms: u64,
         dir: std::path::PathBuf,
     }
 
@@ -1515,6 +1516,7 @@ mod gpu_impl {
             iterations: arg("--iterations", "50").parse().unwrap(),
             warmup: arg("--warmup", "10").parse().unwrap(),
             clock_warm_ms: arg("--clock-warm-ms", "2000").parse().unwrap(),
+            rewarm_max_ms: arg("--rewarm-max-ms", "500").parse().unwrap(),
             dir,
         }
     }
@@ -1574,7 +1576,16 @@ mod gpu_impl {
         validate_launch(dims, &dev, &case.table, n);
         let plan = plan_bounded(n, dims.blk, nb, 1).expect("plan");
         let pl = (plan.splits, plan.steps_per_split);
-        let variants = [Variant::A3Pad, Variant::C3Fast, Variant::C3Accurate];
+        let with_a3 = args.iter().any(|a| a == "--with-a3-unpadded");
+        let mut variants = vec![Variant::A3Pad, Variant::C3Fast, Variant::C3Accurate];
+        if with_a3 {
+            variants.push(Variant::A3);
+        }
+        let harness_version = if with_a3 {
+            format!("{HARNESS_VERSION}+a3unpad")
+        } else {
+            HARNESS_VERSION.to_string()
+        };
         let mut bufs: Vec<TBuf> = variants
             .iter()
             .map(|&v| tbuf(dims, v, plan.splits, st))
@@ -1585,7 +1596,7 @@ mod gpu_impl {
         for (v, b) in variants.iter().zip(bufs.iter_mut()) {
             launch_async(dims, dev.views(), n, pl, *v, b, st);
             let out = readback(b, st);
-            let reference = if *v == Variant::A3Pad {
+            let reference = if matches!(*v, Variant::A3Pad | Variant::A3) {
                 &full_ref.context
             } else {
                 &latent_ref.context
@@ -1617,7 +1628,8 @@ mod gpu_impl {
         'timing: for it in 0..ta.iterations {
             let empty_pre = nvml.as_ref().and_then(Nvml::sm_clock);
             let empty_ms = ev.measure(st, || {});
-            let mut row = clock_fields(nvml.as_ref(), empty_pre);
+            // Reasons are read once per iteration below (~20 ms under WSL2; clock_fields_fast).
+            let mut row = clock_fields_fast(nvml.as_ref(), empty_pre);
             row.as_object_mut().unwrap().extend(
                 serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":0,"variant":"NONE","component":"empty","latency_ms":empty_ms})
                     .as_object()
@@ -1631,7 +1643,7 @@ mod gpu_impl {
                 let ms = ev.measure(st, || {
                     launch_async(dims, dev.views(), n, pl, variants[idx], &mut bufs[idx], st)
                 });
-                let mut row = clock_fields(nvml.as_ref(), pre);
+                let mut row = clock_fields_fast(nvml.as_ref(), pre);
                 let temp = row["temperature_c"].as_u64();
                 row.as_object_mut().unwrap().extend(
                     serde_json::json!({"suite":"e3_timing","seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[idx].name(),"component":"pipeline","latency_ms":ms,"t_ms":t0.elapsed().as_secs_f64()*1e3,"splits":plan.splits,"steps_per_split":plan.steps_per_split})
@@ -1645,8 +1657,26 @@ mod gpu_impl {
                     break 'timing;
                 }
             }
+            // After the iteration's timed samples: the reasons bits once (stored on its last
+            // row), then an untimed re-warm before the next iteration.
+            let reasons = nvml.as_ref().and_then(Nvml::reasons);
+            let (rewarm_ms, rewarm_bursts, rewarm_restored) =
+                rewarm(nvml.as_ref(), st, reference_clock, ta.rewarm_max_ms, || {
+                    for (v, b) in variants.iter().zip(bufs.iter_mut()) {
+                        launch_async(dims, dev.views(), n, pl, *v, b, st);
+                    }
+                });
+            if let Some(last) = samples.last_mut().and_then(|r| r.as_object_mut()) {
+                last.insert("clock_event_reasons".into(), serde_json::json!(reasons));
+                last.insert("rewarm_ms".into(), serde_json::json!(rewarm_ms));
+                last.insert("rewarm_bursts".into(), serde_json::json!(rewarm_bursts));
+                last.insert("rewarm_restored".into(), serde_json::json!(rewarm_restored));
+            }
         }
-        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)"});
+        // Same analytical accounting as E4 (one sequence, model_small shape). C3 fast is not
+        // given a byte count: its query-projection traffic is not separately accounted.
+        let eb = e4_config::e4_bytes(plan, n);
+        let meta = serde_json::json!({"suite":"e3_timing","seq":n,"plan":{"splits":plan.splits,"steps_per_split":plan.steps_per_split,"blocks_read":plan.blocks_read},"bytes_per_step_analytical":{"c3_accurate":eb.c3,"a3pad":eb.a3pad},"cache_only_minimum_bytes":{"c3_accurate":eb.min_c3,"a3pad":eb.min_a3},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"label":"timing; label results with the host (e.g. cloud L4)","reasons_sampling":"once per iteration after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":harness_version});
         write_outputs(
             &ta.dir,
             &samples,
@@ -1666,14 +1696,19 @@ mod gpu_impl {
     /// layer's B launch pairs form one timed interval; a 64 MiB L2-flush memset runs before each
     /// layer outside the interval. The per-step total is the sum of that iteration's layer
     /// intervals (a per-iteration sum, never a sum of medians).
-    fn e4_timing_suite(args: &[String], st: &Arc<Stream>) {
+    fn e4_timing_suite(args: &[String], layout: &E4Layout, st: &Arc<Stream>) {
         let ta = timing_args(args);
-        let batch: usize = args
-            .windows(2)
-            .find(|w| w[0] == "--batch")
-            .map(|w| w[1].parse().unwrap())
-            .unwrap_or(1);
-        let setup = e4_setup(batch, st);
+        let batch = layout.batch;
+        let n = layout.seq;
+        println!("E4_FOOTPRINT {}", layout.footprint.describe());
+        let setup = e4_setup(layout, st);
+        let layer_bytes = |v: Variant| -> u64 {
+            if v == Variant::A3Pad {
+                setup.layer_bytes.a3pad
+            } else {
+                setup.layer_bytes.c3
+            }
+        };
         let dims = setup.seq_dims;
         let variants = [Variant::A3Pad, Variant::C3Accurate];
         let flush = api::zeros::<f32>(&[L2_FLUSH_WORDS]).sync_on(st).unwrap();
@@ -1690,6 +1725,7 @@ mod gpu_impl {
             .collect();
         // Correctness before timing: layer 0, every batch element, both variants.
         let (case0, dev0) = &setup.pools[0];
+        let qp0 = quant_pool(case0);
         let mut worst = [0.0f64; 2];
         for (vi, v) in variants.iter().enumerate() {
             for (si, seq) in setup.seqs.iter().enumerate() {
@@ -1704,9 +1740,8 @@ mod gpu_impl {
                     st,
                 );
                 let out = readback(&bufs[vi][si], st);
-                let seq_case = e4_seq_case(case0, seq);
                 let (latent_ref, full_ref) =
-                    cpu_refs_pool(dims, &seq_case, seq.active, setup.pool_blocks);
+                    cpu_refs_pool(dims, case0, &qp0, seq, setup.pool_blocks);
                 let reference = if *v == Variant::A3Pad {
                     &full_ref.context
                 } else {
@@ -1715,7 +1750,7 @@ mod gpu_impl {
                 let err = max_abs(&out, reference);
                 assert!(
                     err <= ATOL,
-                    "E4 {} b={si} pre-timing correctness {err}",
+                    "E4 {} B={batch} N={n} b={si} pre-timing correctness {err}",
                     v.name()
                 );
                 worst[vi] = worst[vi].max(err);
@@ -1761,10 +1796,12 @@ mod gpu_impl {
                     let pre = nvml.as_ref().and_then(Nvml::sm_clock);
                     let ms = ev.measure(st, || run_layer(vi, dev, &mut bufs));
                     step_ms += ms;
-                    let mut row = clock_fields(nvml.as_ref(), pre);
+                    // No reasons query per layer: it costs ~20 ms under WSL2 (see
+                    // clock_fields_fast); the reasons are read once per step below.
+                    let mut row = clock_fields_fast(nvml.as_ref(), pre);
                     let temp = row["temperature_c"].as_u64();
                     row.as_object_mut().unwrap().extend(
-                        serde_json::json!({"suite":"e4_timing","batch":batch,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"layer","layer":layer,"latency_ms":ms})
+                        serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"layer","layer":layer,"latency_ms":ms,"bytes_analytical":layer_bytes(variants[vi]),"achieved_gbps":achieved_gbps(layer_bytes(variants[vi]), ms)})
                             .as_object()
                             .unwrap()
                             .clone(),
@@ -1775,16 +1812,23 @@ mod gpu_impl {
                         break 'timing;
                     }
                 }
-                samples.push(serde_json::json!({"suite":"e4_timing","batch":batch,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"step_total","latency_ms":step_ms,"layers":setup.layers}));
+                let step_bytes = layer_bytes(variants[vi]) * setup.layers as u64;
+                // After the step's timed layers: the reasons bits once, then an untimed re-warm
+                // so the next step does not start from clocks lowered during this host pause.
+                let reasons = nvml.as_ref().and_then(Nvml::reasons);
+                let (rewarm_ms, rewarm_bursts, rewarm_restored) =
+                    rewarm(nvml.as_ref(), st, reference_clock, ta.rewarm_max_ms, || {
+                        for vj in 0..variants.len() {
+                            run_layer(vj, &setup.pools[0].1, &mut bufs);
+                        }
+                    });
+                samples.push(serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"process":ta.process,"iteration":it,"order":off,"variant":variants[vi].name(),"component":"step_total","latency_ms":step_ms,"layers":setup.layers,"bytes_analytical":step_bytes,"achieved_gbps":achieved_gbps(step_bytes, step_ms),"clock_event_reasons":reasons,"rewarm_ms":rewarm_ms,"rewarm_bursts":rewarm_bursts,"rewarm_restored":rewarm_restored}));
             }
         }
-        let (mut c3_b, mut a3_b) = (0u64, 0u64);
-        for seq in &setup.seqs {
-            let (c, a, _, _) = e4_bytes(seq.plan, seq.active);
-            c3_b += c * setup.layers as u64;
-            a3_b += a * setup.layers as u64;
-        }
-        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":c3_b,"a3pad":a3_b},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted});
+        let lb = setup.layer_bytes;
+        let layers = setup.layers as u64;
+        let fp = &layout.footprint;
+        let meta = serde_json::json!({"suite":"e4_timing","batch":batch,"seq":n,"active_lengths":setup.seqs.iter().map(|s| s.active).collect::<Vec<_>>(),"layers":setup.layers,"pool_blocks":setup.pool_blocks,"l2_flush_bytes":L2_FLUSH_WORDS*4,"bytes_per_step_analytical":{"c3_accurate":lb.c3*layers,"a3pad":lb.a3pad*layers},"bytes_per_layer_analytical":{"c3_accurate":lb.c3,"a3pad":lb.a3pad},"cache_only_minimum_bytes_per_layer":{"c3_accurate":lb.min_c3,"a3pad":lb.min_a3},"footprint_bytes":{"full_kv":fp.full_kv_bytes,"latent":fp.latent_bytes,"device_total":fp.device_bytes,"host_estimate":fp.host_bytes},"nvml_available":nvml.is_some(),"reference_clock_mhz":reference_clock,"warm_clocks_mhz":warm_clocks,"iterations":ta.iterations,"warmup":ta.warmup,"variants":variants.iter().map(|v| v.name()).collect::<Vec<_>>(),"aborted_temperature_c":aborted,"reasons_sampling":"once per step after timing","rewarm_max_ms":ta.rewarm_max_ms,"harness_version":HARNESS_VERSION});
         let correctness = serde_json::json!({"layer0_all_batch_elements":{"a3pad_max_abs_error":worst[0],"c3_accurate_max_abs_error":worst[1],"atol":ATOL}});
         write_outputs(&ta.dir, &samples, &meta, &correctness);
         if aborted.is_some() {
@@ -1796,26 +1840,25 @@ mod gpu_impl {
         println!("E4_TIMING_OK=1 samples={}", samples.len());
     }
 
-    /// CPU references for one sequence reading a shared pool of `pool_blocks` physical blocks.
+    /// CPU references for one sequence reading a shared pool of `pool_blocks` physical blocks
+    /// (projections from the layer's `case`, FP16 pool copies from `qp`).
     fn cpu_refs_pool(
         dims: Dims,
         case: &Case,
-        active: usize,
+        qp: &QuantPool,
+        seq: &E4Seq,
         pool_blocks: usize,
     ) -> (GqaDecodeResult, GqaDecodeResult) {
-        let latent_f16 = quantize_f32_to_f16_storage(&case.latent_physical).unwrap();
-        let k_f16 = quantize_f32_to_f16_storage(&case.k_physical_head_major).unwrap();
-        let v_f16 = quantize_f32_to_f16_storage(&case.v_physical_head_major).unwrap();
         let latent = direct_paged_latent_gqa_decode_fp16_storage_runtime_f32_accum(
-            &case.q,
-            &latent_f16,
-            &case.table,
+            &seq.q,
+            &qp.latent,
+            &seq.table,
             &case.k_projection,
             &case.v_projection,
             dims.hq,
             dims.hkv,
             dims.seq,
-            active,
+            seq.active,
             dims.l,
             dims.d,
             dims.g(),
@@ -1824,14 +1867,14 @@ mod gpu_impl {
         )
         .expect("latent CPU reference (pool)");
         let full = paged_full_kv_gqa_decode_fp16_storage_runtime_f32_accum(
-            &case.q_full,
-            &k_f16,
-            &v_f16,
-            &case.table,
+            &seq.q,
+            &qp.k,
+            &qp.v,
+            &seq.table,
             dims.hq,
             dims.hkv,
             dims.seq,
-            active,
+            seq.active,
             dims.d,
             dims.g(),
             dims.blk,
@@ -1848,6 +1891,33 @@ mod gpu_impl {
             .find(|w| w[0] == "--suite")
             .map(|w| w[1].clone())
             .unwrap_or_else(|| "e3".into());
+        // E4 footprint, tables and plans are validated on the host before a GPU stream exists;
+        // a refused configuration exits non-zero without allocating anything.
+        let e4 = if matches!(suite.as_str(), "e4" | "e4-timing" | "all") {
+            let parsed = parse_e4_args(&args).and_then(|mut a| {
+                // e4-timing keeps its original default of one batch, B = 1.
+                let explicit = args.iter().any(|x| x == "--batch" || x == "--batches");
+                if suite == "e4-timing" && !explicit {
+                    a.batches = vec![1];
+                }
+                if suite == "e4-timing" && a.batches.len() != 1 {
+                    Err(e4_config::E4ConfigError::BadArgument(
+                        "--suite e4-timing takes one --batch".into(),
+                    ))
+                } else {
+                    e4_layouts(&a)
+                }
+            });
+            match parsed {
+                Ok(layouts) => layouts,
+                Err(e) => {
+                    eprintln!("E4_CONFIG_REFUSED: {e}");
+                    std::process::exit(2);
+                }
+            }
+        } else {
+            Vec::new()
+        };
         let st = with_default_device_policy(|p| p.next_stream())
             .unwrap()
             .unwrap();
@@ -1860,14 +1930,14 @@ mod gpu_impl {
             scale_suite(&st);
         }
         if suite == "e4" || suite == "all" {
-            e4_suite(&st);
+            e4_suite(&e4, &st);
         }
         // Timing suites: not part of "all"; intended for a stable-clock host.
         if suite == "timing" {
             e3_timing_suite(&args, &st);
         }
         if suite == "e4-timing" {
-            e4_timing_suite(&args, &st);
+            e4_timing_suite(&args, &e4[0], &st);
         }
         println!("E3_TEMPERATURE_END_C={:?}", gpu_temperature());
     }

@@ -1,0 +1,122 @@
+"""CPU tests for scripts/paper/make_tables.py and scripts/paper/check_numbers.py."""
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load(name):
+    path = ROOT / "scripts" / "paper" / f"{name}.py"
+    sys.path.insert(0, str(path.parent))
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_literal_extraction_skips_code_labels_and_hashes():
+    cn = load("check_numbers")
+    text = (
+        "# 3 Results\n"
+        "C3 is 0.893 of A3 at N=8192 and moves 13.2x fewer bytes (11 %).\n"
+        "Labels B32_N4096, sm_89, commit 507dea2 and `--iterations 50` are not numbers.\n"
+        "<!-- 999 in a comment -->\n"
+        "```\n777 in a fence\n```\n"
+        "See [run](reports/x_20261101/a.json).\n"
+    )
+    lits = [lit for _, line in cn.strip_prose(text) for lit in cn.literals(line)]
+    assert lits == ["0.893", "8192", "13.2", "11"]
+
+
+def test_bibliography_section_is_skipped():
+    cn = load("check_numbers")
+    text = (
+        "# Related work\nsee [1]\n# References\n[1] A. B. Title. arXiv:2309.06180, 2023.\n"
+        "# Appendix\nratio 0.893\n"
+    )
+    lits = [lit for _, line in cn.strip_prose(text) for lit in cn.literals(line)]
+    assert lits == ["1", "0.893"]
+
+
+def test_check_flags_untraceable_and_accepts_registered(tmp_path):
+    cn = load("check_numbers")
+    doc = tmp_path / "p.md"
+    doc.write_text("ratio 0.893, invented 0.777, constant 512\n")
+    bad = cn.check([doc], registry={"0.893"}, whitelist={"512"}, tokens=set())
+    assert bad == [f"{doc}:1: 0.777"]
+    assert cn.check([doc], {"0.893"}, {"512"}, tokens={"0.777"}) == []
+
+
+def test_whitelist_requires_a_reason(tmp_path):
+    cn = load("check_numbers")
+    wl = tmp_path / "wl.txt"
+    wl.write_text("512  # observed HMMA threshold\n")
+    assert cn.load_whitelist(wl) == {"512"}
+    wl.write_text("512\n")
+    with pytest.raises(SystemExit, match="without a reason"):
+        cn.load_whitelist(wl)
+
+
+def test_make_tables_reads_committed_results(tmp_path):
+    mt = load("make_tables")
+    mt.main(["--out", str(tmp_path)])
+    numbers = json.loads((tmp_path / "numbers.json").read_text())
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert summary["label"] == "laptop RTX 4060, WSL2, not a cloud result"
+    assert len(summary["claim_eligible"]) == 4 and len(summary["descriptive"]) == 7
+    for value in ("0.893", "0.865", "1.030", "0.972", "0.924"):
+        assert value in numbers, value
+    timing = (tmp_path / "tab_timing.md").read_text()
+    claims = [ln.rsplit("|", 2)[1].strip() for ln in timing.splitlines()[3:]]
+    assert claims.count("shown") == 3 and claims.count("not shown") == 1
+    assert claims.count("descriptive") == 7
+    assert "Byte ratio" in (tmp_path / "tab_timing_appendix.md").read_text()
+    assert summary["byte_ratio_range_claim_eligible"][0] > summary["byte_ratio_range"][0]
+
+
+def test_submission_copy_strips_claim_tags_and_comments():
+    ap = load("assemble_paper")
+    text = (
+        "A [M:timing] result; a [S:e4] fact. [H] A guess.\n<!-- note -->\n"
+        "Keep [1] and [TODO cite: x].\n"
+    )
+    out = ap.strip_tags(text)
+    assert out == "A result; a fact. A guess.\nKeep [1] and [TODO cite: x].\n"
+    assert ap.table_width(["| a | b |", "|---|---|", "| " + "x" * 200 + " | y |"]) == 0
+    wide = ["| a | b | c |", "|---|---|---|", "| " + "x" * 40 + " | " + "y" * 40 + " | z |"]
+    assert ap.table_width(wide) > ap.ONE_COLUMN_CHARS
+
+
+def test_submission_evidence_list_drops_keys_and_groups_by_topic():
+    ap = load("assemble_paper")
+    text = (
+        "# Appendix B\n\n**Evidence keys.** All paths are relative to the repository root.\n\n"
+        "| Key | Files |\n|---|---|\n| M:timing | `a.json` |\n| S:e4 | `b.rs` |\n"
+        "| M:scale | `c.log` |\n\n**Regenerating.**\n"
+    )
+    out = ap.evidence_list(text)
+    assert "| Key |" not in out and "M:timing" not in out and "S:e4" not in out
+    assert "- *Timing:* `a.json`\n- *Numerics:* `c.log`\n- *Sources" in out
+    assert out.endswith("\n**Regenerating.**\n")
+    with pytest.raises(SystemExit, match="without a topic"):
+        ap.evidence_list(text.replace("M:scale", "M:new"))
+
+
+def test_image_check_fails_on_missing_file(tmp_path):
+    ap = load("assemble_paper")
+    (tmp_path / "fig.png").write_bytes(b"")
+    assert ap.check_images("![a](fig.png)", tmp_path) == ["fig.png"]
+    with pytest.raises(SystemExit, match="missing image"):
+        ap.check_images("![a](fig.png) ![b](nope.png)", tmp_path)
+
+
+def test_paper_images_resolve_from_repo_root_in_builds():
+    ap = load("assemble_paper")
+    full = ap.assemble(ROOT / "paper" / "paper.md")
+    links = ap.check_images(full, ROOT)
+    assert links and all(p.startswith("reports/") for p in links)

@@ -4,6 +4,8 @@
 Run-level THROTTLED (user policy 2026-10-02): any timed sample whose in-process SM clock
 (pre or post) is >5 % below the run's modal timed-sample clock, or any thermal/HW slowdown
 reason bit in in-process NVML reads or in external 100 ms telemetry during the run.
+Added 2026-10-31 (before local data): also THROTTLED if the modal SM clock is >5 % below the
+run's own warm-up reference clock; in_band_fraction (reads >= 95 % of it) is reported per run.
 THROTTLED runs are reported separately and never enter ratios or CIs.
 
 Primary estimate per length/component: geometric mean over clean processes of the
@@ -17,6 +19,7 @@ Launch-count floor: median 'empty' event span + launches x median C1 projection 
 import collections
 import json
 import math
+import os
 import random
 import statistics
 import sys
@@ -52,14 +55,20 @@ def load_run(root, run):
         except (ValueError, IndexError):
             pass
     thermal = bool((reasons | ext_reasons) & THERMAL_BITS)
+    meta = json.loads((d / "timing_meta.json").read_text())
+    reference = meta["reference_clock_mhz"]
+    below_reference = bool(reference) and m < 0.95 * reference
     tags = []
     if low:
         tags.append(f"THROTTLED(clock: {low}/{len(clocks)} reads <95% of mode {m})")
+    if below_reference:
+        tags.append(f"THROTTLED(modal clock {m} <95% of warm-up reference {reference})")
+    elif not reference:
+        tags.append("no reference clock; reference rule not applied")
     if thermal:
         tags.append(f"THROTTLED(thermal bits in-proc {hex(reasons)} ext {hex(ext_reasons)})")
     if run["start_condition"] != "cool-start":
         tags.append(run["start_condition"])
-    meta = json.loads((d / "timing_meta.json").read_text())
     corr = json.loads((d / "correctness.json").read_text())
     return {
         "rows": rows,
@@ -67,7 +76,12 @@ def load_run(root, run):
         "low_reads": low,
         "reads": len(clocks),
         "tags": tags,
-        "throttled": bool(low) or thermal,
+        "throttled": bool(low) or below_reference or thermal,
+        "in_band_fraction": (
+            round(sum(1 for c in clocks if c >= 0.95 * reference) / len(clocks), 4)
+            if reference
+            else None
+        ),
         "mem_clock_mode": mode(
             [r["mem_clock_post_mhz"] for r in rows if r.get("mem_clock_post_mhz")]
         ),
@@ -124,6 +138,8 @@ def main(root):
         "runs": [],
         "results": {},
     }
+    if os.environ.get("E0B_HOST_LABEL"):
+        report["host_label"] = os.environ["E0B_HOST_LABEL"]
     for r in runs:
         report["runs"].append(
             {
@@ -142,6 +158,7 @@ def main(root):
                     "keepalive_launches",
                     "keepalive_failed",
                     "reference_clock",
+                    "in_band_fraction",
                     "correct",
                     "tags",
                     "throttled",

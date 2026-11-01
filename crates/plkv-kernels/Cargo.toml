@@ -94,3 +94,6 @@ required-features = ["gpu-cutile"]
 [[example]]
 name = "e3_splitk_gpu"
 required-features = ["gpu-cutile"]
+
+[[example]]
+name = "e4_plan"

@@ -1,0 +1,28 @@
+# Numbers allowed in the paper prose without a results file. Every entry needs a reason.
+# Results (ratios, CIs, counts, clocks, errors, bytes) must NOT be added here: they come from
+# paper/generated/numbers.json or from files under reports/.
+0  # counting word / zero rows
+1  # counting word; ratio 1.0 reference line
+2  # counting word; two-block steps (SOURCE e3_splitk.rs)
+3  # counting word ("three traps")
+4  # counting word; GQA group 4, 4 warps per CTA (SOURCE e3_splitk.rs, Dims)
+5  # >= 5 clean processes rule; 5 % THROTTLED margin (runbook section 4)
+6  # page budget / section number
+7  # section number
+8  # counting word; 8 GB laptop part (setup)
+9  # counting word
+10  # counting word; 10-iteration instrument check (instrument_checks/README.md)
+11  # 2^-11 relative error of FP16 (IEEE binary16, 11-bit significand)
+16  # 16 query rows after padding; block size 16; HMMA.16816 shape (SOURCE e3_splitk.rs, E3_RESULTS.md)
+20  # "~20 ms" NVML reasons query, rounded from reports/nvml_latency_20261101/nvml_latency.json (median 20.8)
+32  # latent dim 32; 32 tokens per two-block step; 32 MiB L2 (SOURCE Dims; DIAGNOSIS doc)
+64  # head dim 64; 64 MiB L2 flush (SOURCE Dims, e3_splitk_gpu.rs L2_FLUSH_WORDS)
+95  # 95 % in-band / reference threshold (runbook section 4)
+100  # 100 ms external telemetry interval (SOURCE e3e4_campaign.py -lms 100)
+128  # at most 128 two-block steps per CTA; 128 threads; 128-register cap (SOURCE splitk_plan.rs, E3_RESULTS.md)
+256  # 256-output score tile (16 x 16) that fell back to CUDA cores (E3_SPLITK_DESIGN.md); nominal 256 GB/s spec (labelled not measured)
+512  # 512-output tile threshold observed for HMMA (E3_SPLITK_DESIGN.md)
+2026  # year in dates
+0.2  # cuTile version 0.2 (SOURCE Cargo.lock: cutile 0.2.0)
+3e-3  # correctness gate for C3 accurate total error (SOURCE crates/plkv-kernels/examples/e3_splitk_gpu.rs, const GATE)
+93.3  # KV-cache reduction quoted from the abstract of cited work [2] (arXiv:2405.04434); not our result

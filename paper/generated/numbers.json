@@ -1,0 +1,647 @@
+{
+ "0": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json",
+  "reports/e3_splitk_20261002/sass_c3_modes/e3_sass_summary.json",
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "0.002": [
+  "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json"
+ ],
+ "0.03": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "0.09": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "0.096": [
+  "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json"
+ ],
+ "0.15": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "0.29": [
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/samples.jsonl.xz"
+ ],
+ "0.842": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.847": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.856": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.860": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.865": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.869": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "0.873": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "0.876": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.884": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.888": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.891": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.893": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.908": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.909": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.914": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "0.915": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.916": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.924": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.925": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.928": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.936": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.94": [
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_fix1/samples.jsonl.xz"
+ ],
+ "0.943": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.964": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.971": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "0.972": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.974": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
+ ],
+ "0.977": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "0.989": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "0.99": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/samples.jsonl.xz"
+ ],
+ "0.999": [
+  "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json"
+ ],
+ "1": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.00": [
+  "reports/local_4060_20261101/instrument_checks/e3_N8192_50it_prefix/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_10it_fix1/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/samples.jsonl.xz"
+ ],
+ "1.002e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.003": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.009": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.011": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "1.017": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
+ ],
+ "1.029": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.030": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.037": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.038": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "1.051": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.052": [
+  "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json"
+ ],
+ "1.057": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
+ ],
+ "1.078": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "1.088e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.089": [
+  "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json"
+ ],
+ "1.093": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "1.1": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1.247e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.251e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.336e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.402e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.426e-03": [
+  "reports/e3_splitk_20261002/scale/emulate_c3_numerics.out"
+ ],
+ "1.480": [
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "1.659e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "1.7": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
+ ],
+ "1.907e-05": [
+  "reports/e3_splitk_20261002/scale/emulate_c3_numerics.out"
+ ],
+ "10": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_10it_fix1/timing_meta.json",
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "10.3": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "10.7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "10.9": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "1071": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1088": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "11": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "11.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "12.0": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "12.4": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "122": [
+  "reports/diagnosis_20261002/e0/seq1024_run1/run_summary.json"
+ ],
+ "124": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "128": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "13.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "13.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1305": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "133.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "14": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "140": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "148": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "1537": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "16": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "16.7": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
+ ],
+ "18.7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "1890": [
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_fix1/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_fix1/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_10it_fix1/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_10it_fix1/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/timing_meta.json",
+  "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json"
+ ],
+ "2": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "2.651e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "2.729e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "2.8": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "20": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
+ ],
+ "20.8": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "210": [
+  "reports/diagnosis_20261002/e0/seq1024_run1/run_summary.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "219": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
+ ],
+ "23.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "24": [
+  "reports/e3_splitk_20261002/sass_c3_modes/e3_sass_summary.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "25.0": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "255": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "2580": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "2595": [
+  "reports/local_4060_20261101/instrument_checks/e3_N8192_50it_prefix/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e3_N8192_50it_prefix/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/samples.jsonl.xz",
+  "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/timing_meta.json",
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "29.0": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "3": [
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json"
+ ],
+ "3.0": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "3.192e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "3.519e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.586e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.6": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "3.662e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.8": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "3.824e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.881e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.929e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.939e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3.967e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "3105 MHz": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ],
+ "321.5": [
+  "reports/diagnosis_20261002/e0/seq1024_run1/clock_attributed_summary.json"
+ ],
+ "32768": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "33.3": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "35.6": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "378": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "3962": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "4": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "4.072e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "4.163e-03": [
+  "reports/e3_splitk_20261002/scale/emulate_c3_numerics.out"
+ ],
+ "4.182e-3": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "4.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "4.835e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "4.9": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "40": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "4096": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "41.7": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json",
+  "reports/e3_splitk_20261002/sass_c3_modes/e3_sass_summary.json"
+ ],
+ "4104": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "43.0": [
+  "reports/diagnosis_20261002/e0/seq1024_cool2/clock_attributed_summary.json"
+ ],
+ "5": [
+  "reports/diagnosis_20261002/e0/seq1024_cool2/run_summary.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/timing_meta.json",
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/variants_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json",
+  "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/variants_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json",
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json",
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "5.007e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "5.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json"
+ ],
+ "5.655e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "50": [
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_fix1/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e3_N8192_50it_prefix/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_50it_fix2/timing_meta.json",
+  "reports/local_4060_20261101/instrument_checks/e4_B8_N4096_50it_fix2/timing_meta.json",
+  "reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/manifest.json",
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json",
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "50.0": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json"
+ ],
+ "5566": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "5849": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "6.0": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "6.275e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "6.294e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "6.332e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "6.580e-5": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "6.866e-5": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "60.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "616": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "617.42": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt",
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "62": [
+  "reports/nvml_latency_20261101/nvml_latency.json"
+ ],
+ "7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "7.153e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "7.215e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "7.234e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "7.288e-4": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "7.3": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "7.4": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "7.5": [
+  "reports/diagnosis_20261002/e0/seq1024_cool2/clock_attributed_summary.json"
+ ],
+ "7.6": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "7.7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "7.820e-5": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "7.868e-5": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "70.5": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "73": [
+  "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
+ ],
+ "73.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "74.6": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "75": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "76": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "77": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "78": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "79": [
+  "reports/diagnosis_20261002/e0/seq1024_run1/clock_attributed_summary.json",
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "8": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "8.1": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "8.2": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "8.3": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "8.583e-5": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "8.9": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ],
+ "80": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
+  "reports/local_4060_20261101/primary_merged_analysis.json",
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "8001 MHz": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ],
+ "8188 MiB": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ],
+ "8192": [
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+ ],
+ "89": [
+  "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "9.1": [
+  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
+ ],
+ "9.7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "9.9": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "91": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "95": [
+  "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
+  "reports/e3_splitk_20261002/sass_c3_modes/e3_sass_summary.json"
+ ],
+ "95.7": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "97.1": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
+ "NVIDIA GeForce RTX 4060 Laptop GPU": [
+  "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ]
+}

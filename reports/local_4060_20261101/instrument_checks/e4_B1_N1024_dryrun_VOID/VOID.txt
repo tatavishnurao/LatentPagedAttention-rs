@@ -1,0 +1,1 @@
+VOID (2026-10-31): taken before the E4 per-step reasons fix (commit 507dea2). E4 layers ran mostly at 210 MHz idle clocks; see docs/E0B_CLOUD_RUNBOOK.md section 4. Not evidence.

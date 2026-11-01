@@ -135,6 +135,69 @@ pub fn clock_fields(nvml: Option<&Nvml>, pre: Option<u32>) -> serde_json::Value 
     })
 }
 
+/// Like [`clock_fields`] but without the clock-event-reasons query, which takes ~20 ms under
+/// WSL2 (measured on the RTX 4060 laptop, driver 617.42) and lets the GPU drop to idle clocks
+/// between short timed samples. Callers read the reasons once per step with [`Nvml::reasons`]
+/// after the timed region; `clock_event_reasons` is null on rows built here.
+pub fn clock_fields_fast(nvml: Option<&Nvml>, pre: Option<u32>) -> serde_json::Value {
+    serde_json::json!({
+        "sm_clock_pre_mhz": pre,
+        "sm_clock_post_mhz": nvml.and_then(Nvml::sm_clock),
+        "mem_clock_post_mhz": nvml.and_then(Nvml::mem_clock),
+        "temperature_c": nvml.and_then(Nvml::temperature),
+        "clock_event_reasons": serde_json::Value::Null,
+    })
+}
+
+/// Written into every E3 / E4 `timing_meta.json` so data from different harness versions is
+/// never pooled (docs/LOCAL_4060_PLAN.md, addendum item 2).
+pub const HARNESS_VERSION: &str = "e3e4-rewarm-saturating-20ms-2026-11-01";
+
+/// GPU time enqueued back to back per re-warm chunk, with no synchronization inside a chunk.
+pub const REWARM_CHUNK_MS: f64 = 20.0;
+
+/// Untimed re-warm after a host-side pause. Enqueues about [`REWARM_CHUNK_MS`] of `burst`s
+/// back to back (no synchronization between them), synchronizes once, reads the SM clock, and
+/// repeats until the clock is within 95 % of `reference_mhz` or `max_ms` has elapsed. One burst
+/// is timed first to size the chunk. A sync after every short burst kept the GPU duty cycle low
+/// and the clock fell instead of recovering (E4 N=1024, 2026-11-01). Returns (elapsed ms,
+/// bursts, restored); with no NVML or no reference it does nothing and reports `false`.
+pub fn rewarm<F: FnMut()>(
+    nvml: Option<&Nvml>,
+    st: &Arc<Stream>,
+    reference_mhz: Option<u32>,
+    max_ms: u64,
+    mut burst: F,
+) -> (f64, usize, bool) {
+    let start = std::time::Instant::now();
+    let (Some(nvml), Some(reference)) = (nvml, reference_mhz) else {
+        return (0.0, 0, false);
+    };
+    let threshold = f64::from(reference) * 0.95;
+    let elapsed = |s: std::time::Instant| s.elapsed().as_secs_f64() * 1e3;
+    if nvml.sm_clock().is_some_and(|c| f64::from(c) >= threshold) {
+        return (elapsed(start), 0, true);
+    }
+    let one_ms = Events::new().measure(st, &mut burst).max(1e-3);
+    let per_chunk = ((REWARM_CHUNK_MS / one_ms).ceil() as usize).clamp(1, 100_000);
+    let mut bursts = 1;
+    loop {
+        if nvml.sm_clock().is_some_and(|c| f64::from(c) >= threshold) {
+            return (elapsed(start), bursts, true);
+        }
+        if start.elapsed().as_millis() >= u128::from(max_ms) {
+            return (elapsed(start), bursts, false);
+        }
+        for _ in 0..per_chunk {
+            burst();
+        }
+        unsafe {
+            st.synchronize().unwrap();
+        }
+        bursts += per_chunk;
+    }
+}
+
 /// Back-to-back untimed work for `warm_ms`, then the reference clock = mode of the second half
 /// of the NVML reads taken after each synchronized burst.
 pub fn clock_warmup<F: FnMut()>(

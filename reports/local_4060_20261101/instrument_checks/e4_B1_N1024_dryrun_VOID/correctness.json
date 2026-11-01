@@ -1,0 +1,7 @@
+{
+  "layer0_all_batch_elements": {
+    "a3pad_max_abs_error": 0.0018057823181152344,
+    "atol": 0.005,
+    "c3_accurate_max_abs_error": 0.00036525726318359375
+  }
+}

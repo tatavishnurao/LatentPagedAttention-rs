@@ -97,6 +97,8 @@ Still **correctness and code generation only. No timing; no performance claim.**
 
 The mode is a const generic chosen at launch. Accurate mode costs one extra score `mma` per step (+50 % tensor-core instructions per step) and the same loads. Its runtime cost is **not measured**.
 
+> **Note, 2026-11-01.** Superseded: the run-time cost was later measured at one size (E3 N=8192, warm L2) in the local RTX 4060 campaign: C3 accurate / C3 fast 1.052 [0.999, 1.089] and 1.017 [0.974, 1.057] in two runs; both CIs include 1.0 (`reports/local_4060_20261101/runs/*/variants_analysis_vs_c3_fast.json`; paper corrections ledger A9). "One extra score `mma` per step" means the score MMAs double (8 to 16 per CTA per step).
+
 ### The 4.18e-3 heavy-tailed finding and its cause
 
 - **What happened.** The first scale run (`scale/scale_suite.log`) used FP16 q′ and unbounded splits, and stopped on the 3e-3 gate. C3 on heavy-tailed inputs reached **4.18e-3 at N = 8192 at every split count**, and 3.27e-3 at 32K.
