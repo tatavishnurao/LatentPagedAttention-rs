@@ -193,3 +193,42 @@ def test_reference_clock_run_reports_in_band_fraction(tmp_path):
     assert run["clean"] is True
     assert run["in_band_fraction"] == 1.0
     assert run["sm_clock_modal_mhz"] == 1890
+
+
+def _meta(root, label, **kw):
+    (root / label / "timing_meta.json").write_text(json.dumps(kw))
+
+
+def test_absolute_reference_guard_excludes_low_warmup(tmp_path):
+    """A process that warmed up far below the configuration's best reference is THROTTLED even
+    though its own clocks match its own (low) reference."""
+    mod = load()
+    specs = [("e4_timing", "B8_N1024", 0.9, "cool-start", {"clock": c}) for c in (1890, 915)]
+    root = campaign(tmp_path, specs)
+    _meta(root, "e4_timing_B8_N1024_p0", reference_clock_mhz=1890)
+    _meta(root, "e4_timing_B8_N1024_p1", reference_clock_mhz=915)
+    runs = {r["label"]: r for r in mod.analyze(root)["runs"]}
+    assert runs["e4_timing_B8_N1024_p0"]["clean"] is True
+    low = runs["e4_timing_B8_N1024_p1"]
+    assert low["clean"] is False and low["in_band_fraction"] == 1.0
+    assert any("best in config 1890" in t for t in low["tags"])
+
+
+def test_mixed_harness_versions_are_refused(tmp_path):
+    import pytest
+
+    mod = load()
+    specs = [("e3_timing", "N8192", 0.9, "cool-start", {})] * 2
+    root = campaign(tmp_path, specs)
+    _meta(root, "e3_timing_N8192_p0", reference_clock_mhz=1890, harness_version="v-new")
+    _meta(root, "e3_timing_N8192_p1", reference_clock_mhz=1890)
+    with pytest.raises(SystemExit, match="different harness versions"):
+        mod.analyze(root)
+
+
+def test_legacy_runs_are_labelled(tmp_path):
+    mod = load()
+    root = campaign(tmp_path, [("e3_timing", "N1024", 0.9, "cool-start", {})])
+    report = mod.analyze(root)
+    assert report["runs"][0]["harness_version"] == "pre-2026-11-01"
+    assert report["results"]["e3_timing/N1024"]["harness_version"] == "pre-2026-11-01"

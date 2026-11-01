@@ -12,6 +12,10 @@ Policy (2026-10-02, same as analyze_e0b.py):
   Added 2026-10-31 (before local data): also THROTTLED if the modal SM clock is > 5 % below the
   process's own warm-up reference clock. Each run also reports in_band_fraction, the share of
   SM clock reads >= 95 % of that reference (an instrument check, not a gate).
+  Added 2026-11-01 (docs/LOCAL_4060_PLAN.md addendum, before data): also THROTTLED if the warm-up
+  reference is < 95 % of the highest reference among the processes of the same configuration in
+  the same campaign. Processes with different harness_version values (timing_meta.json; missing
+  = "pre-2026-11-01") are never pooled: the analysis refuses such a configuration.
 - Only cool-start, non-THROTTLED, successful processes are "clean". THROTTLED and hot-start
   processes are reported separately and never enter ratios or CIs.
 - Primary estimate: geometric mean of per-process ratios over clean processes; 95 % CI by
@@ -44,6 +48,25 @@ B = 10000
 
 
 DEFAULT_E4_SEQ = 1024
+LEGACY_HARNESS = "pre-2026-11-01"
+
+
+def load_meta(root, label):
+    path = root / label / "timing_meta.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def best_references(root, runs):
+    """{(kind, config): highest warm-up reference clock} over processes that produced samples."""
+    best = {}
+    for run in runs:
+        if run.get("kind") not in COMPONENT or run["returncode"] != 0:
+            continue
+        ref = load_meta(root, run["label"]).get("reference_clock_mhz")
+        if ref:
+            key = (run["kind"], run["config"])
+            best[key] = max(best.get(key, 0), ref)
+    return best
 
 
 def parse_config(kind, config):
@@ -197,6 +220,7 @@ def analyze(root):
     rng = random.Random(20261002)
     groups = collections.defaultdict(list)
     report = {"campaign": str(root), "runs": [], "results": {}}
+    best_ref = best_references(root, manifest["runs"])
     if os.environ.get("E0B_HOST_LABEL"):
         report["host_label"] = os.environ["E0B_HOST_LABEL"]
     for run in manifest["runs"]:
@@ -219,12 +243,17 @@ def analyze(root):
             report["runs"].append(entry)
             continue
         rows = [json.loads(line) for line in samples.open()]
-        meta_path = root / run["label"] / "timing_meta.json"
-        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        meta = load_meta(root, run["label"])
         reference = meta.get("reference_clock_mhz")
         throttled, details = tag(
             rows, external_reasons(root / f"{run['label']}_telemetry.csv"), reference
         )
+        best = best_ref.get((kind, run["config"]))
+        if reference and best and reference < 0.95 * best:
+            throttled = True
+            details.append(f"warm-up reference {reference} <95% of best in config {best}")
+        entry["harness_version"] = meta.get("harness_version", LEGACY_HARNESS)
+        entry["best_reference_clock_mhz_in_config"] = best
         entry.update({"throttled": throttled, "tags": details, **clock_stats(rows, reference)})
         for key in ("start_temp_c", "cooldown_wait_s"):
             if key in run:
@@ -244,10 +273,17 @@ def analyze(root):
             }
             - {BASELINE}
         )
+        versions = {m.get("harness_version", LEGACY_HARNESS) for _, _, _, m in procs}
+        if len(versions) > 1:
+            raise SystemExit(
+                f"{kind}/{config}: processes from different harness versions {sorted(versions)}; "
+                "refusing to pool them"
+            )
         info = bytes_info(kind, [m for _, _, _, m in procs])
         res = {
             "component": component,
             "baseline": BASELINE,
+            "harness_version": versions.pop(),
             **parse_config(kind, config),
             **info,
             "clean_processes": [lbl for c, _, lbl, _ in procs if c],
