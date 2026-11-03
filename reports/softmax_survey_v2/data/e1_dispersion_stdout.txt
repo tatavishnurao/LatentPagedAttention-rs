@@ -1,0 +1,6 @@
+Delta=2: max rel err = 5.87e-16; w=0.5 at N=8.4; w(2048)=0.0036; w(4096)=0.0018; w(8192)=0.0009; w(32768)=0.0002; w(65536)=0.0001
+Delta=4: max rel err = 6.32e-16; w=0.5 at N=55.6; w(2048)=0.0260; w(4096)=0.0132; w(8192)=0.0066; w(32768)=0.0017; w(65536)=0.0008
+Delta=8: max rel err = 1.61e-15; w=0.5 at N=2982.0; w(2048)=0.5929; w(4096)=0.4213; w(8192)=0.2668; w(32768)=0.0834; w(65536)=0.0435
+Delta=16: max rel err = 4.45e-16; w=0.5 at N=8886111.5; w(2048)=0.9998; w(4096)=0.9995; w(8192)=0.9991; w(32768)=0.9963; w(65536)=0.9927
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e1_dispersion.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e1_dispersion.json

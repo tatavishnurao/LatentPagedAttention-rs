@@ -1,0 +1,795 @@
+<title>Where Softmax Lives</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one reading column (~72ch); figures may run wider; quiet technical-report styling. */
+:root{
+  --bg:#fbfbf9; --fg:#17191e; --muted:#596070; --rule:#dcdfe4; --accent:#1f5ea8;
+  --panel:#eff2f6; --plate:#ffffff; --code-bg:#edf0f4;
+  --t-proven:#1d6b46; --t-paper:#1f5ea8; --t-config:#6a4c93; --t-measured:#9a5b00; --t-inference:#8a3a3a;
+  --f-body:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-head:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14161a; --fg:#e6e7ea; --muted:#a2a8b3; --rule:#2d3139; --accent:#86b6f0;
+  --panel:#1c2026; --plate:#ffffff; --code-bg:#1f232a;
+  --t-proven:#6fd0a0; --t-paper:#86b6f0; --t-config:#c3a6ee; --t-measured:#f0b866; --t-inference:#f09a9a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14161a; --fg:#e6e7ea; --muted:#a2a8b3; --rule:#2d3139; --accent:#86b6f0;
+  --panel:#1c2026; --plate:#ffffff; --code-bg:#1f232a;
+  --t-proven:#6fd0a0; --t-paper:#86b6f0; --t-config:#c3a6ee; --t-measured:#f0b866; --t-inference:#f09a9a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:17px/1.62 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px}
+main{max-width:72ch;margin:0 auto;min-width:0}
+h1,h2,h3{font-family:var(--f-head);line-height:1.2;text-wrap:balance;letter-spacing:.005em}
+h1{font-size:2.1rem;margin:0 0 .3rem;font-weight:600}
+h2{font-size:1.45rem;margin:2.6rem 0 .6rem;padding-top:1rem;border-top:1px solid var(--rule);font-weight:600}
+h3{font-size:1.12rem;margin:1.8rem 0 .4rem;font-weight:600}
+h1+p strong{font-family:var(--f-head);font-weight:500;color:var(--muted);font-size:1.15rem}
+a{color:var(--accent);text-underline-offset:2px;overflow-wrap:anywhere}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+hr{border:0;border-top:1px solid var(--rule);margin:1.6rem 0}
+code{font-family:var(--f-mono);font-size:.84em;background:var(--code-bg);padding:.08em .3em;border-radius:3px}
+pre{background:var(--code-bg);padding:12px 14px;border-radius:6px;overflow-x:auto;font-size:.82rem;line-height:1.5}
+pre code{background:none;padding:0}
+.table-wrap{overflow-x:auto;margin:1rem 0}
+table{border-collapse:collapse;font-size:.84rem;line-height:1.4;min-width:560px;width:100%;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-family:var(--f-head);font-weight:600;font-size:.8rem;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+figure{margin:1.8rem 0;width:min(100vw - 32px, 1000px);position:relative;left:50%;transform:translateX(-50%)}
+figure .plate{background:var(--plate);border:1px solid var(--rule);border-radius:6px;padding:10px;overflow-x:auto}
+figure img{display:block;margin:0 auto;max-width:100%;height:auto}
+figcaption{max-width:72ch;margin:.7rem auto 0;font-size:.9rem;line-height:1.5;color:var(--muted)}
+figcaption strong{color:var(--fg);font-family:var(--f-head);font-weight:600}
+blockquote{background:var(--panel);border-radius:6px;padding:4px 18px;margin:1.4rem 0;font-size:.96rem}
+math{font-family:"STIX Two Math","Cambria Math","Latin Modern Math",serif;font-size:1.05em}
+.math-block{overflow-x:auto;margin:1rem 0;padding:2px 0}
+.tag{font-family:var(--f-mono);font-size:.72em;letter-spacing:.02em;white-space:nowrap;border:1px solid currentColor;border-radius:3px;padding:0 .3em;margin:0 .1em}
+.tag-proven{color:var(--t-proven)}.tag-paper{color:var(--t-paper)}.tag-config{color:var(--t-config)}
+.tag-measured{color:var(--t-measured)}.tag-inference{color:var(--t-inference)}
+.cite{font-family:var(--f-head);font-size:.86em;overflow-wrap:anywhere}
+ol.refs{font-size:.88rem;line-height:1.45;padding-left:2.2em}
+ol.refs li{margin:.45rem 0}
+ol.refs details{margin-top:.2rem;font-size:.82rem;color:var(--muted)}
+ol.refs summary{cursor:pointer;color:var(--accent)}
+.vtag{font-family:var(--f-mono);font-size:.78em;color:var(--muted)}
+.backlink{font-size:.9rem;color:var(--muted)}
+@media (max-width:520px){body{font-size:16px} h1{font-size:1.7rem}}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<main>
+<h1>Where Softmax Lives in Modern Models</h1>
+<p><strong>A source-checked survey, a census of 36 model families, and CPU reproductions of three Google DeepMind claims about softmax</strong></p>
+<p><em>Tata Vishnu Vardhan Rao · technical report, version 2 · November 2026 · code, data and sources: <code>reports/softmax_survey_v2/</code></em></p>
+<blockquote>
+<p><strong>Abstract.</strong> Softmax appears in a served model at up to five places: self-attention, cross-attention, the vocabulary head, mixture-of-experts routers and contrastive losses. This report checks four papers in full text, including three with Google DeepMind authors, on dispersion, attention sinks and numerical collapse and cancellation. It then builds a source-backed census of 36 model families, and maps each claim onto each family. Five CPU experiments reproduce the mechanisms. One finding is that the published adaptive-temperature polynomial only sharpens rows whose entropy lies between 0.85 and 5.95 nats. Another is that CPU PyTorch's float32 cross-entropy collapses at paper margin ln(1/ε) ≈ 15.94 nats when there are 113 classes or more, not at the paper's 16.6. A cost model locates the context length at which decode attention overtakes the weight matmuls in four released configs. Real-model probes (E6, E7) were written and smoke-tested. They were not run, because the session could not download model weights.</p>
+</blockquote>
+<p><strong>Keywords:</strong> softmax, attention, dispersion, attention sinks, Softmax Collapse, numerical precision, mixture of experts, KV cache, LLM serving</p>
+<hr />
+<h2>1 Introduction</h2>
+<p>Discussions of "softmax problems" mix up several different things. A kernel paper about the throughput of <code>exp</code> and a training-dynamics paper about rounding in a gradient both say they "fix softmax", yet they have almost nothing in common. Three recent lines of work with Google DeepMind authors make three separate claims. Softmax cannot stay sharp as the number of items grows (<em>dispersion</em>) <span class="cite">[<a href="#ref-velickovic">1</a>]</span>. The attention sink on the first token is a learned way to limit over-mixing <span class="cite">[<a href="#ref-barbero">2</a>]</span>. And standard softmax and cross-entropy code has two floating-point bugs, <em>Softmax Collapse</em> and <em>Softmax Cancellation</em> <span class="cite">[<a href="#ref-barron">3</a>]</span>. The name <em>Softmax Collapse</em> comes from earlier work at Imperial College London <span class="cite">[<a href="#ref-prieto">4</a>]</span>.</p>
+<p>This report asks where softmax appears in current model families, how each family has changed or replaced it, and whether each claim applies to each family. It is a <strong>survey with measurements, not a novel-method paper</strong>. Its contributions are:</p>
+<ol>
+<li><strong>Source verification.</strong> Each claim is checked against the full text of its paper (§4, References). Version 1 of this report could not reach arXiv and relied partly on secondary summaries. Every such number has now been rechecked against the full text, or removed.</li>
+<li><strong>A census</strong> of 36 selected families, built from official configs, reference code, model cards and technical reports (§3). It is a census of the families listed, not an estimate of what fraction of all architectures use softmax.</li>
+<li><strong>A family-by-family mapping</strong> of the claims, ending in a matrix with a source behind every cell (§5).</li>
+<li><strong>Reproductions</strong> (E1–E5) of the mechanisms on CPU, with code, raw JSON and stdout for every figure (§6). E6 and E7 are written and smoke-tested but not run (§6.6).</li>
+</ol>
+<p>I did not search the literature exhaustively, so nothing here is claimed as new. Two results in §6 were not stated in the papers I read: the entropy window of the adaptive-temperature polynomial (E3), and the C-dependence of the float32 collapse threshold on CPU (E4). I checked them only against those papers.</p>
+<p><strong>How claims are tagged.</strong> <strong><span class="tag tag-proven">proven</span></strong> a mathematical fact derived here or standard. <strong><span class="tag tag-paper">paper</span></strong> a paper's own claim, taken from its full text. <strong><span class="tag tag-config">config</span></strong> read from an official config.json, model card or reference code. <strong><span class="tag tag-measured">measured</span></strong> produced by this report's code, with the data file named. <strong><span class="tag tag-inference">inference</span></strong> my reasoning, untested.</p>
+<p><strong>About the study note.</strong> The brief mentions a study note, "Softmax in modern AI — DeepMind findings and study plan". It was not attached to this session, so I used the brief's source list instead.</p>
+<h2>2 Background</h2>
+<h3>2.1 Softmax and its gradient</h3>
+<p>For logits <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>z</mi><mo>&#x02208;</mo><msup><mi>&#x0211D;</mi><mi>N</mi></msup></mrow></math> and temperature <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo>&#x0003E;</mo><mn>0</mn></mrow></math>,</p>
+<div class="math-block"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mo stretchy="false">&#x00028;</mo><mi>z</mi><mo>&#x0002F;</mo><mi>T</mi><msub><mo stretchy="false">&#x00029;</mo><mi>i</mi></msub><mo>&#x0003D;</mo><mfrac><mrow><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>&#x0002F;</mo><mi>T</mi></mrow></msup></mrow><mrow><msubsup><mo>&#x02211;</mo><mrow><mi>j</mi><mo>&#x0003D;</mo><mn>1</mn></mrow><mrow><mi>N</mi></mrow></msubsup><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>&#x0002F;</mo><mi>T</mi></mrow></msup></mrow></mfrac><mo>&#x0002C;</mo><mspace width="2em" /><munder><mo>&#x02211;</mo><mi>i</mi></munder><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mo stretchy="false">&#x00028;</mo><mi>z</mi><mo>&#x0002F;</mo><mi>T</mi><msub><mo stretchy="false">&#x00029;</mo><mi>i</mi></msub><mo>&#x0003D;</mo><mn>1</mn><mo>&#x0002E;</mo></mrow></math></div>
+
+<p>Implementations subtract <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>m</mi><mo>&#x0003D;</mo><msub><mo>max</mo><mi>j</mi></msub><msub><mi>z</mi><mi>j</mi></msub></mrow></math> before exponentiating. This prevents overflow but leaves other rounding problems in place (§4.3). Two properties matter throughout. The outputs are positive and sum to one, so a row cannot withhold mass. And an item's weight depends on logit <em>differences</em> and on the number of competitors. Cross-entropy with target distribution <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>p</mi></mrow></math> and prediction <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>q</mi><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mo stretchy="false">&#x00028;</mo><mi>z</mi><mo stretchy="false">&#x00029;</mo></mrow></math> has gradient <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>q</mi><mo>&#x02212;</mo><mi>p</mi></mrow></math> with respect to <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>z</mi></mrow></math> <span class="tag tag-proven">proven</span>.</p>
+<h3>2.2 Attention softmax</h3>
+<p>A head with query <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>q</mi><mi>t</mi></msub></mrow></math>, keys <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>k</mi><mn>1</mn></msub><mo>&#x0002C;</mo><mo>&#x02026;</mo><mo>&#x0002C;</mo><msub><mi>k</mi><mi>n</mi></msub></mrow></math> and head dimension <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi></mrow></math> computes</p>
+<div class="math-block"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><msub><mi>a</mi><mrow><mi>t</mi><mo>&#x0002C;</mo><mi>i</mi></mrow></msub><mo>&#x0003D;</mo><msub><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mi>i</mi></msub><mspace width="negativethinmathspace" /><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><msubsup><mi>q</mi><mi>t</mi><mo>&#x022A4;</mo></msubsup><msub><mi>k</mi><mi>i</mi></msub></mrow><mrow><msqrt><mi>d</mi></msqrt></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002C;</mo><mspace width="2em" /><msub><mi>o</mi><mi>t</mi></msub><mo>&#x0003D;</mo><munder><mo>&#x02211;</mo><mi>i</mi></munder><msub><mi>a</mi><mrow><mi>t</mi><mo>&#x0002C;</mo><mi>i</mi></mrow></msub><mspace width="0.167em" /><msub><mi>v</mi><mi>i</mi></msub><mo>&#x0002E;</mo></mrow></math></div>
+
+<p>There is one softmax row per query, per head, per layer. In prefill all rows are computed together. In decode, each new token adds one row per head, and the row's length is the current context, or the window size for local layers. Fused kernels never write the row to memory. They keep a running maximum and a running sum, and rescale partial outputs when the maximum changes ("online softmax") <span class="cite">[<a href="#ref-fa1">5</a>]</span>.</p>
+<h3>2.3 Vocabulary softmax and sampling</h3>
+<p>The output head maps a hidden state <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>h</mi><mo>&#x02208;</mo><msup><mi>&#x0211D;</mi><mrow><msub><mi>d</mi><mtext>model</mtext></msub></mrow></msup></mrow></math> to <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>q</mi><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mo stretchy="false">&#x00028;</mo><mi>W</mi><mi>h</mi><mo>&#x0002F;</mo><mi>T</mi><mo stretchy="false">&#x00029;</mo></mrow></math> over <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>V</mi></mrow></math> tokens. In training this feeds the cross-entropy loss. In serving it is used for sampling, at temperature <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi></mrow></math>, often after top-k or top-p truncation. Log-probabilities returned to clients, for example to reinforcement-learning trainers, are <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><mi>q</mi></mrow></math>.</p>
+<h3>2.4 Router and contrastive softmax</h3>
+<p>A mixture-of-experts (MoE) router computes scores <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>r</mi><mo>&#x0003D;</mo><msub><mi>W</mi><mi>r</mi></msub><mi>h</mi></mrow></math> over <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>E</mi></mrow></math> experts. Some designs take a softmax over all <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>E</mi></mrow></math> and keep the top <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>k</mi></mrow></math> (Qwen3-MoE, Jamba, MiniMax). Some take the top <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>k</mi></mrow></math> first and then a softmax over only those (Mixtral, gpt-oss). Others replace the softmax with a sigmoid (DeepSeek-V3, Kimi K2, GLM-4.5, Llama 4) <span class="tag tag-config">config</span>. In CLIP-style training, a softmax over the batch's image-text similarity matrix defines a contrastive loss. SigLIP replaces it with a pairwise sigmoid loss <span class="cite">[<a href="#ref-siglip">6</a>]</span>.</p>
+<h2>3 Architecture census</h2>
+<h3>3.1 Method</h3>
+<p>For each family I read its official <code>config.json</code> on the Hugging Face Hub <span class="cite">[<a href="#ref-hfconfigs">7</a>]</span>, the reference modelling code (Hugging Face transformers at commit <code>3568df44</code> <span class="cite">[<a href="#ref-hftransformers">8</a>]</span>, or the vendor's own code where noted <span class="cite">[<a href="#ref-llamamodels">9</a>]</span>), the model card <span class="cite">[<a href="#ref-cards">10</a>]</span>, and the technical report where one exists <span class="cite">[<a href="#ref-gpt3">11</a>, <a href="#ref-llama1">12</a>, <a href="#ref-llama2">13</a>, <a href="#ref-llama3">14</a>, <a href="#ref-mistral">15</a>, <a href="#ref-mixtral">16</a>, <a href="#ref-qwen2">17</a>, <a href="#ref-qwen3">18</a>, <a href="#ref-gemma1">19</a>, <a href="#ref-gemma2">20</a>, <a href="#ref-gemma3">21</a>, <a href="#ref-phi3">22</a>, <a href="#ref-olmo2">23</a>, <a href="#ref-falcon">24</a>, <a href="#ref-glm45">25</a>, <a href="#ref-gptoss">26</a>, <a href="#ref-dsv2">27</a>, <a href="#ref-dsv3">28</a>, <a href="#ref-kimik2">29</a>, <a href="#ref-mamba">30</a>, <a href="#ref-mamba2">31</a>, <a href="#ref-jamba">32</a>, <a href="#ref-jamba15">33</a>, <a href="#ref-rwkv6">34</a>, <a href="#ref-minimax">35</a>, <a href="#ref-recurrentgemma">36</a>, <a href="#ref-bert">37</a>, <a href="#ref-t5">38</a>, <a href="#ref-vit">39</a>, <a href="#ref-clip">40</a>, <a href="#ref-siglip">6</a>, <a href="#ref-whisper">41</a>]</span>. Four configs were gated for my token (403): Llama 2, Llama 4, Command R and Jamba 1.5. For those, the census uses the paper, the model card and the code defaults, and says so in the row. A feature counts as present only if a source shows it. Where the sources are silent the cell is <em>unknown</em>, not <em>absent</em>. z-loss is a training-recipe detail that most reports do not mention, so it is unknown for every family except OLMo 2.</p>
+<p>Every autoregressive decoder also has a sampling softmax at serving time. It is the same softmax as the vocabulary head, so it is not a separate column.</p>
+<h3>3.2 Results</h3>
+<figure><div class="plate"><img alt="Census heatmap" src="figures/census_heatmap.png" loading="lazy"></div><figcaption><strong>Figure 1.</strong> Softmax sites (left of the bold line) and softmax modifications (right) for 36 selected families, grouped as dense decoders, MoE, hybrid or non-softmax, and encoder/multimodal. ● present; blank, absent in the sources read; ?, unknown or not documented; –, the site does not exist. Sources per row are in data/census.json. Takeaway: almost every family keeps softmax in at least two places (vocabulary head, and attention or router); the modifications cluster after 2024.</figcaption></figure>
+<p><strong>Table 1.</strong> Abbreviated census. Full rows with all sources: <code>data/census_table.md</code> and <code>data/census.json</code> [config/paper].</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Attention</th>
+<th>Context</th>
+<th>Vocab</th>
+<th>Router</th>
+<th>Softmax modifications</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Llama 3.1</td>
+<td>GQA, 8 KV heads</td>
+<td>131,072</td>
+<td>128,256</td>
+<td>–</td>
+<td>none found (RoPE frequency rescaling only)</td>
+</tr>
+<tr>
+<td>Mistral 7B</td>
+<td>GQA + sliding window 4,096</td>
+<td>32,768</td>
+<td>32,000</td>
+<td>–</td>
+<td>sliding window</td>
+</tr>
+<tr>
+<td>Qwen3 (dense)</td>
+<td>GQA, QK-norm</td>
+<td>40,960 (131,072 with YaRN ×4)</td>
+<td>151,936</td>
+<td>–</td>
+<td>QK-norm; opt-in static YaRN</td>
+</tr>
+<tr>
+<td>Gemma 2</td>
+<td>GQA, local 4,096 / global alternating</td>
+<td>8,192</td>
+<td>256,000</td>
+<td>–</td>
+<td>soft-cap 50 (attention), 30 (logits)</td>
+</tr>
+<tr>
+<td>Gemma 3</td>
+<td>5 local (1,024) : 1 global, QK-norm</td>
+<td>131,072 (1B: 32,768)</td>
+<td>262,144</td>
+<td>–</td>
+<td>QK-norm replaces soft-capping</td>
+</tr>
+<tr>
+<td>OLMo 2</td>
+<td>MHA, QK-norm</td>
+<td>4,096</td>
+<td>100,352</td>
+<td>–</td>
+<td>QK-norm, z-loss</td>
+</tr>
+<tr>
+<td>gpt-oss</td>
+<td>GQA 64/8, alternating window 128 / dense</td>
+<td>131,072</td>
+<td>201,088</td>
+<td>softmax over selected top-4</td>
+<td>learned sink logit per head; YaRN ×32</td>
+</tr>
+<tr>
+<td>Mixtral 8×7B</td>
+<td>GQA</td>
+<td>32,768</td>
+<td>32,000</td>
+<td>softmax over top-2 of 8</td>
+<td>–</td>
+</tr>
+<tr>
+<td>DeepSeek-V2</td>
+<td>MLA</td>
+<td>163,840</td>
+<td>102,400</td>
+<td>softmax, top-6 of 160</td>
+<td>YaRN, softmax scale ×1.590</td>
+</tr>
+<tr>
+<td>DeepSeek-V3</td>
+<td>MLA</td>
+<td>163,840</td>
+<td>129,280</td>
+<td>sigmoid + bias, top-8 of 256</td>
+<td>YaRN, softmax scale ×1.874</td>
+</tr>
+<tr>
+<td>Qwen3-MoE</td>
+<td>GQA, QK-norm</td>
+<td>40,960</td>
+<td>151,936</td>
+<td>softmax, top-8 of 128</td>
+<td>QK-norm</td>
+</tr>
+<tr>
+<td>Llama 4</td>
+<td>chunked local 8,192 + NoPE global every 4th</td>
+<td>10M (Scout)</td>
+<td>202,048*</td>
+<td>sigmoid, top-1 + shared</td>
+<td>temperature tuning on NoPE layers; QK-norm*</td>
+</tr>
+<tr>
+<td>Kimi K2</td>
+<td>MLA</td>
+<td>131,072</td>
+<td>163,840</td>
+<td>sigmoid + bias, top-8 of 384</td>
+<td>YaRN ×32</td>
+</tr>
+<tr>
+<td>GLM-4.5</td>
+<td>GQA 96/8, QK-norm</td>
+<td>131,072</td>
+<td>151,552</td>
+<td>sigmoid, top-8 of 160</td>
+<td>QK-norm</td>
+</tr>
+<tr>
+<td>Jamba 1.5</td>
+<td>1 attention : 7 Mamba</td>
+<td>262,144</td>
+<td>65,536*</td>
+<td>softmax, top-2 of 16</td>
+<td>Mamba layers, no positional encoding</td>
+</tr>
+<tr>
+<td>MiniMax-Text-01</td>
+<td>7 lightning (linear) : 1 softmax</td>
+<td>1M train / 4M inference</td>
+<td>200,064</td>
+<td>softmax, top-2 of 32</td>
+<td>linear-attention layers, output gate</td>
+</tr>
+<tr>
+<td>Qwen3-Next</td>
+<td>3 Gated DeltaNet : 1 gated attention</td>
+<td>262,144</td>
+<td>151,936</td>
+<td>softmax, top-10 of 512</td>
+<td>sigmoid output gate, QK-norm</td>
+</tr>
+<tr>
+<td>RecurrentGemma</td>
+<td>2 RG-LRU : 1 local MQA (2,048)</td>
+<td>–</td>
+<td>256,000</td>
+<td>–</td>
+<td>final soft-cap 30</td>
+</tr>
+<tr>
+<td>Mamba / Mamba-2 / RWKV-6</td>
+<td>none</td>
+<td>–</td>
+<td>50,280 / 50,277 / 65,536</td>
+<td>–</td>
+<td>no attention softmax</td>
+</tr>
+<tr>
+<td>CLIP / SigLIP</td>
+<td>ViT + text encoder</td>
+<td>77 / –</td>
+<td>49,408 / 32,000</td>
+<td>–</td>
+<td>softmax contrastive loss / sigmoid loss</td>
+</tr>
+</tbody>
+</table></div>
+<p>* From the Hugging Face config class defaults or the reference code, because the released config is gated. The released values were not checked.</p>
+<p>Four observations stand out [config/paper]:</p>
+<ul>
+<li><strong>The vocabulary softmax is universal among the generative families</strong>, including the non-softmax backbones (Mamba, Mamba-2, RWKV-6). None of the 36 families removes it.</li>
+<li><strong>MoE routing is moving from softmax to sigmoid.</strong> DeepSeek-V3, Kimi K2, GLM-4.5 and Llama 4 score experts with a sigmoid. Mixtral, DeepSeek-V2, Qwen3-MoE, Jamba, MiniMax-01, Qwen3-Next and gpt-oss use a softmax, either before or after top-k.</li>
+<li><strong>Logit-range control changed between generations of one family.</strong> Gemma 2 soft-capped attention and output logits; Gemma 3 replaced attention soft-capping with QK-norm <span class="cite">[<a href="#ref-gemma3">21</a>]</span>. QK-norm also appears in OLMo 2, Qwen3, GLM-4.5, Qwen3-Next and, by code default, Llama 4.</li>
+<li><strong>Explicit sink or gating mechanisms are recent.</strong> In this census they appear only in gpt-oss (a learned sink logit per head, Aug 2025) <span class="cite">[<a href="#ref-gptoss">26</a>]</span>, Qwen3-Next (a sigmoid output gate on softmax attention, Sep 2025) and MiniMax-01 (a gate on its <em>linear</em>-attention layers).</li>
+</ul>
+<figure><div class="plate"><img alt="Census timeline" src="figures/census_timeline.png" loading="lazy"></div><figcaption><strong>Figure 2.</strong> First appearance of each modification within this census, by the date of the family&#x27;s report, card or release. It is not a claim about the first use anywhere. Takeaway: in the selected families, most softmax modifications first ship in 2024–2025.</figcaption></figure>
+<p>The timeline counts only census rows. QK-norm, for example, was proposed in 2020 <span class="cite">[<a href="#ref-qknorm">42</a>]</span> and used in ViT-22B in 2023 <span class="cite">[<a href="#ref-vit22b">43</a>]</span>, and neither is a census row.</p>
+<h2>4 The four issue types and the DeepMind claims</h2>
+<p>The papers address four different issue types. Confusing them leads to wrong expectations, such as expecting a numerically fixed softmax to help long-context retrieval.</p>
+<ol>
+<li><strong>Selection and dispersion.</strong> What softmax <em>can represent</em> as the number of items grows.</li>
+<li><strong>Attention sinks.</strong> Where the mass goes when a head has nothing to read, given that the weights must sum to one.</li>
+<li><strong>Numerical collapse and cancellation.</strong> What goes wrong when the gradient, or a log-probability, is computed in finite precision.</li>
+<li><strong>Output expressivity.</strong> What the vocabulary head can represent, given that the rank of <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><mi>q</mi></mrow></math> across contexts is limited by <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>d</mi><mtext>model</mtext></msub></mrow></math> <span class="cite">[<a href="#ref-bottleneck">44</a>]</span>.</li>
+</ol>
+<p>Runtime cost (exp throughput, KV traffic) is a fifth concern. It is treated in E5 and §7.</p>
+<h3>4.1 Dispersion — Veličković, Perivolaropoulos, Barbero, Pascanu <span class="cite">[<a href="#ref-velickovic">1</a>]</span></h3>
+<p><em>Claim</em> <span class="tag tag-paper">paper</span>. If the logits in a row are bounded, every softmax coefficient is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo>&#x0002F;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math> as the number of items <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>n</mi></mrow></math> grows (Lemma 2.1). In a Transformer of MLPs and softmax self-attention over a finite token vocabulary, the logits are bounded. So for any temperature <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x003B8;</mi><mo>&#x0003E;</mo><mn>0</mn></mrow></math> and any <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x003F5;</mi><mo>&#x0003E;</mo><mn>0</mn></mrow></math>, there is an <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>n</mi></mrow></math> at which every coefficient of every <em>global</em> head is below <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x003F5;</mi></mrow></math> (Theorem 2.2). Their bound is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>&#x003B1;</mi><mi>k</mi></msub><mo>&#x02264;</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mi>n</mi></mfrac></mstyle><msup><mi>e</mi><mrow><mi>&#x003B4;</mi><mo>&#x0002F;</mo><mi>&#x003B8;</mi></mrow></msup></mrow></math>, where <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x003B4;</mi></mrow></math> is the logit spread.</p>
+<p><em>Assumptions.</em> A finite input vocabulary, continuous layers, a non-zero temperature, and global attention. The paper names three ways out: unnormalised attention (linear, sigmoid, stick-breaking), hard or local attention, and removing excess attention as selective attention does <span class="cite">[<a href="#ref-selective">45</a>]</span>.</p>
+<p><em>Scope.</em> A single-head max-retrieval model trained on sets of at most 16 items and tested on up to 16,384 items. Gemma 2B fine-tuned on the 30 CLRS-Text algorithmic tasks. Entropy measurements on Gemma 2B heads.</p>
+<p><em>Finding with number</em> <span class="tag tag-paper">paper</span>. With adaptive temperature applied only at inference, max-retrieval accuracy over ten seeds rose from 81.3% to 82.1% at 256 items and from 12.4% to 14.0% at 16,384 items (Table 1). On a ~4,000-token code sample, Gemma 2B's measured logit spread δ ranged over [2.28, 14.78], with mean 5.69 ± 2.05.</p>
+<p><em>Limitation.</em> The authors call adaptive temperature "ad-hoc" and say it "does not escape the conclusions of our theory". Its polynomial was fitted on one synthetic task. For CLRS-Text it had to be applied during fine-tuning as well as at inference, and they suggest the remaining failures may come from contexts longer than those the fit was derived on. The full JAX code is in their Figure 4. E3 below uses it exactly as printed.</p>
+<h3>4.2 Attention sinks — Barbero, Arroyo, Gu, Perivolaropoulos, Bronstein, Veličković, Pascanu <span class="cite">[<a href="#ref-barbero">2</a>]</span></h3>
+<p><em>Claim</em> <span class="tag tag-paper">paper</span>. Heavy attention to the first token is a learned mechanism that lets deep Transformers avoid <em>over-mixing</em>, the collapse of token representations under repeated attention. Their Theorem 3.2 bounds token-to-token sensitivity by sums over attention paths. A sink that absorbs attention while its value vector has small norm acts as an approximate no-op, which caps that sensitivity.</p>
+<p><em>Assumptions.</em> Decoder-only Transformers with causal softmax attention. The bound does not differentiate through the softmax.</p>
+<p><em>Scope.</em> Perturbation and attention-map analyses of Gemma 7B. The Llama 3.1 family (8B, 70B, 405B). 120M-parameter LLaMA-2-style models pre-trained from scratch, following Gu et al. <span class="cite">[<a href="#ref-gu">46</a>]</span>, with varied context length and data packing.</p>
+<p><em>Finding with number</em> <span class="tag tag-paper">paper</span>. With threshold ε = 0.8, the share of heads with a strong first-token sink is 45.97% for Llama 3.1 8B, 73.49% for 70B and 78.29% for 405B (Table 1). Separately, removing ⟨bos⟩ from Gemma 7B at inference drops RULER at 4,096 tokens from 82.57 to 0.00 (Table 3).</p>
+<p><em>Limitation.</em> The paper explains why sinks are useful. It does not test sink-free alternatives at scale, and it offers no serving method. In its own pre-training runs, models trained with ⟨bos⟩ fixed at position 0 lose their sink and their loss (2.69 → 7.56) when ⟨bos⟩ is removed at inference (Table 2). That makes sink handling a deployment concern <span class="tag tag-inference">inference</span>.</p>
+<h3>4.3 Collapse and cancellation — Barron, Gnanapragasam, Tschannen <span class="cite">[<a href="#ref-barron">3</a>]</span></h3>
+<p><em>Claim</em> <span class="tag tag-paper">paper</span>. Standard softmax, log-softmax and cross-entropy have two numerical bugs.
+<strong>Softmax Collapse.</strong> When the target logit leads by margin <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>m</mi><mo>&#x0003D;</mo><msub><mi>z</mi><mi>t</mi></msub><mo>&#x02212;</mo><msub><mrow><mi mathvariant="normal">L</mi><mi mathvariant="normal">S</mi><mi mathvariant="normal">E</mi></mrow><mrow><mi>j</mi><mo>&#x02260;</mo><mi>t</mi></mrow></msub><msub><mi>z</mi><mi>j</mi></msub></mrow></math>, the denominator <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mn>1</mn><mo>&#x0002B;</mo><msup><mi>e</mi><mrow><mo>&#x02212;</mo><mi>m</mi></mrow></msup></mrow></math> rounds to 1 beyond a "precision cliff" <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>c</mi><mi>d</mi></msub></mrow></math>. They give ≈5.5 in bf16, 16.6 in fp32 and 36.7 in fp64. Above the cliff the target gradient <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>q</mi><mi>t</mi></msub><mo>&#x02212;</mo><mn>1</mn></mrow></math> is exactly 0, while the non-target gradients stay positive, so the gradients no longer sum to zero.
+<strong>Softmax Cancellation.</strong> In distillation, computing <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>q</mi></mrow></math> and <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>p</mi></mrow></math> separately and subtracting them loses precision. Small differences between the forward softmax and the backward log-softmax leave a non-zero gradient even when the student and teacher logits are equal.
+The fix computes everything relative to the target or the arg-max in log space, using <code>softplus</code>, <code>log1p</code> and <code>expm1</code>, without casting to higher precision. JAX code for both fixes is printed in the paper.</p>
+<p><em>Assumptions.</em> Max-subtracted implementations. Collapse needs high-confidence targets. Cancellation needs a student close to its teacher.</p>
+<p><em>Scope.</em> Grokking benchmarks: a 1-layer Transformer and 2-layer MLPs on modular arithmetic, with AdamW or LaProp, across bf16, fp32 and fp64. Distillation of a 2-layer MLP student initialised at the teacher's weights.</p>
+<p><em>Finding with number</em> <span class="tag tag-paper">paper</span>. On a + b mod 31 at ε = 10⁻⁸, fixed fp32 cross-entropy reaches 100.0 ± 0.0% test accuracy against 94.3 ± 5.4% for standard fp32 cross-entropy (Table 1). Without weight decay on a² + b² mod 97, a slingshot spike at the fp32 cliff drops standard test accuracy from 61% to 23%, while the fixed version continues to 85%. They also derive that the margin settles at <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mi>m</mi><mo>&#x022C6;</mo></msup><mo>&#x02248;</mo><mi>log</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo>&#x0002F;</mo><msub><mi>&#x003F5;</mi><mtext>Adam</mtext></msub><mo stretchy="false">&#x00029;</mo></mrow></math>.</p>
+<p><em>Limitation.</em> The authors note that "the extreme margins and near-zero student–teacher gaps probed by our experiments are uncommon in standard large-scale training". Every experiment is small-scale. The arXiv listing is at v3 (29 Oct 2026). An erratum says an earlier version of the printed code gave NaN gradients when all but one logit is −∞.</p>
+<h3>4.4 Origin of "Softmax Collapse" — Prieto, Barsbey, Mediano, Birdal <span class="cite">[<a href="#ref-prieto">4</a>]</span></h3>
+<p><em>Claim</em> <span class="tag tag-paper">paper</span>. Without regularisation, grokking tasks push models into floating-point <em>absorption errors</em> in softmax, which they name Softmax Collapse. Once the correct-class term absorbs the rest of the sum, the loss and the correct-class gradient become exactly zero. The logits grow because the gradient aligns with <em>naïve loss minimisation</em>, a direction that only scales the logits. Their fixes are StableMax, a softmax with a ramp-shaped function in place of exp, and ⊥Grad, which removes the gradient component along the weights.</p>
+<p><em>Scope.</em> MLPs and a 1-layer Transformer on modular arithmetic mod 113, sparse parity, and a 200-sample MNIST subset.</p>
+<p><em>Finding with number</em> <span class="tag tag-paper">paper</span>. With ⊥SGD, the model "reaches 100% test accuracy within 400 iterations" on modular addition (Fig. 6a). Without regularisation, standard softmax cross-entropy stays at chance in the 40%-training-data setting (Fig. 2a, Fig. 4).</p>
+<p><em>Limitation.</em> Prieto et al. are at Imperial College London; this is not a DeepMind paper. The tasks are tiny. Barron et al. report that StableMax inflates margins to ~10³–10⁴ and trails their fix (their Table 1).</p>
+<h3>4.5 Other Google and Google DeepMind work bearing on the claims (2023–2026)</h3>
+<p>All of the following were read in full text <span class="tag tag-paper">paper</span>:</p>
+<ul>
+<li><strong>Selective attention</strong> (Leviathan, Kalman, Matias, Google Research) <span class="cite">[<a href="#ref-selective">45</a>]</span>. A parameter-free change that reduces attention to unneeded elements. They report language modelling equivalent to standard Transformers with about twice as many attention heads and parameters. It bears on dispersion, which Veličković et al. explicitly connect it to.</li>
+<li><strong>Round and round we go</strong> (Barbero et al.) <span class="cite">[<a href="#ref-roundround">47</a>]</span>. Gemma 7B uses RoPE's highest frequencies to build positional attention patterns. This bears on why RoPE rescaling, unlike logit scaling, does not address dispersion directly.</li>
+<li><strong>Transformers need glasses!</strong> (Barbero et al.) <span class="cite">[<a href="#ref-glasses">48</a>]</span>. Proves a <em>representational collapse</em> in which distinct inputs map to arbitrarily close final-token representations, an effect "exacerbated by the low-precision" formats. This is the over-squashing theory that the sink paper builds on.</li>
+<li><strong>Gemma 2 and Gemma 3 reports</strong> <span class="cite">[<a href="#ref-gemma2">20</a>, <a href="#ref-gemma3">21</a>]</span>: logit soft-capping, then QK-norm, plus local/global layer ratios.</li>
+<li><strong>Griffin and RecurrentGemma</strong> <span class="cite">[<a href="#ref-griffin">49</a>, <a href="#ref-recurrentgemma">36</a>]</span>: linear recurrences mixed with local attention.</li>
+<li><strong>Infini-attention</strong> (Munkhdalai, Faruqui, Gopal) <span class="cite">[<a href="#ref-infini">50</a>]</span>: a compressive linear-attention memory alongside softmax attention, for unbounded context.</li>
+<li><strong>SigLIP</strong> (Google DeepMind Zürich) <span class="cite">[<a href="#ref-siglip">6</a>]</span>: removes softmax from the contrastive loss.</li>
+</ul>
+<h2>5 The claims across architectures</h2>
+<h3>5.1 Dispersion</h3>
+<p>Dispersion applies to <strong>global softmax heads whose key count grows with context</strong>. A local or sliding-window head sees at most its window, so its row length is bounded no matter how long the context gets <span class="tag tag-proven">proven</span>. Mitigations, classified by whether they act on dispersion directly:</p>
+<ul>
+<li><strong>Directly: length-dependent logit scaling.</strong> Llama 4 multiplies the query by <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mn>1</mn><mo>&#x0002B;</mo><mn>0.1</mn><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mi>&#x0230A;</mi><mo stretchy="false">&#x00028;</mo><mtext>pos</mtext><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>&#x0002F;</mo><mn>8192</mn><mi>&#x0230B;</mi><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math> on its NoPE global layers <span class="tag tag-config">config: llama-models <code>model.py</code></span>. Scalable-Softmax uses <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>s</mi><mi>ln</mi><mi>n</mi></mrow></math> <span class="cite">[<a href="#ref-ssmax">51</a>]</span>. Sigmoid attention uses a bias <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>b</mi><mo>&#x0003D;</mo><mo>&#x02212;</mo><mi>log</mi><mi>n</mi></mrow></math> <span class="cite">[<a href="#ref-sigmoidattn">52</a>]</span>. Each grows with <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><mi>n</mi></mrow></math>, which is the rate E2 shows is needed.</li>
+<li><strong>Partly: constant YaRN temperature.</strong> YaRN multiplies the logits by <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo stretchy="false">&#x00028;</mo><mn>0.1</mn><mi>ln</mi><mi>s</mi><mo>&#x0002B;</mo><mn>1</mn><msup><mo stretchy="false">&#x00029;</mo><mn>2</mn></msup></mrow></math>, where <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>s</mi></mrow></math> is the extension factor <span class="cite">[<a href="#ref-yarn">53</a>]</span>. Shipped values are ×1.813 for gpt-oss and Kimi K2 (s = 32), ×1.874 for DeepSeek-V3 (s = 40, applied through the softmax scale in the DeepSeek code path), ×1.590 for DeepSeek-V2, and ×1.296 for Qwen3's opt-in s = 4 <span class="tag tag-config">config</span>. The factor is the same at every length, so it buys a fixed amount of headroom (E2). Where YaRN is applied during long-context training (gpt-oss, DeepSeek), the learned logits already absorb the factor <span class="tag tag-inference">inference</span>.</li>
+<li><strong>Indirectly: local/global mixing.</strong> Gemma 2/3, Mistral, gpt-oss, Llama 4 chunked layers, RecurrentGemma. This caps row length in most layers but leaves the global layers exposed <span class="tag tag-proven">proven</span>. It is mainly a KV-memory measure (E5).</li>
+<li><strong>Not at all: RoPE frequency rescaling alone.</strong> Llama 3.1's <code>llama3</code> rope, Gemma 3's linear ×8 on global layers. These change positions, not the logit scale <span class="tag tag-config">config</span>. <strong>QK-norm</strong> bounds <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo fence="false" stretchy="false">&#x02016;</mo><mi>q</mi><mo fence="false" stretchy="false">&#x02016;</mo></mrow></math> and <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo fence="false" stretchy="false">&#x02016;</mo><mi>k</mi><mo fence="false" stretchy="false">&#x02016;</mo></mrow></math>, which by Proposition 3.1 of <span class="cite">[<a href="#ref-velickovic">1</a>]</span> <em>bounds</em> the spread. It helps stability, but if anything it tightens the dispersion bound <span class="tag tag-inference">inference</span>.</li>
+<li><strong>Different mechanism: linear attention and SSM layers.</strong> Mamba, RWKV-6, the DeltaNet layers of Qwen3-Next, MiniMax's lightning layers. These are not softmax-normalised, so Theorem 2.2 does not apply to them <span class="tag tag-paper">paper</span>. They have their own capacity limits, which are not studied here. The softmax layers in these hybrids remain exposed.</li>
+<li><strong>MoE routers:</strong> essentially not applicable. <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>E</mi></mrow></math> is fixed (8–512) and does not grow with context. The score vector has 8–512 entries no matter how long the input is <span class="tag tag-proven">proven</span>.</li>
+</ul>
+<h3>5.2 Attention sinks</h3>
+<p>Sinks have been <em>measured</em> in LLaMA-2/3 and Mistral models <span class="cite">[<a href="#ref-gu">46</a>]</span> and in Llama 3.1 8B–405B <span class="cite">[<a href="#ref-barbero">2</a>]</span>. StreamingLLM shows that window-only attention fails without the initial tokens for Llama-2, MPT, Falcon and Pythia <span class="cite">[<a href="#ref-streamingllm">54</a>]</span>. Gu et al. find that a sink "acts more like key biases" and that sigmoid attention without normalisation shows no sinks up to 1B parameters <span class="cite">[<a href="#ref-gu">46</a>]</span>. Three kinds of response appear:</p>
+<ul>
+<li><strong>Ship an explicit sink.</strong> gpt-oss gives each head "a learned bias in the denominator of the softmax", which lets a head attend to nothing <span class="cite">[<a href="#ref-gptoss">26</a>]</span> <span class="tag tag-config">config: <code>sinks</code> parameter</span>. FlashAttention-4 supports this as <code>learnable_sink</code>: one extra softmax column per head, with no value vector <span class="cite">[<a href="#ref-flashattn">55</a>]</span> <span class="tag tag-config">config</span>. StreamingLLM proposed a dedicated sink token during pre-training <span class="cite">[<a href="#ref-streamingllm">54</a>]</span>.</li>
+<li><strong>Claim to remove sinks.</strong> Gated attention, a sigmoid gate on the attention output, cuts the average share of first-token attention across layers from 46.7% to 4.8% in its baseline comparison <span class="cite">[<a href="#ref-gatedattn">56</a>]</span>; Qwen3-Next ships such a gate <span class="tag tag-config">config</span>. Softpick, a rectified softmax that need not sum to one, reports a sink rate of 0.00% against 63.41% for matched 340M softmax models <span class="cite">[<a href="#ref-softpick">57</a>]</span>. Sigmoid attention removes the sum-to-one constraint <span class="cite">[<a href="#ref-sigmoidattn">52</a>]</span>.</li>
+<li><strong>Do nothing explicit.</strong> Every other softmax family in the census. Whether a family shows sinks has to be <em>measured</em>. E6 was designed to do that and could not run.</li>
+</ul>
+<p><strong>For KV eviction</strong> <span class="tag tag-inference">inference, building on established results</span>. StreamingLLM shows that a window-only cache breaks generation unless "4 initial tokens" are kept <span class="cite">[<a href="#ref-streamingllm">54</a>]</span> (established). KVSink argues that sinks are not always at the first positions and predicts them for KV-cache quantization <span class="cite">[<a href="#ref-kvsink">58</a>]</span> (established, for quantization). For a learned-sink model such as gpt-oss, the sink is a parameter, not a cached token, so pinning the first page should be unnecessary. That is a hypothesis for §9, not a result.</p>
+<h3>5.3 Collapse and cancellation</h3>
+<p>These are <strong>training-time</strong> bugs in the gradient. At <strong>inference</strong>, only the forward analogue matters: <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><msub><mi>q</mi><mi>t</mi></msub></mrow></math> rounding to exactly 0 for confident tokens (E4c). Exposure therefore depends on the training recipe and on the serving log-prob path, not on the architecture:</p>
+<ul>
+<li>Float32 loss (autocast) moves the cliff from the bf16 value to the fp32 value. It does not remove it (E4a: the bf16-logit, fp32-loss setup collapses at gap 20.69 on the grid, or 20.75 after rounding to bf16).</li>
+<li>z-loss (PaLM, OLMo 2) pushes <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><mi>Z</mi></mrow></math> toward 0 <span class="cite">[<a href="#ref-palm">59</a>, <a href="#ref-olmo2">23</a>]</span>. It does not bound the margin, so by itself it does not prevent collapse <span class="tag tag-inference">inference</span>.</li>
+<li>Final-logit soft-capping (Gemma 2 at 30, RecurrentGemma at 30) bounds every logit to ±30, so the gap is at most 60 <span class="tag tag-config">config</span>. Under fp32 that still allows gaps beyond the 20.7–27.9 thresholds measured in E4 <span class="tag tag-inference">inference from E4</span>.</li>
+<li>Fused cross-entropy kernels: not inspected for this report. Unknown.</li>
+<li><strong>Distillation pipelines</strong> are exposed to cancellation whenever the student is close to its teacher and the loss is computed in low precision. E4b shows a floor of ~1.2×10⁻³ in pure bf16 and ~10⁻⁸ in fp32 <span class="tag tag-measured">measured</span>. No census family documents its distillation loss implementation, so it is unknown for all of them.</li>
+</ul>
+<h3>5.4 Output expressivity</h3>
+<p>The log-probability matrix of a softmax head has rank at most <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo>&#x0002B;</mo><mn>1</mn></mrow></math> across contexts, the <em>softmax bottleneck</em> of Yang et al. <span class="cite">[<a href="#ref-bottleneck">44</a>]</span> <span class="tag tag-paper">paper</span>. In the census, <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>V</mi><mo>&#x0002F;</mo><msub><mi>d</mi><mtext>model</mtext></msub></mrow></math> ranges from 7.8 (Mistral 7B and Mixtral: 32,000/4,096) through 18.0 (DeepSeek-V3: 129,280/7,168), 31.3 (Llama 3.1-8B: 128,256/4,096), 65.4 (GPT-2: 50,257/768) and 69.8 (gpt-oss: 201,088/2,880) to 227.6 (Gemma 3-1B: 262,144/1,152) <span class="tag tag-config">config</span>. So <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>V</mi></mrow></math> exceeds the rank bound <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo>&#x0002B;</mo><mn>1</mn></mrow></math> by roughly 8× to 228×. <strong>No census family ships a bottleneck-breaking head</strong> such as a mixture of softmaxes. The trend is towards larger vocabularies at fixed width, which widens <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>V</mi><mo>&#x0002F;</mo><mi>d</mi></mrow></math> <span class="tag tag-config">config</span>. Whether this costs quality at current widths is not tested here.</p>
+<h3>5.5 Matrix</h3>
+<p><strong>Table 2.</strong> Exposure by family. E = exposed; M = mitigated (how); N/A = not applicable; ? = unknown. Sources are the census rows (§3) and the papers named.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Dispersion</th>
+<th>Sinks</th>
+<th>Collapse / cancellation (training)</th>
+<th>Output expressivity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPT-2/3, Llama 1–3.1, Falcon, Phi</td>
+<td>E (global heads; GPT-3 half local)</td>
+<td>E (measured in Llama 2/3/3.1 <span class="cite">[<a href="#ref-gu">46</a>, <a href="#ref-barbero">2</a>]</span>; window failure in Falcon <span class="cite">[<a href="#ref-streamingllm">54</a>]</span>); others ?</td>
+<td>? (recipes not documented)</td>
+<td>E (no MoS)</td>
+</tr>
+<tr>
+<td>Mistral 7B</td>
+<td>M-indirect (window 4,096)</td>
+<td>E (measured <span class="cite">[<a href="#ref-streamingllm">54</a>, <a href="#ref-gu">46</a>]</span>)</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Qwen2/2.5/3, Qwen3-MoE</td>
+<td>M-partial (opt-in static YaRN)</td>
+<td>?</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Gemma 2</td>
+<td>M-indirect (local/global)</td>
+<td>?</td>
+<td>M-partial (soft-cap 30)</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Gemma 3</td>
+<td>M-indirect (5:1 local)</td>
+<td>?</td>
+<td>? (soft-cap removed)</td>
+<td>E (V/d = 228 at 1B)</td>
+</tr>
+<tr>
+<td>OLMo 2</td>
+<td>E</td>
+<td>?</td>
+<td>M-partial (z-loss)</td>
+<td>E</td>
+</tr>
+<tr>
+<td>gpt-oss</td>
+<td>M-partial (YaRN ×1.813, window 128 layers)</td>
+<td>M (learned sink logit)</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>DeepSeek-V2/V3, Kimi K2</td>
+<td>M-partial (YaRN ×1.59 / ×1.87 / ×1.81)</td>
+<td>?</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Llama 4</td>
+<td>M-direct (log-length temperature, NoPE layers)</td>
+<td>?</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>GLM-4.5, Command R</td>
+<td>E</td>
+<td>?</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Qwen3-Next</td>
+<td>E in 1 of 4 layers; N/A in DeltaNet layers</td>
+<td>M (sigmoid output gate <span class="cite">[<a href="#ref-gatedattn">56</a>]</span>)</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>MiniMax-01, Jamba</td>
+<td>E in 1 of 8 layers; N/A elsewhere</td>
+<td>?</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>RecurrentGemma</td>
+<td>M-indirect (local window 2,048 only)</td>
+<td>?</td>
+<td>M-partial (soft-cap 30)</td>
+<td>E</td>
+</tr>
+<tr>
+<td>Mamba, Mamba-2, RWKV-6</td>
+<td>N/A (no attention softmax)</td>
+<td>N/A</td>
+<td>?</td>
+<td>E</td>
+</tr>
+<tr>
+<td>BERT, T5, Whisper</td>
+<td>E within fixed max length (512 / 448)</td>
+<td>E (BERT "no-op" attention, Clark et al. 2019 as cited in <span class="cite">[<a href="#ref-barbero">2</a>]</span>)</td>
+<td>?</td>
+<td>E (MLM / decoder heads)</td>
+</tr>
+<tr>
+<td>ViT, CLIP, SigLIP</td>
+<td>E only if the patch count grows</td>
+<td>?</td>
+<td>CLIP: ?; SigLIP: N/A (sigmoid loss)</td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table></div>
+<h2>6 Experiments</h2>
+<p>All experiments ran on CPU: Python 3.13.18, NumPy 2.5.4, Matplotlib 3.11.2, PyTorch 2.15.0 (the PyPI build, running on CPU), mpmath 1.3.0. Seeds are fixed. Each script writes its figure to <code>figures/</code>, raw numbers to <code>data/*.json</code> and console output to <code>data/*_stdout.txt</code>. Nothing here ran on a GPU.</p>
+<h3>6.1 E1 — Dispersion closed form (illustration, not a finding)</h3>
+<p>One target logit Δ, <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>N</mi><mo>&#x02212;</mo><mn>1</mn></mrow></math> distractors at 0, <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo>&#x0003D;</mo><mn>1</mn></mrow></math>. The target weight is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>w</mi><mo stretchy="false">&#x00028;</mo><mi>N</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><msup><mi>e</mi><mi>&#x00394;</mi></msup><mo>&#x0002F;</mo><mo stretchy="false">&#x00028;</mo><msup><mi>e</mi><mi>&#x00394;</mi></msup><mo>&#x0002B;</mo><mi>N</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math>, and <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>w</mi><mo>&#x0003D;</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle></mrow></math> at <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>N</mi><mo>&#x0003D;</mo><msup><mi>e</mi><mi>&#x00394;</mi></msup><mo>&#x0002B;</mo><mn>1</mn></mrow></math> <span class="tag tag-proven">proven</span>. I compared it with float64 softmax over the explicit vector, for <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>N</mi></mrow></math> from 2 to 65,536.</p>
+<figure><div class="plate"><img alt="E1" src="figures/e1_dispersion.png" loading="lazy"></div><figcaption><strong>Figure 3.</strong> E1. Target weight versus number of keys N (log scale) for Δ ∈ {2, 4, 8, 16}, T = 1. Lines: closed form; circles: float64 softmax (every fourth of 60 N values). Takeaway: a fixed gap loses half the target&#x27;s mass once N passes e^Δ + 1.</figcaption></figure>
+<p><strong>Result</strong> <span class="tag tag-measured">measured, <code>e1_dispersion.json</code></span>. Maximum relative error 1.6×10⁻¹⁵. The half-weight points are N = 8.4, 55.6, 2,982 and 8.9 million. For Δ = 8 the weight is 0.593 at N = 2,048, 0.421 at 4,096, 0.267 at 8,192 and 0.083 at 32,768. So a head with an 8-nat gap still gives the target 42% of its mass at 4k. It falls below 10% only past 32k.</p>
+<h3>6.2 E2 — Gap needed, and what shipped multipliers provide</h3>
+<p>Requiring <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>w</mi><mo>&#x02265;</mo><mi>&#x003B1;</mi></mrow></math> gives <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00394;</mi><mo>&#x0002F;</mo><mi>T</mi><mo>&#x02265;</mo><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mi>N</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>ln</mi><mfrac><mrow><mi>&#x003B1;</mi></mrow><mrow><mn>1</mn><mo>&#x02212;</mo><mi>&#x003B1;</mi></mrow></mfrac></mrow></math> <span class="tag tag-proven">proven</span>. Bisection on the explicit softmax matches this to within 1.7×10⁻¹³. I calibrated a head to hold α = 0.9 at N = 4,096 (Δ₀ = 10.52), then applied each family's logit multiplier from Part B.</p>
+<figure><div class="plate"><img alt="E2" src="figures/e2_temperature.png" loading="lazy"></div><figcaption><strong>Figure 4.</strong> E2. (a) Required Δ/T for α ∈ {0.5, 0.9, 0.99} versus N; lines are the closed form, circles bisection. (b) Multiplier needed to hold α = 0.9 relative to N = 4,096 (black), against the multipliers families ship. YaRN factors are constant; the gpt-oss/DeepSeek/Kimi factors are in place during their long-context training, so their learned gaps already absorb them. Toy best case: one target, identical distractors. Takeaway: only length-dependent scaling (Llama 4, log-length) tracks the requirement; constant factors buy a fixed amount of headroom.</figcaption></figure>
+<p><strong>Result</strong> <span class="tag tag-measured">measured, <code>e2_temperature.json</code></span>. The required multiplier is 1.198 at 32,768, 1.330 at 131,072, 1.527 at 1,048,576 and 1.746 at 10,485,760. Without scaling, the calibrated head's weight falls to 0.529, 0.219, 0.034 and 0.004 at those lengths. With Llama 4's temperature tuning the multiplier is 1.161, 1.283, 1.486 and 1.716, and the weight stays at 0.85–0.87. That covers 81–96% of the needed increase. Static YaRN with s = 4 (×1.296) holds 0.864 at 131,072, the length it is meant for, but only 0.443 at 1M. In this toy model, the constant ×1.81–1.87 factors exceed the requirement up to about 10M.</p>
+<p><strong>Interpretation.</strong> Llama 4's formula tracks <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mi>N</mi></mrow></math>, which is the dispersion rate, and it is applied exactly on the global NoPE layers where dispersion applies. This is the clearest case in the census of a shipped dispersion mitigation <span class="tag tag-inference">inference</span>. Real heads have many competitors with spread-out logits, so these are best-case numbers.</p>
+<h3>6.3 E3 — Gaussian logits and the paper's adaptive temperature</h3>
+<p>Rows of i.i.d. <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>z</mi><mi>&#x0007E;</mi><mi mathvariant="script">N</mi><mo stretchy="false">&#x00028;</mo><mn>0</mn><mo>&#x0002C;</mo><msup><mi>&#x003C3;</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math>, σ ∈ {1, 2, 4}, N from 2 to 65,536 (20–400 rows per point, seed 0). For large N the entropy approaches <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mi>N</mi><mo>&#x02212;</mo><msup><mi>&#x003C3;</mi><mn>2</mn></msup><mo>&#x0002F;</mo><mn>2</mn></mrow></math> <span class="tag tag-proven">proven</span>. I then applied the adaptive temperature <em>exactly as printed</em> in Veličković et al.'s Figure 4:</p>
+<div class="math-block"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><mi>&#x003B2;</mi><mo>&#x0003D;</mo><mo>max</mo><mo minsize="1.2em" maxsize="1.2em">(</mo><mrow><mi mathvariant="normal">p</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">y</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">l</mi></mrow><mo stretchy="false">&#x00028;</mo><mo stretchy="false">[</mo><mo>&#x02212;</mo><mn>0.037</mn><mo>&#x0002C;</mo><mn>0.481</mn><mo>&#x0002C;</mo><mo>&#x02212;</mo><mn>2.3</mn><mo>&#x0002C;</mo><mn>4.917</mn><mo>&#x0002C;</mo><mo>&#x02212;</mo><mn>1.791</mn><mo stretchy="false">]</mo><mo>&#x0002C;</mo><mi>H</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0002C;</mo><mspace width="0.167em" /><mn>1</mn><mo minsize="1.2em" maxsize="1.2em">)</mo><mtext>&#x000A0;</mtext><mtext>if&#x000A0;</mtext><mi>H</mi><mo>&#x0003E;</mo><mn>0.5</mn><mo>&#x0002C;</mo><mtext>&#x000A0;</mtext><mtext>else&#x000A0;</mtext><mn>1</mn><mo>&#x0002E;</mo></mrow></math></div>
+
+<p>I tested it on the Gaussian rows and on rows with one planted target at 4σ or 6σ above Gaussian distractors.</p>
+<figure><div class="plate"><img alt="E3" src="figures/e3_random_logits.png" loading="lazy"></div><figcaption><strong>Figure 5.</strong> E3. (a) Mean row entropy (nats) versus N for Gaussian logits, with the ln N − σ²/2 asymptote. (b) Mean max weight at T = 1 (solid) and after the paper&#x27;s adaptive θ (dashed). (c) The paper&#x27;s β(H), clipped at 1. 20–400 rows per point. Takeaway: the published polynomial only sharpens rows with entropy between 0.85 and 5.95 nats, so it switches off in exactly the long-context regime where dispersion is worst.</figcaption></figure>
+<p><strong>Result</strong> <span class="tag tag-measured">measured, <code>e3_random_logits.json</code></span>.
+* The entropy at N = 65,536 is 10.590 against an asymptote of 10.590 for σ = 1, and 9.103 against 9.090 for σ = 2. For σ = 4 it is 4.646 against 3.090, which has not converged, because the log-normal sum needs <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>N</mi><mo>&#x0226B;</mo><msup><mi>e</mi><mrow><msup><mi>&#x003C3;</mi><mn>2</mn></msup></mrow></msup></mrow></math>.
+* <strong>The polynomial gives β &gt; 1 only for H ∈ [0.849, 5.945] nats</strong>, peaking at β = 2.42 at H = 4.41. For σ = 1 and σ = 2 at 65,536 the row entropy exceeds 5.95, so β = 1 and the max weight is unchanged (0.0008 and 0.0136).
+* With a target planted 4σ above the distractors, adaptive θ raises its weight from 0.125 to 0.798 at N = 235. It switches off entirely (β = 1) from N = 861. At 6σ it switches off from N = 1,328.</p>
+<p><strong>Interpretation.</strong> This matches the paper's own description: a fit derived on its max-retrieval task, which is "ad-hoc". It does not contradict their Table 1, whose largest test set is 16,384 items for a single trained head whose entropies I did not measure. For scale, a uniform row over 4,096 keys already has ln 4096 ≈ 8.3 nats <span class="tag tag-proven">proven</span>. It does mean that this polynomial cannot be used as-is on long-context LLM heads with entropy above ~6 nats <span class="tag tag-inference">inference</span>. Refitting it would be needed, as the authors themselves suggest for Gemma.</p>
+<h3>6.4 E4 — Collapse and cancellation in float32, bfloat16 and float16 (CPU PyTorch)</h3>
+<p><strong>All thresholds in this section are properties of CPU PyTorch 2.15.0 in this environment.</strong> GPU kernels and other versions may differ.</p>
+<p><strong>E4a setup.</strong> C classes, target logit equal to the gap <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>g</mi></mrow></math>, all others 0. The paper's margin is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>m</mi><mo>&#x0003D;</mo><mi>g</mi><mo>&#x02212;</mo><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mi>C</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math>. I scanned g from 0 to 45 at step 0.01, then at step 0.001 within ±0.25 of each transition. Four setups: <strong>pure</strong> (logits, loss and gradient in the dtype); <strong>upcast</strong> (logits stored in the dtype, <code>.float()</code> before <code>F.cross_entropy</code>); <strong>autocast</strong> (<code>torch.autocast('cpu', bfloat16)</code>, which runs the loss in fp32; the loss dtype was checked); <strong>fixed</strong> (Barron et al.'s Section 2 <code>cross_entropy</code>, translated line by line from JAX to torch, autodiff in the dtype).</p>
+<figure><div class="plate"><img alt="E4a" src="figures/e4_collapse.png" loading="lazy"></div><figcaption><strong>Figure 6.</strong> E4a. |∂L/∂z_target| versus logit gap g for C = 113, CPU PyTorch 2.15.0. Solid: built-in F.cross_entropy in each dtype; dashed: Barron et al.&#x27;s fixed cross-entropy in the same dtype; dash-dot: bf16 logits with fp32 loss. Exact zeros are drawn on the floor; dotted verticals mark each built-in collapse. Grid step 0.01, refined to 0.001 near transitions. Takeaway: in each dtype the built-in gradient hits exactly zero at a sharp threshold; the fix follows the exact curve in fp32 and bf16, and in fp16 until each non-target exponential underflows.</figcaption></figure>
+<p><strong>Table 3.</strong> First gap at which the built-in target gradient is exactly 0, with the paper's margin in parentheses <span class="tag tag-measured">measured, <code>e4_collapse.json</code></span>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>C</th>
+<th>float32 pure</th>
+<th>bfloat16 pure</th>
+<th>float16 pure</th>
+<th>bf16 logits, fp32 loss</th>
+<th>Barron fix, fp16</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>16.636 (16.636)</td>
+<td>5.547 (5.547)</td>
+<td>7.624 (7.624)</td>
+<td>16.688</td>
+<td>17.336</td>
+</tr>
+<tr>
+<td>113</td>
+<td>20.661 (15.943)</td>
+<td>10.282 (5.564)</td>
+<td>12.340 (7.622)</td>
+<td>20.688</td>
+<td>17.336</td>
+</tr>
+<tr>
+<td>1,000</td>
+<td>22.851 (15.944)</td>
+<td>12.469 (5.562)</td>
+<td>14.528 (7.621)</td>
+<td>22.813</td>
+<td>17.336</td>
+</tr>
+<tr>
+<td>32,000</td>
+<td>26.316 (15.943)</td>
+<td>15.907 (5.534)</td>
+<td>17.961 (7.588)</td>
+<td>not run</td>
+<td>17.336</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Result.</strong></p>
+<ul>
+<li><strong>float32.</strong> For C ≥ 113 the threshold is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mi>C</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo>&#x0002F;</mo><mi>&#x003F5;</mi><mo stretchy="false">&#x00029;</mo></mrow></math> to within 0.002 (paper margin 15.94). For C = 2 it is <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mn>2</mn><mo>&#x0002F;</mo><mi>&#x003F5;</mi><mo stretchy="false">&#x00029;</mo></mrow></math> = 16.636, which is the paper's "16.6". So the paper's fp32 cliff matches CPU PyTorch only for two classes. With more classes, CPU PyTorch collapses about 0.69 nats <em>earlier</em> in paper-margin terms. I did not trace this to a specific line of the reduction kernel.</li>
+<li><strong>bfloat16 and float16.</strong> The thresholds sit at <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mi>C</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>ln</mi><mo stretchy="false">&#x00028;</mo><mn>2</mn><mo>&#x0002F;</mo><mi>&#x003F5;</mi><mo stretchy="false">&#x00029;</mo></mrow></math> to within 0.04, giving paper margins of 5.53–5.56 (bf16) and 7.59–7.62 (fp16). These agree with the paper's bf16 ≈ 5.5.</li>
+<li><strong>Realistic setups.</strong> With bf16 logits and an fp32 loss, through either autocast or <code>.float()</code>, the bf16 threshold <em>disappears</em> and the fp32 one <em>survives</em>. It appears at grid gap 20.688 because the gap is first rounded to bf16, whose spacing near 20 is 0.125; 20.6875 rounds to 20.75, the first bf16 value above 20.661. This explains v1's "20.75". It was a bf16 representation artefact, not the fp32 threshold.</li>
+<li><strong>The fix.</strong> In fp32 and bf16 the fix never returns a zero target gradient on [0, 45]. Its maximum relative error in the normal range is 3.2×10⁻⁷ (fp32) and 9.7×10⁻³ (bf16). In fp16 it returns exactly 0 from gap 17.336 <em>for every C tested</em>. The mechanism is that each non-target term <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>&#x02212;</mo><msub><mi>z</mi><mi>t</mi></msub></mrow></msup><mo>&#x0003D;</mo><msup><mi>e</mi><mrow><mo>&#x02212;</mo><mi>g</mi></mrow></msup></mrow></math> underflows fp16 there: <code>exp(-g)</code> in fp16 first returns 0 at g = 17.336. The underflow of σ(r) in v1's alternative formulation would instead occur at g = 22.055 for C = 113 and would depend on C. It does not match the data.</li>
+</ul>
+<p><strong>E4b setup (cancellation).</strong> C = 1,000. Teacher logits <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>z</mi><mi>T</mi></msub><mi>&#x0007E;</mi><mi mathvariant="script">N</mi><mo stretchy="false">&#x00028;</mo><mn>0</mn><mo>&#x0002C;</mo><msup><mn>3</mn><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math>, rounded to the dtype. Student <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>z</mi><mi>S</mi></msub><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi></mrow><mo stretchy="false">&#x00028;</mo><msub><mi>z</mi><mi>T</mi></msub><mo>&#x0002B;</mo><mi>&#x003B5;</mi><mi>&#x003BE;</mi><mo stretchy="false">&#x00029;</mo></mrow></math>, so ε = 0 means the two are identical. Setups: <strong>all-dtype</strong> (teacher probabilities, loss and gradient in the dtype); <strong>teacher-fp32</strong> (teacher probabilities in fp32, student logits upcast to fp32 for the loss); <strong>autocast</strong> (bf16); <strong>fixed</strong> (Barron et al.'s Section 3 listing, translated, in the dtype). The reference is float64 naive <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>q</mi><mo>&#x02212;</mo><mi>p</mi></mrow></math> on the same rounded logits; it is not the fix formula. I checked it against mpmath at 50 digits: the maximum absolute difference was ≤ 2.6×10⁻¹⁷ for ε ∈ {0, 10⁻⁶, 10⁻³} in all dtypes.</p>
+<figure><div class="plate"><img alt="E4b" src="figures/e4_cancellation.png" loading="lazy"></div><figcaption><strong>Figure 7.</strong> E4b. ‖g − g_ref‖₂ versus student–teacher perturbation ε (C = 1,000; 29 ε values; g_ref is float64 p − q). Values of 1e-30 mean exactly 0. Dotted: ‖g_ref‖ for fp32 logits. Takeaway: the built-in gradient has an ε-independent floor (≈1e-3 in pure bf16, ≈1e-8 in fp32) that exceeds the true gradient for small ε; the fix returns exactly 0 at ε = 0 in every dtype.</figcaption></figure>
+<p><strong>Result</strong> <span class="tag tag-measured">measured, <code>e4_cancellation.json</code></span>. At ε = 0, the built-in gradient norm is 9.1×10⁻⁹ (fp32), 1.22×10⁻³ (pure bf16) and 2.27×10⁻⁴ (pure fp16). The fix returns exactly 0 in all three. In the teacher-fp32 and autocast setups the bf16 floor falls to 2.2×10⁻⁸. For fp16 the teacher-fp32 floor happens to be exactly 0 for this draw of logits.</p>
+<p><strong>Where the floor comes from.</strong> At ε = 0 the built-in formula is effectively <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>exp</mi><mo stretchy="false">&#x00028;</mo><msub><mtext>log_softmax</mtext><mtext>dtype</mtext></msub><mo stretchy="false">&#x00028;</mo><mi>z</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x00029;</mo><mo>&#x02212;</mo><msub><mi>q</mi><mtext>dtype</mtext></msub></mrow></math>. I computed each stored term's error in float64:
+* <strong>bf16:</strong> student log-softmax stored in bf16 → 1.08×10⁻³; teacher probabilities stored in bf16 → 3.29×10⁻⁴; both → 1.29×10⁻³.
+* <strong>fp16:</strong> 2.10×10⁻⁴ and 4.12×10⁻⁵ respectively.
+* <strong>fp32:</strong> the floor comes from PyTorch's own two paths. ‖softmax − exp(log_softmax)‖ = 5.3×10⁻⁹, against a floor of 9.1×10⁻⁹.</p>
+<p>So low-precision <em>storage</em> causes the floor in bf16 and fp16, and PyTorch's gradient path causes it in fp32. In this data the larger term is the student's log-softmax, not the teacher's probabilities. A v1 reviewer suggested the teacher-probability term dominates; this measurement does not support that.</p>
+<p><strong>E4c — forward log-probabilities.</strong> The first gap at which <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>log</mi><msub><mi>q</mi><mi>t</mi></msub></mrow></math> is exactly 0 <span class="tag tag-measured">measured, <code>e4_forward_logprob.json</code></span>. For C = 151,936 (the Qwen vocabulary), it is gap 27.88 for fp32 <code>log_softmax</code>, 27.88 for fp32 <code>log(softmax)</code>, 17.44 for bf16 and 19.53 for fp16. In paper margins that is 15.95, 15.95, 5.51 and 7.6. So <strong>a bf16 log-softmax returns log p = 0 for any token with p ≳ 1 − e⁻⁵·⁵ ≈ 0.996</strong>, whereas fp32 does so only when p is within ~10⁻⁷ of 1 <span class="tag tag-inference">inference from the margin</span>.</p>
+<h3>6.5 E5 — Prefill and decode cost model (a model, not a measurement)</h3>
+<p>For four released configs I counted, per decode token at batch 1, the softmax <code>exp</code> evaluations, the attention score and value FLOPs, the weight-matmul FLOPs (attention projections, MLP or active experts, router, LM head) and the bf16 KV cache. Prefill counts are in the JSON. MLA decode uses the weight-absorbed form: scores over 576 dims, values over 512. Gated DeltaNet layers contribute a fixed fp32 state.</p>
+<figure><div class="plate"><img alt="E5" src="figures/e5_cost_model.png" loading="lazy"></div><figcaption><strong>Figure 8.</strong> E5. (a) exp() evaluations per decode token; (b) decode attention FLOPs divided by weight-matmul FLOPs (dots: crossover at 1); (c) KV cache plus recurrent state for one sequence. Configs: Llama-3.1-8B, DeepSeek-V3, Gemma-3-27B, Qwen3-Next-80B-A3B; batch 1, bf16 KV. A model, not a measurement. Takeaway: where decode attention overtakes the weight matmuls depends on the architecture: ~4k tokens (MLA) to ~324k (5:1 local/global).</figcaption></figure>
+<p><strong>Table 4.</strong> Cost model at exactly n = 32,768 <span class="tag tag-measured">measured, <code>e5_cost_model.json</code></span>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Config</th>
+<th>Linear GFLOP/token</th>
+<th>KV bytes per context token (growing layers)</th>
+<th>KV + state at 32,768</th>
+<th>Decode attn / linear at 32,768</th>
+<th>Decode crossover n</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Llama-3.1-8B (GQA)</td>
+<td>15.01</td>
+<td>131,072</td>
+<td>4.000 GiB</td>
+<td>1.14</td>
+<td>28,628</td>
+</tr>
+<tr>
+<td>DeepSeek-V3 (MLA)</td>
+<td>73.25</td>
+<td>70,272</td>
+<td>2.145 GiB</td>
+<td>7.60</td>
+<td>4,311</td>
+</tr>
+<tr>
+<td>Gemma-3-27B (5:1)</td>
+<td>54.02</td>
+<td>81,920 (global layers; local capped at 1,024)</td>
+<td>2.906 GiB</td>
+<td>0.12</td>
+<td>324,358</td>
+</tr>
+<tr>
+<td>Qwen3-Next-80B-A3B</td>
+<td>7.24</td>
+<td>24,576 (attention layers) + 72 MiB fixed state</td>
+<td>0.820 GiB</td>
+<td>0.89</td>
+<td>36,814</td>
+</tr>
+</tbody>
+</table></div>
+<p>As a sanity check, DeepSeek-V3's linear FLOPs are 2 × 36.6B. The V3 report gives 37B activated parameters <span class="cite">[<a href="#ref-dsv3">28</a>]</span>. MLA cuts the cache by about half relative to Llama-3.1-8B per context token, even though DeepSeek-V3 is a much larger model. Its absorbed decode spends 2·(576+512) FLOPs per key per head across 128 heads, so its attention passes the weight matmuls at only ~4.3k tokens. That is compute it can afford because decode is memory-bound <span class="tag tag-inference">inference</span>. FlashAttention-4 gives the B200 tensor-core rate as 8,192 FLOPs per clock per SM against 16 exponentials per clock per SM for the multifunction unit, a ratio of 512 <span class="cite">[<a href="#ref-fa4">60</a>]</span>. A head with <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003D;</mo><mn>128</mn></mrow></math> needs <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mn>4</mn><mi>d</mi><mo>&#x0003D;</mo><mn>512</mn></mrow></math> matmul FLOPs per score, so the exp unit and the tensor cores are exactly balanced at <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003D;</mo><mn>128</mn></mrow></math> [proven; arithmetic on the paper's numbers]. This is why FA4 emulates part of <code>exp2</code> on FMA units (10–25% of entries per row) and skips rescaling unless the running max grows by more than τ = 8.0 (a factor of 256) <span class="cite">[<a href="#ref-fa4">60</a>]</span> <span class="tag tag-config">config: <code>rescale_threshold</code></span>.</p>
+<h3>6.6 E6 and E7 — Real-model probes: not run</h3>
+<p>E6 (per-layer attention entropy vs ln N, first-token mass, planted-needle fit of Δ) and E7 (bf16 vs fp32 log-probs of high-confidence tokens) are implemented in <code>code/e6_e7_probes.py</code>. The planned models are Qwen3-0.6B, Gemma-3-1B-it and SmolLM2-360M, plus the matched vanilla/softpick 340M pair released by the softpick authors <span class="cite">[<a href="#ref-softpickckpt">61</a>]</span>. Model configs and tokenizers downloaded. <strong>The weights did not</strong>: <code>huggingface.co/.../resolve/</code> redirects safetensors to <code>us.aws.cdn.hf.co</code>, and the session's network policy denied that host. <code>--smoke</code> runs every code path on tiny randomly initialised copies of the real configs. That only checks the code; no smoke number appears in this report. The softpick pair needs a custom loader for its flash-linear-attention model class, which is not written.</p>
+<p><strong>The E7 code audit did run.</strong> It reads the serving engines' source <span class="tag tag-config">config</span>:
+* <strong>vLLM</strong> (<code>v1/sample/sampler.py</code> @1fc9d00) <span class="cite">[<a href="#ref-vllm">62</a>]</span>: <code>compute_logprobs</code> returns <code>logits.log_softmax(dim=-1, dtype=torch.float32)</code>, and the logits are converted to float32 before sampling. The bf16 failure of E4c cannot occur on this path.
+* <strong>SGLang</strong> (<code>logits_processor.py</code>, <code>sampler.py</code> @36273b9) <span class="cite">[<a href="#ref-sglang">63</a>]</span>: logits are cast to float32 at the end of <code>_get_logits</code>. Greedy requests use <code>log_softmax</code> on those. The standard sampling path returns <code>torch.log(probs)</code> of the fp32 softmax, which has the same zero threshold as fp32 <code>log_softmax</code> (E4c). <strong>The exception is RL on-policy mode</strong> (<code>rl_on_policy_target</code> set). There the code casts logits to bfloat16, divides by temperature in bfloat16 and runs <code>log_softmax</code> in bfloat16 "to match the trainer". On that path the bf16 failure <em>can</em> occur by design: tokens with p ≳ 0.996 return log p = 0.</p>
+<h2>7 Implications for serving</h2>
+<p>Each item is tagged <strong>established</strong> (shown in a cited source or measured here) or <strong>inference</strong> (untested reasoning).</p>
+<ul>
+<li><strong>KV eviction and sinks.</strong> Window-only eviction breaks unless the first few tokens are kept: <em>established</em> <span class="cite">[<a href="#ref-streamingllm">54</a>]</span>. Sinks are not always at position 0, and protecting predicted sinks improves KV quantization: <em>established</em> <span class="cite">[<a href="#ref-kvsink">58</a>]</span>. For learned-sink models (gpt-oss), the sink lives in the kernel's softmax statistics, so a paged cache need not pin page 0: <em>inference</em>. For gated or softpick models, first-token mass is reported to be low <span class="cite">[<a href="#ref-gatedattn">56</a>, <a href="#ref-softpick">57</a>]</span>, so sink-based heuristics such as "keep the first page" lose their rationale: <em>inference</em>.</li>
+<li><strong>Long-context retrieval.</strong> Global softmax heads lose target mass at a rate set by <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>ln</mi><mi>N</mi></mrow></math>: <em>established</em> <span class="cite">[<a href="#ref-velickovic">1</a>]</span>, and E1/E2. Families that cap most layers with windows (Gemma 3, gpt-oss) are exposed only in their global layers: <em>established</em> by the configs. Whether an engine applies YaRN or Llama 4's temperature correctly at long context is worth verifying in tests: <em>inference</em>. The factor sits in the RoPE cos/sin tables in HF, but in the softmax scale in DeepSeek's code path.</li>
+<li><strong>Fused kernels.</strong> On B200 the exp unit and the tensor cores are balanced at <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003D;</mo><mn>128</mn></mrow></math>, so softmax work is on the critical path of prefill: <em>established</em> <span class="cite">[<a href="#ref-fa4">60</a>]</span>. Learned sinks are supported in FA4 as one extra column folded into the normaliser: <em>established</em> <span class="tag tag-config">config</span>. Conditional rescaling makes the running max "stale" by up to τ = 8; this is exact after final normalisation: <em>established</em> <span class="cite">[<a href="#ref-fa4">60</a>]</span>.</li>
+<li><strong>Log-prob APIs.</strong> vLLM and SGLang return fp32 log-probs on their default paths, so exact zeros need p within ~10⁻⁷ of 1: <em>established</em> by source reading and E4c. SGLang's RL on-policy mode computes bf16 log-probs, which round to 0 for p ≳ 0.996: <em>established</em> by source reading and E4c on synthetic logits. Real-model counts are pending E7. A trainer comparing these against fp32 log-probs will see a systematic mismatch on confident tokens: <em>inference</em>.</li>
+</ul>
+<h2>8 Limitations</h2>
+<ul>
+<li><strong>E6 and E7 did not run.</strong> Every real-model claim about sinks, entropy and needle retrieval therefore rests on the cited papers, not on my measurements.</li>
+<li>The census covers 36 selected families. Four configs were gated. For Llama 4, QK-norm, temperature tuning and vocabulary size come from code defaults, not the released config. "Unknown" cells are common, especially for z-loss and distillation.</li>
+<li>All thresholds in E4 are specific to CPU PyTorch 2.15.0 (a PyPI build with CUDA libraries, run on CPU). The CPU-only wheel index was unreachable. GPU kernels may differ. I did not trace the C-dependence of the fp32 threshold into PyTorch's kernel.</li>
+<li>E1–E3 are toy models: one target, identical or Gaussian distractors. E5 is an analytic count that ignores memory bandwidth, kernels, batching and the cost of non-matmul operations other than exp.</li>
+<li>The "fixed" functions are my line-by-line translations of the paper's JAX listings to PyTorch, not the authors' code.</li>
+<li>Source reading: the four core papers were read end to end. For family reports and other sources I read the passages relevant to each cited fact, in full text.</li>
+</ul>
+<h2>9 Open questions: three GPU experiments for a single-GPU SGLang / paged-KV setup</h2>
+<ol>
+<li><strong>Sink pinning versus learned sinks under paged eviction.</strong> Serve gpt-oss-20b and a Llama-3.1-8B-class model with a window-plus-pinned-prefix eviction policy, and sweep the pinned prefix over 0, 1 page (16 tokens) and 4 pages. <em>Positive result:</em> with no pinned page, gpt-oss perplexity on PG-19-style long text stays within 1% of the full cache, while the Llama-class model degrades by more than 10%. That would show learned sinks make page-0 pinning unnecessary.</li>
+<li><strong>Dispersion in a real retrieval head.</strong> Run E6's needle probe on GPU at 1k–128k for Llama-3.1-8B with and without Llama-4-style log-length query scaling applied at inference to global layers only. <em>Positive result:</em> the fitted Δ is constant across N, consistent with the <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mi>e</mi><mi>&#x00394;</mi></msup><mo>&#x0002F;</mo><mo stretchy="false">&#x00028;</mo><msup><mi>e</mi><mi>&#x00394;</mi></msup><mo>&#x0002B;</mo><mi>N</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math> law; scaling raises the best-head needle weight at 128k by more than 2× without raising perplexity at 4k by more than 1%.</li>
+<li><strong>Log-prob precision in an RL loop.</strong> In SGLang, compare default fp32 log-probs with <code>rl_on_policy_target</code> bf16 log-probs for 10k sampled tokens from a 1B model. <em>Positive result:</em> the share of tokens with p &gt; 0.99 whose bf16 log p is exactly 0 matches the E4c prediction (all tokens with p ≳ 0.996), and the importance-ratio error that a trainer would compute exceeds 10⁻³ on those tokens.</li>
+</ol>
+<h2>References</h2>
+<p><strong>Verification tags.</strong> <span class="vtag">[R]</span> full text obtained from arXiv and read (the four core papers end to end; for the others, the passages behind each cited fact). <span class="vtag">[C]</span> code, config or model card read at the commit or date given. <span class="vtag">[I]</span> indexed copy only: none in this version. Author lists are as returned by the arXiv API; team papers list the team as on arXiv.</p><ol class="refs"><li id="ref-velickovic">Petar Veličković, Christos Perivolaropoulos, Federico Barbero, Razvan Pascanu. <em>Softmax is not Enough (for Sharp Size Generalisation)</em>. arXiv:<a href="https://arxiv.org/abs/2410.01104">2410.01104</a> (2024-10-01; read as 2410.01104v3). ICML 2025 (PMLR 267). Read end to end. <span class="vtag">[R]</span></li>
+<li id="ref-barbero">Federico Barbero, Álvaro Arroyo, Xiangming Gu, Christos Perivolaropoulos, Michael Bronstein, Petar Veličković, Razvan Pascanu. <em>Why do LLMs attend to the first token?</em>. arXiv:<a href="https://arxiv.org/abs/2504.02732">2504.02732</a> (2025-04-03; read as 2504.02732v4). COLM 2025. Read end to end. <span class="vtag">[R]</span></li>
+<li id="ref-barron">Jonathan T. Barron, Dan Gnanapragasam, Michael Tschannen. <em>A Fix for Softmax and Cross-Entropy</em>. arXiv:<a href="https://arxiv.org/abs/2610.31642">2610.31642</a> (2026-10-22; read as 2610.31642v3). arXiv v3, 29 Oct 2026. Read end to end. <span class="vtag">[R]</span></li>
+<li id="ref-prieto">Lucas Prieto, Melih Barsbey, Pedro A. M. Mediano, Tolga Birdal. <em>Grokking at the Edge of Numerical Stability</em>. arXiv:<a href="https://arxiv.org/abs/2501.04697">2501.04697</a> (2025-01-08; read as 2501.04697v2). ICLR 2025. Read end to end. <span class="vtag">[R]</span></li>
+<li id="ref-fa1">Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré. <em>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</em>. arXiv:<a href="https://arxiv.org/abs/2205.14135">2205.14135</a> (2022-05-27; read as 2205.14135v2). NeurIPS 2022. <span class="vtag">[R]</span></li>
+<li id="ref-siglip">Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, Lucas Beyer. <em>Sigmoid Loss for Language Image Pre-Training</em>. arXiv:<a href="https://arxiv.org/abs/2303.15343">2303.15343</a> (2023-03-27; read as 2303.15343v4). ICCV 2023. <span class="vtag">[R]</span></li>
+<li id="ref-hfconfigs">Hugging Face Hub model repositories (various owners). <em>Official config.json files for the 44 repositories listed in sources/configs/ (read 2026-11-03)</em>. <a href="https://huggingface.co">https://huggingface.co</a>. <span class="vtag">[C]</span></li>
+<li id="ref-hftransformers">Hugging Face. <em>transformers, modelling code for gemma2, gemma3, qwen3, qwen3_moe, qwen3_next, gpt_oss, llama4, deepseek_v3, mixtral, olmo2, glm4_moe, cohere, cohere2, minimax, jamba, recurrent_gemma, mamba2, phi3; modeling_rope_utils.py</em>. <a href="https://github.com/huggingface/transformers/tree/3568df44fff52979f1f9cecc7f729713e940d277">https://github.com/huggingface/transformers/tree/3568df44fff52979f1f9cecc7f729713e940d277</a>. <span class="vtag">[C]</span></li>
+<li id="ref-llamamodels">Meta. <em>llama-models: models/llama4/model.py, moe.py, args.py and MODEL_CARD.md</em>. <a href="https://github.com/meta-llama/llama-models/tree/0e0b8c519242d5833d8c11bffc1232b77ad7f301">https://github.com/meta-llama/llama-models/tree/0e0b8c519242d5833d8c11bffc1232b77ad7f301</a>. <span class="vtag">[C]</span></li>
+<li id="ref-cards">Qwen, Cohere Labs, AI21 Labs. <em>Model cards: Qwen/Qwen3-8B, CohereLabs/c4ai-command-r-v01, ai21labs/AI21-Jamba-1.5-Mini (README.md)</em>. <a href="https://huggingface.co/Qwen/Qwen3-8B">https://huggingface.co/Qwen/Qwen3-8B</a>. <span class="vtag">[C]</span></li>
+<li id="ref-gpt3">Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel Herbert-Voss, et al.. <em>Language Models are Few-Shot Learners</em>. arXiv:<a href="https://arxiv.org/abs/2005.14165">2005.14165</a> (2020-05-28; read as 2005.14165v4). NeurIPS 2020. <span class="vtag">[R]</span><details><summary>Full author list (31)</summary>Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child, Aditya Ramesh, Daniel M. Ziegler, Jeffrey Wu, Clemens Winter, Christopher Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam McCandlish, Alec Radford, Ilya Sutskever, Dario Amodei</details></li>
+<li id="ref-llama1">Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, et al.. <em>LLaMA: Open and Efficient Foundation Language Models</em>. arXiv:<a href="https://arxiv.org/abs/2302.13971">2302.13971</a> (2023-02-27; read as 2302.13971v1).  <span class="vtag">[R]</span><details><summary>Full author list (14)</summary>Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, Guillaume Lample</details></li>
+<li id="ref-llama2">Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, Dan Bikel, Lukas Blecher, et al.. <em>Llama 2: Open Foundation and Fine-Tuned Chat Models</em>. arXiv:<a href="https://arxiv.org/abs/2307.09288">2307.09288</a> (2023-07-18; read as 2307.09288v2).  <span class="vtag">[R]</span><details><summary>Full author list (68)</summary>Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, Dan Bikel, Lukas Blecher, Cristian Canton Ferrer, Moya Chen, Guillem Cucurull, David Esiobu, Jude Fernandes, Jeremy Fu, Wenyin Fu, Brian Fuller, Cynthia Gao, Vedanuj Goswami, Naman Goyal, Anthony Hartshorn, Saghar Hosseini, Rui Hou, Hakan Inan, Marcin Kardas, Viktor Kerkez, Madian Khabsa, Isabel Kloumann, Artem Korenev, Punit Singh Koura, Marie-Anne Lachaux, Thibaut Lavril, Jenya Lee, Diana Liskovich, Yinghai Lu, Yuning Mao, Xavier Martinet, Todor Mihaylov, Pushkar Mishra, Igor Molybog, Yixin Nie, Andrew Poulton, Jeremy Reizenstein, Rashi Rungta, Kalyan Saladi, Alan Schelten, Ruan Silva, Eric Michael Smith, Ranjan Subramanian, Xiaoqing Ellen Tan, Binh Tang, Ross Taylor, Adina Williams, Jian Xiang Kuan, Puxin Xu, Zheng Yan, Iliyan Zarov, Yuchen Zhang, Angela Fan, Melanie Kambadur, Sharan Narang, Aurelien Rodriguez, Robert Stojnic, Sergey Edunov, Thomas Scialom</details></li>
+<li id="ref-llama3">Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, Amy Yang, Angela Fan, et al.. <em>The Llama 3 Herd of Models</em>. arXiv:<a href="https://arxiv.org/abs/2407.21783">2407.21783</a> (2024-07-31; read as 2407.21783v3).  <span class="vtag">[R]</span><details><summary>Full author list (561)</summary>Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, Amy Yang, Angela Fan, Anirudh Goyal, Anthony Hartshorn, Aobo Yang, Archi Mitra, Archie Sravankumar, Artem Korenev, Arthur Hinsvark, Arun Rao, Aston Zhang, Aurelien Rodriguez, Austen Gregerson, Ava Spataru, Baptiste Roziere, Bethany Biron, Binh Tang, Bobbie Chern, Charlotte Caucheteux, Chaya Nayak, Chloe Bi, Chris Marra, Chris McConnell, Christian Keller, Christophe Touret, Chunyang Wu, Corinne Wong, Cristian Canton Ferrer, Cyrus Nikolaidis, Damien Allonsius, Daniel Song, Danielle Pintz, Danny Livshits, Danny Wyatt, David Esiobu, Dhruv Choudhary, Dhruv Mahajan, Diego Garcia-Olano, Diego Perino, Dieuwke Hupkes, Egor Lakomkin, Ehab AlBadawy, Elina Lobanova, Emily Dinan, Eric Michael Smith, Filip Radenovic, Francisco Guzmán, Frank Zhang, Gabriel Synnaeve, Gabrielle Lee, Georgia Lewis Anderson, Govind Thattai, Graeme Nail, Gregoire Mialon, Guan Pang, Guillem Cucurell, Hailey Nguyen, Hannah Korevaar, Hu Xu, Hugo Touvron, Iliyan Zarov, Imanol Arrieta Ibarra, Isabel Kloumann, Ishan Misra, Ivan Evtimov, Jack Zhang, Jade Copet, Jaewon Lee, Jan Geffert, Jana Vranes, Jason Park, Jay Mahadeokar, Jeet Shah, Jelmer van der Linde, Jennifer Billock, Jenny Hong, Jenya Lee, Jeremy Fu, Jianfeng Chi, Jianyu Huang, Jiawen Liu, Jie Wang, Jiecao Yu, Joanna Bitton, Joe Spisak, Jongsoo Park, Joseph Rocca, Joshua Johnstun, Joshua Saxe, Junteng Jia, Kalyan Vasuden Alwala, Karthik Prasad, Kartikeya Upasani, Kate Plawiak, Ke Li, Kenneth Heafield, Kevin Stone, Khalid El-Arini, Krithika Iyer, Kshitiz Malik, Kuenley Chiu, Kunal Bhalla, Kushal Lakhotia, Lauren Rantala-Yeary, Laurens van der Maaten, Lawrence Chen, Liang Tan, Liz Jenkins, Louis Martin, Lovish Madaan, Lubo Malo, Lukas Blecher, Lukas Landzaat, Luke de Oliveira, Madeline Muzzi, Mahesh Pasupuleti, Mannat Singh, Manohar Paluri, Marcin Kardas, Maria Tsimpoukelli, Mathew Oldham, Mathieu Rita, Maya Pavlova, Melanie Kambadur, Mike Lewis, Min Si, Mitesh Kumar Singh, Mona Hassan, Naman Goyal, Narjes Torabi, Nikolay Bashlykov, Nikolay Bogoychev, Niladri Chatterji, Ning Zhang, Olivier Duchenne, Onur Çelebi, Patrick Alrassy, Pengchuan Zhang, Pengwei Li, Petar Vasic, Peter Weng, Prajjwal Bhargava, Pratik Dubal, Praveen Krishnan, Punit Singh Koura, Puxin Xu, Qing He, Qingxiao Dong, Ragavan Srinivasan, Raj Ganapathy, Ramon Calderer, Ricardo Silveira Cabral, Robert Stojnic, Roberta Raileanu, Rohan Maheswari, Rohit Girdhar, Rohit Patel, Romain Sauvestre, Ronnie Polidoro, Roshan Sumbaly, Ross Taylor, Ruan Silva, Rui Hou, Rui Wang, Saghar Hosseini, Sahana Chennabasappa, Sanjay Singh, Sean Bell, Seohyun Sonia Kim, Sergey Edunov, Shaoliang Nie, Sharan Narang, Sharath Raparthy, Sheng Shen, Shengye Wan, Shruti Bhosale, Shun Zhang, Simon Vandenhende, Soumya Batra, Spencer Whitman, Sten Sootla, Stephane Collot, Suchin Gururangan, Sydney Borodinsky, Tamar Herman, Tara Fowler, Tarek Sheasha, Thomas Georgiou, Thomas Scialom, Tobias Speckbacher, Todor Mihaylov, Tong Xiao, Ujjwal Karn, Vedanuj Goswami, Vibhor Gupta, Vignesh Ramanathan, Viktor Kerkez, Vincent Gonguet, Virginie Do, Vish Vogeti, Vítor Albiero, Vladan Petrovic, Weiwei Chu, Wenhan Xiong, Wenyin Fu, Whitney Meers, Xavier Martinet, Xiaodong Wang, Xiaofang Wang, Xiaoqing Ellen Tan, Xide Xia, Xinfeng Xie, Xuchao Jia, Xuewei Wang, Yaelle Goldschlag, Yashesh Gaur, Yasmine Babaei, Yi Wen, Yiwen Song, Yuchen Zhang, Yue Li, Yuning Mao, Zacharie Delpierre Coudert, Zheng Yan, Zhengxing Chen, Zoe Papakipos, Aaditya Singh, Aayushi Srivastava, Abha Jain, Adam Kelsey, Adam Shajnfeld, Adithya Gangidi, Adolfo Victoria, Ahuva Goldstand, Ajay Menon, Ajay Sharma, Alex Boesenberg, Alexei Baevski, Allie Feinstein, Amanda Kallet, Amit Sangani, Amos Teo, Anam Yunus, Andrei Lupu, Andres Alvarado, Andrew Caples, Andrew Gu, Andrew Ho, Andrew Poulton, Andrew Ryan, Ankit Ramchandani, Annie Dong, Annie Franco, Anuj Goyal, Aparajita Saraf, Arkabandhu Chowdhury, Ashley Gabriel, Ashwin Bharambe, Assaf Eisenman, Azadeh Yazdan, Beau James, Ben Maurer, Benjamin Leonhardi, Bernie Huang, Beth Loyd, Beto De Paola, Bhargavi Paranjape, Bing Liu, Bo Wu, Boyu Ni, Braden Hancock, Bram Wasti, Brandon Spence, Brani Stojkovic, Brian Gamido, Britt Montalvo, Carl Parker, Carly Burton, Catalina Mejia, Ce Liu, Changhan Wang, Changkyu Kim, Chao Zhou, Chester Hu, Ching-Hsiang Chu, Chris Cai, Chris Tindal, Christoph Feichtenhofer, Cynthia Gao, Damon Civin, Dana Beaty, Daniel Kreymer, Daniel Li, David Adkins, David Xu, Davide Testuggine, Delia David, Devi Parikh, Diana Liskovich, Didem Foss, Dingkang Wang, Duc Le, Dustin Holland, Edward Dowling, Eissa Jamil, Elaine Montgomery, Eleonora Presani, Emily Hahn, Emily Wood, Eric-Tuan Le, Erik Brinkman, Esteban Arcaute, Evan Dunbar, Evan Smothers, Fei Sun, Felix Kreuk, Feng Tian, Filippos Kokkinos, Firat Ozgenel, Francesco Caggioni, Frank Kanayet, Frank Seide, Gabriela Medina Florez, Gabriella Schwarz, Gada Badeer, Georgia Swee, Gil Halpern, Grant Herman, Grigory Sizov, Guangyi, Zhang, Guna Lakshminarayanan, Hakan Inan, Hamid Shojanazeri, Han Zou, Hannah Wang, Hanwen Zha, Haroun Habeeb, Harrison Rudolph, Helen Suk, Henry Aspegren, Hunter Goldman, Hongyuan Zhan, Ibrahim Damlaj, Igor Molybog, Igor Tufanov, Ilias Leontiadis, Irina-Elena Veliche, Itai Gat, Jake Weissman, James Geboski, James Kohli, Janice Lam, Japhet Asher, Jean-Baptiste Gaya, Jeff Marcus, Jeff Tang, Jennifer Chan, Jenny Zhen, Jeremy Reizenstein, Jeremy Teboul, Jessica Zhong, Jian Jin, Jingyi Yang, Joe Cummings, Jon Carvill, Jon Shepard, Jonathan McPhie, Jonathan Torres, Josh Ginsburg, Junjie Wang, Kai Wu, Kam Hou U, Karan Saxena, Kartikay Khandelwal, Katayoun Zand, Kathy Matosich, Kaushik Veeraraghavan, Kelly Michelena, Keqian Li, Kiran Jagadeesh, Kun Huang, Kunal Chawla, Kyle Huang, Lailin Chen, Lakshya Garg, Lavender A, Leandro Silva, Lee Bell, Lei Zhang, Liangpeng Guo, Licheng Yu, Liron Moshkovich, Luca Wehrstedt, Madian Khabsa, Manav Avalani, Manish Bhatt, Martynas Mankus, Matan Hasson, Matthew Lennie, Matthias Reso, Maxim Groshev, Maxim Naumov, Maya Lathi, Meghan Keneally, Miao Liu, Michael L. Seltzer, Michal Valko, Michelle Restrepo, Mihir Patel, Mik Vyatskov, Mikayel Samvelyan, Mike Clark, Mike Macey, Mike Wang, Miquel Jubert Hermoso, Mo Metanat, Mohammad Rastegari, Munish Bansal, Nandhini Santhanam, Natascha Parks, Natasha White, Navyata Bawa, Nayan Singhal, Nick Egebo, Nicolas Usunier, Nikhil Mehta, Nikolay Pavlovich Laptev, Ning Dong, Norman Cheng, Oleg Chernoguz, Olivia Hart, Omkar Salpekar, Ozlem Kalinli, Parkin Kent, Parth Parekh, Paul Saab, Pavan Balaji, Pedro Rittner, Philip Bontrager, Pierre Roux, Piotr Dollar, Polina Zvyagina, Prashant Ratanchandani, Pritish Yuvraj, Qian Liang, Rachad Alao, Rachel Rodriguez, Rafi Ayub, Raghotham Murthy, Raghu Nayani, Rahul Mitra, Rangaprabhu Parthasarathy, Raymond Li, Rebekkah Hogan, Robin Battey, Rocky Wang, Russ Howes, Ruty Rinott, Sachin Mehta, Sachin Siby, Sai Jayesh Bondu, Samyak Datta, Sara Chugh, Sara Hunt, Sargun Dhillon, Sasha Sidorov, Satadru Pan, Saurabh Mahajan, Saurabh Verma, Seiji Yamamoto, Sharadh Ramaswamy, Shaun Lindsay, Shaun Lindsay, Sheng Feng, Shenghao Lin, Shengxin Cindy Zha, Shishir Patil, Shiva Shankar, Shuqiang Zhang, Shuqiang Zhang, Sinong Wang, Sneha Agarwal, Soji Sajuyigbe, Soumith Chintala, Stephanie Max, Stephen Chen, Steve Kehoe, Steve Satterfield, Sudarshan Govindaprasad, Sumit Gupta, Summer Deng, Sungmin Cho, Sunny Virk, Suraj Subramanian, Sy Choudhury, Sydney Goldman, Tal Remez, Tamar Glaser, Tamara Best, Thilo Koehler, Thomas Robinson, Tianhe Li, Tianjun Zhang, Tim Matthews, Timothy Chou, Tzook Shaked, Varun Vontimitta, Victoria Ajayi, Victoria Montanez, Vijai Mohan, Vinay Satish Kumar, Vishal Mangla, Vlad Ionescu, Vlad Poenaru, Vlad Tiberiu Mihailescu, Vladimir Ivanov, Wei Li, Wenchen Wang, Wenwen Jiang, Wes Bouaziz, Will Constable, Xiaocheng Tang, Xiaojian Wu, Xiaolan Wang, Xilun Wu, Xinbo Gao, Yaniv Kleinman, Yanjun Chen, Ye Hu, Ye Jia, Ye Qi, Yenda Li, Yilin Zhang, Ying Zhang, Yossi Adi, Youngjin Nam, Yu, Wang, Yu Zhao, Yuchen Hao, Yundi Qian, Yunlu Li, Yuzi He, Zach Rait, Zachary DeVito, Zef Rosnbrick, Zhaoduo Wen, Zhenyu Yang, Zhiwei Zhao, Zhiyu Ma</details></li>
+<li id="ref-mistral">Albert Q. Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Florian Bressand, Gianna Lengyel, Guillaume Lample, Lucile Saulnier, Lélio Renard Lavaud, Marie-Anne Lachaux, et al.. <em>Mistral 7B</em>. arXiv:<a href="https://arxiv.org/abs/2310.06825">2310.06825</a> (2023-10-10; read as 2310.06825v1).  <span class="vtag">[R]</span><details><summary>Full author list (18)</summary>Albert Q. Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Florian Bressand, Gianna Lengyel, Guillaume Lample, Lucile Saulnier, Lélio Renard Lavaud, Marie-Anne Lachaux, Pierre Stock, Teven Le Scao, Thibaut Lavril, Thomas Wang, Timothée Lacroix, William El Sayed</details></li>
+<li id="ref-mixtral">Albert Q. Jiang, Alexandre Sablayrolles, Antoine Roux, Arthur Mensch, Blanche Savary, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Emma Bou Hanna, Florian Bressand, Gianna Lengyel, Guillaume Bour, et al.. <em>Mixtral of Experts</em>. arXiv:<a href="https://arxiv.org/abs/2401.04088">2401.04088</a> (2024-01-08; read as 2401.04088v1).  <span class="vtag">[R]</span><details><summary>Full author list (26)</summary>Albert Q. Jiang, Alexandre Sablayrolles, Antoine Roux, Arthur Mensch, Blanche Savary, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Emma Bou Hanna, Florian Bressand, Gianna Lengyel, Guillaume Bour, Guillaume Lample, Lélio Renard Lavaud, Lucile Saulnier, Marie-Anne Lachaux, Pierre Stock, Sandeep Subramanian, Sophia Yang, Szymon Antoniak, Teven Le Scao, Théophile Gervet, Thibaut Lavril, Thomas Wang, Timothée Lacroix, William El Sayed</details></li>
+<li id="ref-qwen2">An Yang, Baosong Yang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Zhou, Chengpeng Li, Chengyuan Li, Dayiheng Liu, Fei Huang, Guanting Dong, Haoran Wei, et al.. <em>Qwen2 Technical Report</em>. arXiv:<a href="https://arxiv.org/abs/2407.10671">2407.10671</a> (2024-07-15; read as 2407.10671v4).  <span class="vtag">[R]</span><details><summary>Full author list (62)</summary>An Yang, Baosong Yang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Zhou, Chengpeng Li, Chengyuan Li, Dayiheng Liu, Fei Huang, Guanting Dong, Haoran Wei, Huan Lin, Jialong Tang, Jialin Wang, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin Ma, Jianxin Yang, Jin Xu, Jingren Zhou, Jinze Bai, Jinzheng He, Junyang Lin, Kai Dang, Keming Lu, Keqin Chen, Kexin Yang, Mei Li, Mingfeng Xue, Na Ni, Pei Zhang, Peng Wang, Ru Peng, Rui Men, Ruize Gao, Runji Lin, Shijie Wang, Shuai Bai, Sinan Tan, Tianhang Zhu, Tianhao Li, Tianyu Liu, Wenbin Ge, Xiaodong Deng, Xiaohuan Zhou, Xingzhang Ren, Xinyu Zhang, Xipin Wei, Xuancheng Ren, Xuejing Liu, Yang Fan, Yang Yao, Yichang Zhang, Yu Wan, Yunfei Chu, Yuqiong Liu, Zeyu Cui, Zhenru Zhang, Zhifang Guo, Zhihao Fan</details></li>
+<li id="ref-qwen3">An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayiheng Liu, et al.. <em>Qwen3 Technical Report</em>. arXiv:<a href="https://arxiv.org/abs/2505.09388">2505.09388</a> (2025-05-14; read as 2505.09388v1).  <span class="vtag">[R]</span><details><summary>Full author list (60)</summary>An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayiheng Liu, Fan Zhou, Fei Huang, Feng Hu, Hao Ge, Haoran Wei, Huan Lin, Jialong Tang, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin Yang, Jiaxi Yang, Jing Zhou, Jingren Zhou, Junyang Lin, Kai Dang, Keqin Bao, Kexin Yang, Le Yu, Lianghao Deng, Mei Li, Mingfeng Xue, Mingze Li, Pei Zhang, Peng Wang, Qin Zhu, Rui Men, Ruize Gao, Shixuan Liu, Shuang Luo, Tianhao Li, Tianyi Tang, Wenbiao Yin, Xingzhang Ren, Xinyu Wang, Xinyu Zhang, Xuancheng Ren, Yang Fan, Yang Su, Yichang Zhang, Yinger Zhang, Yu Wan, Yuqiong Liu, Zekun Wang, Zeyu Cui, Zhenru Zhang, Zhipeng Zhou, Zihan Qiu</details></li>
+<li id="ref-gemma1">Gemma Team, Thomas Mesnard, Cassidy Hardin, Robert Dadashi, Surya Bhupatiraju, Shreya Pathak, Laurent Sifre, Morgane Rivière, Mihir Sanjay Kale, Juliette Love, Pouya Tafti, Léonard Hussenot, et al.. <em>Gemma: Open Models Based on Gemini Research and Technology</em>. arXiv:<a href="https://arxiv.org/abs/2403.08295">2403.08295</a> (2024-03-13; read as 2403.08295v4).  <span class="vtag">[R]</span><details><summary>Full author list (108)</summary>Gemma Team, Thomas Mesnard, Cassidy Hardin, Robert Dadashi, Surya Bhupatiraju, Shreya Pathak, Laurent Sifre, Morgane Rivière, Mihir Sanjay Kale, Juliette Love, Pouya Tafti, Léonard Hussenot, Pier Giuseppe Sessa, Aakanksha Chowdhery, Adam Roberts, Aditya Barua, Alex Botev, Alex Castro-Ros, Ambrose Slone, Amélie Héliou, Andrea Tacchetti, Anna Bulanova, Antonia Paterson, Beth Tsai, Bobak Shahriari, Charline Le Lan, Christopher A. Choquette-Choo, Clément Crepy, Daniel Cer, Daphne Ippolito, David Reid, Elena Buchatskaya, Eric Ni, Eric Noland, Geng Yan, George Tucker, George-Christian Muraru, Grigory Rozhdestvenskiy, Henryk Michalewski, Ian Tenney, Ivan Grishchenko, Jacob Austin, James Keeling, Jane Labanowski, Jean-Baptiste Lespiau, Jeff Stanway, Jenny Brennan, Jeremy Chen, Johan Ferret, Justin Chiu, Justin Mao-Jones, Katherine Lee, Kathy Yu, Katie Millican, Lars Lowe Sjoesund, Lisa Lee, Lucas Dixon, Machel Reid, Maciej Mikuła, Mateo Wirth, Michael Sharman, Nikolai Chinaev, Nithum Thain, Olivier Bachem, Oscar Chang, Oscar Wahltinez, Paige Bailey, Paul Michel, Petko Yotov, Rahma Chaabouni, Ramona Comanescu, Reena Jana, Rohan Anil, Ross McIlroy, Ruibo Liu, Ryan Mullins, Samuel L Smith, Sebastian Borgeaud, Sertan Girgin, Sholto Douglas, Shree Pandya, Siamak Shakeri, Soham De, Ted Klimenko, Tom Hennigan, Vlad Feinberg, Wojciech Stokowiec, Yu-hui Chen, Zafarali Ahmed, Zhitao Gong, Tris Warkentin, Ludovic Peran, Minh Giang, Clément Farabet, Oriol Vinyals, Jeff Dean, Koray Kavukcuoglu, Demis Hassabis, Zoubin Ghahramani, Douglas Eck, Joelle Barral, Fernando Pereira, Eli Collins, Armand Joulin, Noah Fiedel, Evan Senter, Alek Andreev, Kathleen Kenealy</details></li>
+<li id="ref-gemma2">Gemma Team, Morgane Riviere, Shreya Pathak, Pier Giuseppe Sessa, Cassidy Hardin, Surya Bhupatiraju, Léonard Hussenot, Thomas Mesnard, Bobak Shahriari, Alexandre Ramé, Johan Ferret, Peter Liu, et al.. <em>Gemma 2: Improving Open Language Models at a Practical Size</em>. arXiv:<a href="https://arxiv.org/abs/2408.00118">2408.00118</a> (2024-07-31; read as 2408.00118v3).  <span class="vtag">[R]</span><details><summary>Full author list (198)</summary>Gemma Team, Morgane Riviere, Shreya Pathak, Pier Giuseppe Sessa, Cassidy Hardin, Surya Bhupatiraju, Léonard Hussenot, Thomas Mesnard, Bobak Shahriari, Alexandre Ramé, Johan Ferret, Peter Liu, Pouya Tafti, Abe Friesen, Michelle Casbon, Sabela Ramos, Ravin Kumar, Charline Le Lan, Sammy Jerome, Anton Tsitsulin, Nino Vieillard, Piotr Stanczyk, Sertan Girgin, Nikola Momchev, Matt Hoffman, Shantanu Thakoor, Jean-Bastien Grill, Behnam Neyshabur, Olivier Bachem, Alanna Walton, Aliaksei Severyn, Alicia Parrish, Aliya Ahmad, Allen Hutchison, Alvin Abdagic, Amanda Carl, Amy Shen, Andy Brock, Andy Coenen, Anthony Laforge, Antonia Paterson, Ben Bastian, Bilal Piot, Bo Wu, Brandon Royal, Charlie Chen, Chintu Kumar, Chris Perry, Chris Welty, Christopher A. Choquette-Choo, Danila Sinopalnikov, David Weinberger, Dimple Vijaykumar, Dominika Rogozińska, Dustin Herbison, Elisa Bandy, Emma Wang, Eric Noland, Erica Moreira, Evan Senter, Evgenii Eltyshev, Francesco Visin, Gabriel Rasskin, Gary Wei, Glenn Cameron, Gus Martins, Hadi Hashemi, Hanna Klimczak-Plucińska, Harleen Batra, Harsh Dhand, Ivan Nardini, Jacinda Mein, Jack Zhou, James Svensson, Jeff Stanway, Jetha Chan, Jin Peng Zhou, Joana Carrasqueira, Joana Iljazi, Jocelyn Becker, Joe Fernandez, Joost van Amersfoort, Josh Gordon, Josh Lipschultz, Josh Newlan, Ju-yeong Ji, Kareem Mohamed, Kartikeya Badola, Kat Black, Katie Millican, Keelin McDonell, Kelvin Nguyen, Kiranbir Sodhia, Kish Greene, Lars Lowe Sjoesund, Lauren Usui, Laurent Sifre, Lena Heuermann, Leticia Lago, Lilly McNealus, Livio Baldini Soares, Logan Kilpatrick, Lucas Dixon, Luciano Martins, Machel Reid, Manvinder Singh, Mark Iverson, Martin Görner, Mat Velloso, Mateo Wirth, Matt Davidow, Matt Miller, Matthew Rahtz, Matthew Watson, Meg Risdal, Mehran Kazemi, Michael Moynihan, Ming Zhang, Minsuk Kahng, Minwoo Park, Mofi Rahman, Mohit Khatwani, Natalie Dao, Nenshad Bardoliwalla, Nesh Devanathan, Neta Dumai, Nilay Chauhan, Oscar Wahltinez, Pankil Botarda, Parker Barnes, Paul Barham, Paul Michel, Pengchong Jin, Petko Georgiev, Phil Culliton, Pradeep Kuppala, Ramona Comanescu, Ramona Merhej, Reena Jana, Reza Ardeshir Rokni, Rishabh Agarwal, Ryan Mullins, Samaneh Saadat, Sara Mc Carthy, Sarah Cogan, Sarah Perrin, Sébastien M. R. Arnold, Sebastian Krause, Shengyang Dai, Shruti Garg, Shruti Sheth, Sue Ronstrom, Susan Chan, Timothy Jordan, Ting Yu, Tom Eccles, Tom Hennigan, Tomas Kocisky, Tulsee Doshi, Vihan Jain, Vikas Yadav, Vilobh Meshram, Vishal Dharmadhikari, Warren Barkley, Wei Wei, Wenming Ye, Woohyun Han, Woosuk Kwon, Xiang Xu, Zhe Shen, Zhitao Gong, Zichuan Wei, Victor Cotruta, Phoebe Kirk, Anand Rao, Minh Giang, Ludovic Peran, Tris Warkentin, Eli Collins, Joelle Barral, Zoubin Ghahramani, Raia Hadsell, D. Sculley, Jeanine Banks, Anca Dragan, Slav Petrov, Oriol Vinyals, Jeff Dean, Demis Hassabis, Koray Kavukcuoglu, Clement Farabet, Elena Buchatskaya, Sebastian Borgeaud, Noah Fiedel, Armand Joulin, Kathleen Kenealy, Robert Dadashi, Alek Andreev</details></li>
+<li id="ref-gemma3">Gemma Team, Aishwarya Kamath, Johan Ferret, Shreya Pathak, Nino Vieillard, Ramona Merhej, Sarah Perrin, Tatiana Matejovicova, Alexandre Ramé, Morgane Rivière, Louis Rouillard, Thomas Mesnard, et al.. <em>Gemma 3 Technical Report</em>. arXiv:<a href="https://arxiv.org/abs/2503.19786">2503.19786</a> (2025-03-25; read as 2503.19786v1).  <span class="vtag">[R]</span><details><summary>Full author list (216)</summary>Gemma Team, Aishwarya Kamath, Johan Ferret, Shreya Pathak, Nino Vieillard, Ramona Merhej, Sarah Perrin, Tatiana Matejovicova, Alexandre Ramé, Morgane Rivière, Louis Rouillard, Thomas Mesnard, Geoffrey Cideron, Jean-bastien Grill, Sabela Ramos, Edouard Yvinec, Michelle Casbon, Etienne Pot, Ivo Penchev, Gaël Liu, Francesco Visin, Kathleen Kenealy, Lucas Beyer, Xiaohai Zhai, Anton Tsitsulin, Robert Busa-Fekete, Alex Feng, Noveen Sachdeva, Benjamin Coleman, Yi Gao, Basil Mustafa, Iain Barr, Emilio Parisotto, David Tian, Matan Eyal, Colin Cherry, Jan-Thorsten Peter, Danila Sinopalnikov, Surya Bhupatiraju, Rishabh Agarwal, Mehran Kazemi, Dan Malkin, Ravin Kumar, David Vilar, Idan Brusilovsky, Jiaming Luo, Andreas Steiner, Abe Friesen, Abhanshu Sharma, Abheesht Sharma, Adi Mayrav Gilady, Adrian Goedeckemeyer, Alaa Saade, Alex Feng, Alexander Kolesnikov, Alexei Bendebury, Alvin Abdagic, Amit Vadi, András György, André Susano Pinto, Anil Das, Ankur Bapna, Antoine Miech, Antoine Yang, Antonia Paterson, Ashish Shenoy, Ayan Chakrabarti, Bilal Piot, Bo Wu, Bobak Shahriari, Bryce Petrini, Charlie Chen, Charline Le Lan, Christopher A. Choquette-Choo, CJ Carey, Cormac Brick, Daniel Deutsch, Danielle Eisenbud, Dee Cattle, Derek Cheng, Dimitris Paparas, Divyashree Shivakumar Sreepathihalli, Doug Reid, Dustin Tran, Dustin Zelle, Eric Noland, Erwin Huizenga, Eugene Kharitonov, Frederick Liu, Gagik Amirkhanyan, Glenn Cameron, Hadi Hashemi, Hanna Klimczak-Plucińska, Harman Singh, Harsh Mehta, Harshal Tushar Lehri, Hussein Hazimeh, Ian Ballantyne, Idan Szpektor, Ivan Nardini, Jean Pouget-Abadie, Jetha Chan, Joe Stanton, John Wieting, Jonathan Lai, Jordi Orbay, Joseph Fernandez, Josh Newlan, Ju-yeong Ji, Jyotinder Singh, Kat Black, Kathy Yu, Kevin Hui, Kiran Vodrahalli, Klaus Greff, Linhai Qiu, Marcella Valentine, Marina Coelho, Marvin Ritter, Matt Hoffman, Matthew Watson, Mayank Chaturvedi, Michael Moynihan, Min Ma, Nabila Babar, Natasha Noy, Nathan Byrd, Nick Roy, Nikola Momchev, Nilay Chauhan, Noveen Sachdeva, Oskar Bunyan, Pankil Botarda, Paul Caron, Paul Kishan Rubenstein, Phil Culliton, Philipp Schmid, Pier Giuseppe Sessa, Pingmei Xu, Piotr Stanczyk, Pouya Tafti, Rakesh Shivanna, Renjie Wu, Renke Pan, Reza Rokni, Rob Willoughby, Rohith Vallu, Ryan Mullins, Sammy Jerome, Sara Smoot, Sertan Girgin, Shariq Iqbal, Shashir Reddy, Shruti Sheth, Siim Põder, Sijal Bhatnagar, Sindhu Raghuram Panyam, Sivan Eiger, Susan Zhang, Tianqi Liu, Trevor Yacovone, Tyler Liechty, Uday Kalra, Utku Evci, Vedant Misra, Vincent Roseberry, Vlad Feinberg, Vlad Kolesnikov, Woohyun Han, Woosuk Kwon, Xi Chen, Yinlam Chow, Yuvein Zhu, Zichuan Wei, Zoltan Egyed, Victor Cotruta, Minh Giang, Phoebe Kirk, Anand Rao, Kat Black, Nabila Babar, Jessica Lo, Erica Moreira, Luiz Gustavo Martins, Omar Sanseviero, Lucas Gonzalez, Zach Gleicher, Tris Warkentin, Vahab Mirrokni, Evan Senter, Eli Collins, Joelle Barral, Zoubin Ghahramani, Raia Hadsell, Yossi Matias, D. Sculley, Slav Petrov, Noah Fiedel, Noam Shazeer, Oriol Vinyals, Jeff Dean, Demis Hassabis, Koray Kavukcuoglu, Clement Farabet, Elena Buchatskaya, Jean-Baptiste Alayrac, Rohan Anil, Dmitry, Lepikhin, Sebastian Borgeaud, Olivier Bachem, Armand Joulin, Alek Andreev, Cassidy Hardin, Robert Dadashi, Léonard Hussenot</details></li>
+<li id="ref-phi3">Marah Abdin, Jyoti Aneja, Hany Awadalla, Ahmed Awadallah, Ammar Ahmad Awan, Nguyen Bach, Amit Bahree, Arash Bakhtiari, Jianmin Bao, Harkirat Behl, Alon Benhaim, Misha Bilenko, et al.. <em>Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone</em>. arXiv:<a href="https://arxiv.org/abs/2404.14219">2404.14219</a> (2024-04-22; read as 2404.14219v4).  <span class="vtag">[R]</span><details><summary>Full author list (129)</summary>Marah Abdin, Jyoti Aneja, Hany Awadalla, Ahmed Awadallah, Ammar Ahmad Awan, Nguyen Bach, Amit Bahree, Arash Bakhtiari, Jianmin Bao, Harkirat Behl, Alon Benhaim, Misha Bilenko, Johan Bjorck, Sébastien Bubeck, Martin Cai, Qin Cai, Vishrav Chaudhary, Dong Chen, Dongdong Chen, Weizhu Chen, Yen-Chun Chen, Yi-Ling Chen, Hao Cheng, Parul Chopra, Xiyang Dai, Matthew Dixon, Ronen Eldan, Victor Fragoso, Jianfeng Gao, Mei Gao, Min Gao, Amit Garg, Allie Del Giorno, Abhishek Goswami, Suriya Gunasekar, Emman Haider, Junheng Hao, Russell J. Hewett, Wenxiang Hu, Jamie Huynh, Dan Iter, Sam Ade Jacobs, Mojan Javaheripi, Xin Jin, Nikos Karampatziakis, Piero Kauffmann, Mahoud Khademi, Dongwoo Kim, Young Jin Kim, Lev Kurilenko, James R. Lee, Yin Tat Lee, Yuanzhi Li, Yunsheng Li, Chen Liang, Lars Liden, Xihui Lin, Zeqi Lin, Ce Liu, Liyuan Liu, Mengchen Liu, Weishung Liu, Xiaodong Liu, Chong Luo, Piyush Madan, Ali Mahmoudzadeh, David Majercak, Matt Mazzola, Caio César Teodoro Mendes, Arindam Mitra, Hardik Modi, Anh Nguyen, Brandon Norick, Barun Patra, Daniel Perez-Becker, Thomas Portet, Reid Pryzant, Heyang Qin, Marko Radmilac, Liliang Ren, Gustavo de Rosa, Corby Rosset, Sambudha Roy, Olatunji Ruwase, Olli Saarikivi, Amin Saied, Adil Salim, Michael Santacroce, Shital Shah, Ning Shang, Hiteshi Sharma, Yelong Shen, Swadheen Shukla, Xia Song, Masahiro Tanaka, Andrea Tupini, Praneetha Vaddamanu, Chunyu Wang, Guanhua Wang, Lijuan Wang, Shuohang Wang, Xin Wang, Yu Wang, Rachel Ward, Wen Wen, Philipp Witte, Haiping Wu, Xiaoxia Wu, Michael Wyatt, Bin Xiao, Can Xu, Jiahang Xu, Weijian Xu, Jilong Xue, Sonali Yadav, Fan Yang, Jianwei Yang, Yifan Yang, Ziyi Yang, Donghan Yu, Lu Yuan, Chenruidong Zhang, Cyril Zhang, Jianwen Zhang, Li Lyna Zhang, Yi Zhang, Yue Zhang, Yunan Zhang, Xiren Zhou</details></li>
+<li id="ref-olmo2">Team OLMo, Pete Walsh, Luca Soldaini, Dirk Groeneveld, Kyle Lo, Shane Arora, Akshita Bhagia, Yuling Gu, Shengyi Huang, Matt Jordan, Nathan Lambert, Dustin Schwenk, et al.. <em>2 OLMo 2 Furious</em>. arXiv:<a href="https://arxiv.org/abs/2501.00656">2501.00656</a> (2024-12-31; read as 2501.00656v3).  <span class="vtag">[R]</span><details><summary>Full author list (43)</summary>Team OLMo, Pete Walsh, Luca Soldaini, Dirk Groeneveld, Kyle Lo, Shane Arora, Akshita Bhagia, Yuling Gu, Shengyi Huang, Matt Jordan, Nathan Lambert, Dustin Schwenk, Oyvind Tafjord, Taira Anderson, David Atkinson, Faeze Brahman, Christopher Clark, Pradeep Dasigi, Nouha Dziri, Allyson Ettinger, Michal Guerquin, David Heineman, Hamish Ivison, Pang Wei Koh, Jiacheng Liu, Saumya Malik, William Merrill, Lester James V. Miranda, Jacob Morrison, Tyler Murray, Crystal Nam, Jake Poznanski, Valentina Pyatkin, Aman Rangapur, Michael Schmitz, Sam Skjonsberg, David Wadden, Christopher Wilhelm, Michael Wilson, Luke Zettlemoyer, Ali Farhadi, Noah A. Smith, Hannaneh Hajishirzi</details></li>
+<li id="ref-falcon">Ebtesam Almazrouei, Hamza Alobeidli, Abdulaziz Alshamsi, Alessandro Cappelli, Ruxandra Cojocaru, Mérouane Debbah, Étienne Goffinet, Daniel Hesslow, Julien Launay, Quentin Malartic, Daniele Mazzotta, Badreddine Noune, et al.. <em>The Falcon Series of Open Language Models</em>. arXiv:<a href="https://arxiv.org/abs/2311.16867">2311.16867</a> (2023-11-28; read as 2311.16867v2).  <span class="vtag">[R]</span><details><summary>Full author list (14)</summary>Ebtesam Almazrouei, Hamza Alobeidli, Abdulaziz Alshamsi, Alessandro Cappelli, Ruxandra Cojocaru, Mérouane Debbah, Étienne Goffinet, Daniel Hesslow, Julien Launay, Quentin Malartic, Daniele Mazzotta, Badreddine Noune, Baptiste Pannier, Guilherme Penedo</details></li>
+<li id="ref-glm45">GLM-4. 5 Team, Aohan Zeng, Xin Lv, Qinkai Zheng, Zhenyu Hou, Bin Chen, Chengxing Xie, Cunxiang Wang, Da Yin, Hao Zeng, Jiajie Zhang, Kedong Wang, et al.. <em>GLM-4.5: Agentic, Reasoning, and Coding (ARC) Foundation Models</em>. arXiv:<a href="https://arxiv.org/abs/2508.06471">2508.06471</a> (2025-08-08; read as 2508.06471v1).  <span class="vtag">[R]</span><details><summary>Full author list (171)</summary>GLM-4. 5 Team, Aohan Zeng, Xin Lv, Qinkai Zheng, Zhenyu Hou, Bin Chen, Chengxing Xie, Cunxiang Wang, Da Yin, Hao Zeng, Jiajie Zhang, Kedong Wang, Lucen Zhong, Mingdao Liu, Rui Lu, Shulin Cao, Xiaohan Zhang, Xuancheng Huang, Yao Wei, Yean Cheng, Yifan An, Yilin Niu, Yuanhao Wen, Yushi Bai, Zhengxiao Du, Zihan Wang, Zilin Zhu, Bohan Zhang, Bosi Wen, Bowen Wu, Bowen Xu, Can Huang, Casey Zhao, Changpeng Cai, Chao Yu, Chen Li, Chendi Ge, Chenghua Huang, Chenhui Zhang, Chenxi Xu, Chenzheng Zhu, Chuang Li, Congfeng Yin, Daoyan Lin, Dayong Yang, Dazhi Jiang, Ding Ai, Erle Zhu, Fei Wang, Gengzheng Pan, Guo Wang, Hailong Sun, Haitao Li, Haiyang Li, Haiyi Hu, Hanyu Zhang, Hao Peng, Hao Tai, Haoke Zhang, Haoran Wang, Haoyu Yang, He Liu, He Zhao, Hongwei Liu, Hongxi Yan, Huan Liu, Huilong Chen, Ji Li, Jiajing Zhao, Jiamin Ren, Jian Jiao, Jiani Zhao, Jianyang Yan, Jiaqi Wang, Jiayi Gui, Jiayue Zhao, Jie Liu, Jijie Li, Jing Li, Jing Lu, Jingsen Wang, Jingwei Yuan, Jingxuan Li, Jingzhao Du, Jinhua Du, Jinxin Liu, Junkai Zhi, Junli Gao, Ke Wang, Lekang Yang, Liang Xu, Lin Fan, Lindong Wu, Lintao Ding, Lu Wang, Man Zhang, Minghao Li, Minghuan Xu, Mingming Zhao, Mingshu Zhai, Pengfan Du, Qian Dong, Shangde Lei, Shangqing Tu, Shangtong Yang, Shaoyou Lu, Shijie Li, Shuang Li, Shuang-Li, Shuxun Yang, Sibo Yi, Tianshu Yu, Wei Tian, Weihan Wang, Wenbo Yu, Weng Lam Tam, Wenjie Liang, Wentao Liu, Xiao Wang, Xiaohan Jia, Xiaotao Gu, Xiaoying Ling, Xin Wang, Xing Fan, Xingru Pan, Xinyuan Zhang, Xinze Zhang, Xiuqing Fu, Xunkai Zhang, Yabo Xu, Yandong Wu, Yida Lu, Yidong Wang, Yilin Zhou, Yiming Pan, Ying Zhang, Yingli Wang, Yingru Li, Yinpei Su, Yipeng Geng, Yitong Zhu, Yongkun Yang, Yuhang Li, Yuhao Wu, Yujiang Li, Yunan Liu, Yunqing Wang, Yuntao Li, Yuxuan Zhang, Zezhen Liu, Zhen Yang, Zhengda Zhou, Zhongpei Qiao, Zhuoer Feng, Zhuorui Liu, Zichen Zhang, Zihan Wang, Zijun Yao, Zikang Wang, Ziqiang Liu, Ziwei Chai, Zixuan Li, Zuodong Zhao, Wenguang Chen, Jidong Zhai, Bin Xu, Minlie Huang, Hongning Wang, Juanzi Li, Yuxiao Dong, Jie Tang</details></li>
+<li id="ref-gptoss">OpenAI, Sandhini Agarwal, Lama Ahmad, Jason Ai, Sam Altman, Andy Applebaum, Edwin Arbus, Rahul K. Arora, Yu Bai, Bowen Baker, Haiming Bao, Boaz Barak, et al.. <em>gpt-oss-120b &amp; gpt-oss-20b Model Card</em>. arXiv:<a href="https://arxiv.org/abs/2508.10925">2508.10925</a> (2025-08-08; read as 2508.10925v1). Model card. <span class="vtag">[R]</span><details><summary>Full author list (126)</summary>OpenAI, Sandhini Agarwal, Lama Ahmad, Jason Ai, Sam Altman, Andy Applebaum, Edwin Arbus, Rahul K. Arora, Yu Bai, Bowen Baker, Haiming Bao, Boaz Barak, Ally Bennett, Tyler Bertao, Nivedita Brett, Eugene Brevdo, Greg Brockman, Sebastien Bubeck, Che Chang, Kai Chen, Mark Chen, Enoch Cheung, Aidan Clark, Dan Cook, Marat Dukhan, Casey Dvorak, Kevin Fives, Vlad Fomenko, Timur Garipov, Kristian Georgiev, Mia Glaese, Tarun Gogineni, Adam Goucher, Lukas Gross, Katia Gil Guzman, John Hallman, Jackie Hehir, Johannes Heidecke, Alec Helyar, Haitang Hu, Romain Huet, Jacob Huh, Saachi Jain, Zach Johnson, Chris Koch, Irina Kofman, Dominik Kundel, Jason Kwon, Volodymyr Kyrylov, Elaine Ya Le, Guillaume Leclerc, James Park Lennon, Scott Lessans, Mario Lezcano-Casado, Yuanzhi Li, Zhuohan Li, Ji Lin, Jordan Liss, Lily, Liu, Jiancheng Liu, Kevin Lu, Chris Lu, Zoran Martinovic, Lindsay McCallum, Josh McGrath, Scott McKinney, Aidan McLaughlin, Song Mei, Steve Mostovoy, Tong Mu, Gideon Myles, Alexander Neitz, Alex Nichol, Jakub Pachocki, Alex Paino, Dana Palmie, Ashley Pantuliano, Giambattista Parascandolo, Jongsoo Park, Leher Pathak, Carolina Paz, Ludovic Peran, Dmitry Pimenov, Michelle Pokrass, Elizabeth Proehl, Huida Qiu, Gaby Raila, Filippo Raso, Hongyu Ren, Kimmy Richardson, David Robinson, Bob Rotsted, Hadi Salman, Suvansh Sanjeev, Max Schwarzer, D. Sculley, Harshit Sikchi, Kendal Simon, Karan Singhal, Yang Song, Dane Stuckey, Zhiqing Sun, Philippe Tillet, Sam Toizer, Foivos Tsimpourlas, Nikhil Vyas, Eric Wallace, Xin Wang, Miles Wang, Olivia Watkins, Kevin Weil, Amy Wendling, Kevin Whinnery, Cedric Whitney, Hannah Wong, Lin Yang, Yu Yang, Michihiro Yasunaga, Kristen Ying, Wojciech Zaremba, Wenting Zhan, Cyril Zhang, Brian Zhang, Eddie Zhang, Shengjia Zhao</details></li>
+<li id="ref-dsv2">DeepSeek-AI, Aixin Liu, Bei Feng, Bin Wang, Bingxuan Wang, Bo Liu, Chenggang Zhao, Chengqi Dengr, Chong Ruan, Damai Dai, Daya Guo, Dejian Yang, et al.. <em>DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model</em>. arXiv:<a href="https://arxiv.org/abs/2405.04434">2405.04434</a> (2024-05-07; read as 2405.04434v5).  <span class="vtag">[R]</span><details><summary>Full author list (157)</summary>DeepSeek-AI, Aixin Liu, Bei Feng, Bin Wang, Bingxuan Wang, Bo Liu, Chenggang Zhao, Chengqi Dengr, Chong Ruan, Damai Dai, Daya Guo, Dejian Yang, Deli Chen, Dongjie Ji, Erhang Li, Fangyun Lin, Fuli Luo, Guangbo Hao, Guanting Chen, Guowei Li, H. Zhang, Hanwei Xu, Hao Yang, Haowei Zhang, Honghui Ding, Huajian Xin, Huazuo Gao, Hui Li, Hui Qu, J. L. Cai, Jian Liang, Jianzhong Guo, Jiaqi Ni, Jiashi Li, Jin Chen, Jingyang Yuan, Junjie Qiu, Junxiao Song, Kai Dong, Kaige Gao, Kang Guan, Lean Wang, Lecong Zhang, Lei Xu, Leyi Xia, Liang Zhao, Liyue Zhang, Meng Li, Miaojun Wang, Mingchuan Zhang, Minghua Zhang, Minghui Tang, Mingming Li, Ning Tian, Panpan Huang, Peiyi Wang, Peng Zhang, Qihao Zhu, Qinyu Chen, Qiushi Du, R. J. Chen, R. L. Jin, Ruiqi Ge, Ruizhe Pan, Runxin Xu, Ruyi Chen, S. S. Li, Shanghao Lu, Shangyan Zhou, Shanhuang Chen, Shaoqing Wu, Shengfeng Ye, Shirong Ma, Shiyu Wang, Shuang Zhou, Shuiping Yu, Shunfeng Zhou, Size Zheng, T. Wang, Tian Pei, Tian Yuan, Tianyu Sun, W. L. Xiao, Wangding Zeng, Wei An, Wen Liu, Wenfeng Liang, Wenjun Gao, Wentao Zhang, X. Q. Li, Xiangyue Jin, Xianzu Wang, Xiao Bi, Xiaodong Liu, Xiaohan Wang, Xiaojin Shen, Xiaokang Chen, Xiaosha Chen, Xiaotao Nie, Xiaowen Sun, Xiaoxiang Wang, Xin Liu, Xin Xie, Xingkai Yu, Xinnan Song, Xinyi Zhou, Xinyu Yang, Xuan Lu, Xuecheng Su, Y. Wu, Y. K. Li, Y. X. Wei, Y. X. Zhu, Yanhong Xu, Yanping Huang, Yao Li, Yao Zhao, Yaofeng Sun, Yaohui Li, Yaohui Wang, Yi Zheng, Yichao Zhang, Yiliang Xiong, Yilong Zhao, Ying He, Ying Tang, Yishi Piao, Yixin Dong, Yixuan Tan, Yiyuan Liu, Yongji Wang, Yongqiang Guo, Yuchen Zhu, Yuduan Wang, Yuheng Zou, Yukun Zha, Yunxian Ma, Yuting Yan, Yuxiang You, Yuxuan Liu, Z. Z. Ren, Zehui Ren, Zhangli Sha, Zhe Fu, Zhen Huang, Zhen Zhang, Zhenda Xie, Zhewen Hao, Zhihong Shao, Zhiniu Wen, Zhipeng Xu, Zhongyu Zhang, Zhuoshu Li, Zihan Wang, Zihui Gu, Zilin Li, Ziwei Xie</details></li>
+<li id="ref-dsv3">DeepSeek-AI, Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang, Bochao Wu, Chengda Lu, Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan, Damai Dai, et al.. <em>DeepSeek-V3 Technical Report</em>. arXiv:<a href="https://arxiv.org/abs/2412.19437">2412.19437</a> (2024-12-27; read as 2412.19437v2).  <span class="vtag">[R]</span><details><summary>Full author list (200)</summary>DeepSeek-AI, Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang, Bochao Wu, Chengda Lu, Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan, Damai Dai, Daya Guo, Dejian Yang, Deli Chen, Dongjie Ji, Erhang Li, Fangyun Lin, Fucong Dai, Fuli Luo, Guangbo Hao, Guanting Chen, Guowei Li, H. Zhang, Han Bao, Hanwei Xu, Haocheng Wang, Haowei Zhang, Honghui Ding, Huajian Xin, Huazuo Gao, Hui Li, Hui Qu, J. L. Cai, Jian Liang, Jianzhong Guo, Jiaqi Ni, Jiashi Li, Jiawei Wang, Jin Chen, Jingchang Chen, Jingyang Yuan, Junjie Qiu, Junlong Li, Junxiao Song, Kai Dong, Kai Hu, Kaige Gao, Kang Guan, Kexin Huang, Kuai Yu, Lean Wang, Lecong Zhang, Lei Xu, Leyi Xia, Liang Zhao, Litong Wang, Liyue Zhang, Meng Li, Miaojun Wang, Mingchuan Zhang, Minghua Zhang, Minghui Tang, Mingming Li, Ning Tian, Panpan Huang, Peiyi Wang, Peng Zhang, Qiancheng Wang, Qihao Zhu, Qinyu Chen, Qiushi Du, R. J. Chen, R. L. Jin, Ruiqi Ge, Ruisong Zhang, Ruizhe Pan, Runji Wang, Runxin Xu, Ruoyu Zhang, Ruyi Chen, S. S. Li, Shanghao Lu, Shangyan Zhou, Shanhuang Chen, Shaoqing Wu, Shengfeng Ye, Shengfeng Ye, Shirong Ma, Shiyu Wang, Shuang Zhou, Shuiping Yu, Shunfeng Zhou, Shuting Pan, T. Wang, Tao Yun, Tian Pei, Tianyu Sun, W. L. Xiao, Wangding Zeng, Wanjia Zhao, Wei An, Wen Liu, Wenfeng Liang, Wenjun Gao, Wenqin Yu, Wentao Zhang, X. Q. Li, Xiangyue Jin, Xianzu Wang, Xiao Bi, Xiaodong Liu, Xiaohan Wang, Xiaojin Shen, Xiaokang Chen, Xiaokang Zhang, Xiaosha Chen, Xiaotao Nie, Xiaowen Sun, Xiaoxiang Wang, Xin Cheng, Xin Liu, Xin Xie, Xingchao Liu, Xingkai Yu, Xinnan Song, Xinxia Shan, Xinyi Zhou, Xinyu Yang, Xinyuan Li, Xuecheng Su, Xuheng Lin, Y. K. Li, Y. Q. Wang, Y. X. Wei, Y. X. Zhu, Yang Zhang, Yanhong Xu, Yanhong Xu, Yanping Huang, Yao Li, Yao Zhao, Yaofeng Sun, Yaohui Li, Yaohui Wang, Yi Yu, Yi Zheng, Yichao Zhang, Yifan Shi, Yiliang Xiong, Ying He, Ying Tang, Yishi Piao, Yisong Wang, Yixuan Tan, Yiyang Ma, Yiyuan Liu, Yongqiang Guo, Yu Wu, Yuan Ou, Yuchen Zhu, Yuduan Wang, Yue Gong, Yuheng Zou, Yujia He, Yukun Zha, Yunfan Xiong, Yunxian Ma, Yuting Yan, Yuxiang Luo, Yuxiang You, Yuxuan Liu, Yuyang Zhou, Z. F. Wu, Z. Z. Ren, Zehui Ren, Zhangli Sha, Zhe Fu, Zhean Xu, Zhen Huang, Zhen Zhang, Zhenda Xie, Zhengyan Zhang, Zhewen Hao, Zhibin Gou, Zhicheng Ma, Zhigang Yan, Zhihong Shao, Zhipeng Xu, Zhiyu Wu, Zhongyu Zhang, Zhuoshu Li, Zihui Gu, Zijia Zhu, Zijun Liu, Zilin Li, Ziwei Xie, Ziyang Song, Ziyi Gao, Zizheng Pan</details></li>
+<li id="ref-kimik2">Kimi Team, Yifan Bai, Yiping Bao, Y. Charles, Cheng Chen, Guanduo Chen, Haiting Chen, Huarong Chen, Jiahao Chen, Ningxin Chen, Ruijue Chen, Yanru Chen, et al.. <em>Kimi K2: Open Agentic Intelligence</em>. arXiv:<a href="https://arxiv.org/abs/2507.20534">2507.20534</a> (2025-07-28; read as 2507.20534v2).  <span class="vtag">[R]</span><details><summary>Full author list (200)</summary>Kimi Team, Yifan Bai, Yiping Bao, Y. Charles, Cheng Chen, Guanduo Chen, Haiting Chen, Huarong Chen, Jiahao Chen, Ningxin Chen, Ruijue Chen, Yanru Chen, Yuankun Chen, Yutian Chen, Zhuofu Chen, Jialei Cui, Hao Ding, Mengnan Dong, Angang Du, Chenzhuang Du, Dikang Du, Yulun Du, Yu Fan, Yichen Feng, Kelin Fu, Bofei Gao, Chenxiao Gao, Hongcheng Gao, Peizhong Gao, Tong Gao, Yuyao Ge, Shangyi Geng, Qizheng Gu, Xinran Gu, Longyu Guan, Haiqing Guo, Jianhang Guo, Xiaoru Hao, Tianhong He, Weiran He, Wenyang He, Yunjia He, Chao Hong, Hao Hu, Yangyang Hu, Zhenxing Hu, Weixiao Huang, Zhiqi Huang, Zihao Huang, Tao Jiang, Zhejun Jiang, Xinyi Jin, Yongsheng Kang, Guokun Lai, Cheng Li, Fang Li, Haoyang Li, Ming Li, Wentao Li, Yang Li, Yanhao Li, Yiwei Li, Zhaowei Li, Zheming Li, Hongzhan Lin, Xiaohan Lin, Zongyu Lin, Chengyin Liu, Chenyu Liu, Hongzhang Liu, Jingyuan Liu, Junqi Liu, Liang Liu, Shaowei Liu, T. Y. Liu, Tianwei Liu, Weizhou Liu, Yangyang Liu, Yibo Liu, Yiping Liu, Yue Liu, Zhengying Liu, Enzhe Lu, Haoyu Lu, Lijun Lu, Yashuo Luo, Shengling Ma, Xinyu Ma, Yingwei Ma, Shaoguang Mao, Jie Mei, Xin Men, Yibo Miao, Siyuan Pan, Yebo Peng, Ruoyu Qin, Zeyu Qin, Bowen Qu, Zeyu Shang, Lidong Shi, Shengyuan Shi, Feifan Song, Jianlin Su, Zhengyuan Su, Lin Sui, Xinjie Sun, Flood Sung, Yunpeng Tai, Heyi Tang, Jiawen Tao, Qifeng Teng, Chaoran Tian, Chensi Wang, Dinglu Wang, Feng Wang, Hailong Wang, Haiming Wang, Jianzhou Wang, Jiaxing Wang, Jinhong Wang, Shengjie Wang, Shuyi Wang, Si Wang, Xinyuan Wang, Yao Wang, Yejie Wang, Yiqin Wang, Yuxin Wang, Yuzhi Wang, Zhaoji Wang, Zhengtao Wang, Zhengtao Wang, Zhexu Wang, Chu Wei, Qianqian Wei, Haoning Wu, Wenhao Wu, Xingzhe Wu, Yuxin Wu, Chenjun Xiao, Jin Xie, Xiaotong Xie, Weimin Xiong, Boyu Xu, Jinjing Xu, L. H. Xu, Lin Xu, Suting Xu, Weixin Xu, Xinran Xu, Yangchuan Xu, Ziyao Xu, Jing Xu, Jing Xu, Junjie Yan, Yuzi Yan, Hao Yang, Xiaofei Yang, Yi Yang, Ying Yang, Zhen Yang, Zhilin Yang, Zonghan Yang, Haotian Yao, Xingcheng Yao, Wenjie Ye, Zhuorui Ye, Bohong Yin, Longhui Yu, Enming Yuan, Hongbang Yuan, Mengjie Yuan, Siyu Yuan, Haobing Zhan, Dehao Zhang, Hao Zhang, Wanlu Zhang, Xiaobin Zhang, Yadong Zhang, Yangkun Zhang, Yichi Zhang, Yizhi Zhang, Yongting Zhang, Yu Zhang, Yutao Zhang, Yutong Zhang, Zheng Zhang, Haotian Zhao, Yikai Zhao, Zijia Zhao, Huabin Zheng, Shaojie Zheng, Longguang Zhong, Jianren Zhou, Xinyu Zhou, Zaida Zhou, Jinguo Zhu, Zhen Zhu, Weiyu Zhuang, Xinxing Zu</details></li>
+<li id="ref-mamba">Albert Gu, Tri Dao. <em>Mamba: Linear-Time Sequence Modeling with Selective State Spaces</em>. arXiv:<a href="https://arxiv.org/abs/2312.00752">2312.00752</a> (2023-12-01; read as 2312.00752v2).  <span class="vtag">[R]</span></li>
+<li id="ref-mamba2">Tri Dao, Albert Gu. <em>Transformers are SSMs: Generalized Models and Efficient Algorithms Through Structured State Space Duality</em>. arXiv:<a href="https://arxiv.org/abs/2405.21060">2405.21060</a> (2024-05-31; read as 2405.21060v1). ICML 2024. <span class="vtag">[R]</span></li>
+<li id="ref-jamba">Opher Lieber, Barak Lenz, Hofit Bata, Gal Cohen, Jhonathan Osin, Itay Dalmedigos, Erez Safahi, Shaked Meirom, Yonatan Belinkov, Shai Shalev-Shwartz, Omri Abend, Raz Alon, et al.. <em>Jamba: A Hybrid Transformer-Mamba Language Model</em>. arXiv:<a href="https://arxiv.org/abs/2403.19887">2403.19887</a> (2024-03-28; read as 2403.19887v2).  <span class="vtag">[R]</span><details><summary>Full author list (22)</summary>Opher Lieber, Barak Lenz, Hofit Bata, Gal Cohen, Jhonathan Osin, Itay Dalmedigos, Erez Safahi, Shaked Meirom, Yonatan Belinkov, Shai Shalev-Shwartz, Omri Abend, Raz Alon, Tomer Asida, Amir Bergman, Roman Glozman, Michael Gokhman, Avashalom Manevich, Nir Ratner, Noam Rozen, Erez Shwartz, Mor Zusman, Yoav Shoham</details></li>
+<li id="ref-jamba15">Jamba Team, Barak Lenz, Alan Arazi, Amir Bergman, Avshalom Manevich, Barak Peleg, Ben Aviram, Chen Almagor, Clara Fridman, Dan Padnos, Daniel Gissin, Daniel Jannai, et al.. <em>Jamba-1.5: Hybrid Transformer-Mamba Models at Scale</em>. arXiv:<a href="https://arxiv.org/abs/2408.12570">2408.12570</a> (2024-08-22; read as 2408.12570v1).  <span class="vtag">[R]</span><details><summary>Full author list (61)</summary>Jamba Team, Barak Lenz, Alan Arazi, Amir Bergman, Avshalom Manevich, Barak Peleg, Ben Aviram, Chen Almagor, Clara Fridman, Dan Padnos, Daniel Gissin, Daniel Jannai, Dor Muhlgay, Dor Zimberg, Edden M Gerber, Elad Dolev, Eran Krakovsky, Erez Safahi, Erez Schwartz, Gal Cohen, Gal Shachaf, Haim Rozenblum, Hofit Bata, Ido Blass, Inbal Magar, Itay Dalmedigos, Jhonathan Osin, Julie Fadlon, Maria Rozman, Matan Danos, Michael Gokhman, Mor Zusman, Naama Gidron, Nir Ratner, Noam Gat, Noam Rozen, Oded Fried, Ohad Leshno, Omer Antverg, Omri Abend, Opher Lieber, Or Dagan, Orit Cohavi, Raz Alon, Ro&#x27;i Belson, Roi Cohen, Rom Gilad, Roman Glozman, Shahar Lev, Shaked Meirom, Tal Delbari, Tal Ness, Tomer Asida, Tom Ben Gal, Tom Braude, Uriya Pumerantz, Yehoshua Cohen, Yonatan Belinkov, Yuval Globerson, Yuval Peleg Levy, Yoav Shoham</details></li>
+<li id="ref-rwkv6">Bo Peng, Daniel Goldstein, Quentin Anthony, Alon Albalak, Eric Alcaide, Stella Biderman, Eugene Cheah, Xingjian Du, Teddy Ferdinan, Haowen Hou, Przemysław Kazienko, Kranthi Kiran GV, et al.. <em>Eagle and Finch: RWKV with Matrix-Valued States and Dynamic Recurrence</em>. arXiv:<a href="https://arxiv.org/abs/2404.05892">2404.05892</a> (2024-04-08; read as 2404.05892v4). COLM 2024. <span class="vtag">[R]</span><details><summary>Full author list (30)</summary>Bo Peng, Daniel Goldstein, Quentin Anthony, Alon Albalak, Eric Alcaide, Stella Biderman, Eugene Cheah, Xingjian Du, Teddy Ferdinan, Haowen Hou, Przemysław Kazienko, Kranthi Kiran GV, Jan Kocoń, Bartłomiej Koptyra, Satyapriya Krishna, Ronald McClelland, Jiaju Lin, Niklas Muennighoff, Fares Obeid, Atsushi Saito, Guangyu Song, Haoqin Tu, Cahya Wirawan, Stanisław Woźniak, Ruichong Zhang, Bingchen Zhao, Qihang Zhao, Peng Zhou, Jian Zhu, Rui-Jie Zhu</details></li>
+<li id="ref-minimax">MiniMax, Aonian Li, Bangwei Gong, Bo Yang, Boji Shan, Chang Liu, Cheng Zhu, Chunhao Zhang, Congchao Guo, Da Chen, Dong Li, Enwei Jiao, et al.. <em>MiniMax-01: Scaling Foundation Models with Lightning Attention</em>. arXiv:<a href="https://arxiv.org/abs/2501.08313">2501.08313</a> (2025-01-14; read as 2501.08313v1).  <span class="vtag">[R]</span><details><summary>Full author list (90)</summary>MiniMax, Aonian Li, Bangwei Gong, Bo Yang, Boji Shan, Chang Liu, Cheng Zhu, Chunhao Zhang, Congchao Guo, Da Chen, Dong Li, Enwei Jiao, Gengxin Li, Guojun Zhang, Haohai Sun, Houze Dong, Jiadai Zhu, Jiaqi Zhuang, Jiayuan Song, Jin Zhu, Jingtao Han, Jingyang Li, Junbin Xie, Junhao Xu, Junjie Yan, Kaishun Zhang, Kecheng Xiao, Kexi Kang, Le Han, Leyang Wang, Lianfei Yu, Liheng Feng, Lin Zheng, Linbo Chai, Long Xing, Meizhi Ju, Mingyuan Chi, Mozhi Zhang, Peikai Huang, Pengcheng Niu, Pengfei Li, Pengyu Zhao, Qi Yang, Qidi Xu, Qiexiang Wang, Qin Wang, Qiuhui Li, Ruitao Leng, Shengmin Shi, Shuqi Yu, Sichen Li, Songquan Zhu, Tao Huang, Tianrun Liang, Weigao Sun, Weixuan Sun, Weiyu Cheng, Wenkai Li, Xiangjun Song, Xiao Su, Xiaodong Han, Xinjie Zhang, Xinzhu Hou, Xu Min, Xun Zou, Xuyang Shen, Yan Gong, Yingjie Zhu, Yipeng Zhou, Yiran Zhong, Yongyi Hu, Yuanxiang Fan, Yue Yu, Yufeng Yang, Yuhao Li, Yunan Huang, Yunji Li, Yunpeng Huang, Yunzhi Xu, Yuxin Mao, Zehan Li, Zekang Li, Zewei Tao, Zewen Ying, Zhaoyang Cong, Zhen Qin, Zhenhua Fan, Zhihang Yu, Zhuo Jiang, Zijia Wu</details></li>
+<li id="ref-recurrentgemma">Aleksandar Botev, Soham De, Samuel L Smith, Anushan Fernando, George-Cristian Muraru, Ruba Haroun, Leonard Berrada, Razvan Pascanu, Pier Giuseppe Sessa, Robert Dadashi, Léonard Hussenot, Johan Ferret, et al.. <em>RecurrentGemma: Moving Past Transformers for Efficient Open Language Models</em>. arXiv:<a href="https://arxiv.org/abs/2404.07839">2404.07839</a> (2024-04-11; read as 2404.07839v2).  <span class="vtag">[R]</span><details><summary>Full author list (62)</summary>Aleksandar Botev, Soham De, Samuel L Smith, Anushan Fernando, George-Cristian Muraru, Ruba Haroun, Leonard Berrada, Razvan Pascanu, Pier Giuseppe Sessa, Robert Dadashi, Léonard Hussenot, Johan Ferret, Sertan Girgin, Olivier Bachem, Alek Andreev, Kathleen Kenealy, Thomas Mesnard, Cassidy Hardin, Surya Bhupatiraju, Shreya Pathak, Laurent Sifre, Morgane Rivière, Mihir Sanjay Kale, Juliette Love, Pouya Tafti, Armand Joulin, Noah Fiedel, Evan Senter, Yutian Chen, Srivatsan Srinivasan, Guillaume Desjardins, David Budden, Arnaud Doucet, Sharad Vikram, Adam Paszke, Trevor Gale, Sebastian Borgeaud, Charlie Chen, Andy Brock, Antonia Paterson, Jenny Brennan, Meg Risdal, Raj Gundluru, Nesh Devanathan, Paul Mooney, Nilay Chauhan, Phil Culliton, Luiz Gustavo Martins, Elisa Bandy, David Huntsperger, Glenn Cameron, Arthur Zucker, Tris Warkentin, Ludovic Peran, Minh Giang, Zoubin Ghahramani, Clément Farabet, Koray Kavukcuoglu, Demis Hassabis, Raia Hadsell, Yee Whye Teh, Nando de Frietas</details></li>
+<li id="ref-bert">Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova. <em>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</em>. arXiv:<a href="https://arxiv.org/abs/1810.04805">1810.04805</a> (2018-10-11; read as 1810.04805v2). NAACL 2019. <span class="vtag">[R]</span></li>
+<li id="ref-t5">Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, Peter J. Liu. <em>Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer</em>. arXiv:<a href="https://arxiv.org/abs/1910.10683">1910.10683</a> (2019-10-23; read as 1910.10683v4). JMLR 2020. <span class="vtag">[R]</span></li>
+<li id="ref-vit">Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby. <em>An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale</em>. arXiv:<a href="https://arxiv.org/abs/2010.11929">2010.11929</a> (2020-10-22; read as 2010.11929v2). ICLR 2021. <span class="vtag">[R]</span></li>
+<li id="ref-clip">Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, Ilya Sutskever. <em>Learning Transferable Visual Models From Natural Language Supervision</em>. arXiv:<a href="https://arxiv.org/abs/2103.00020">2103.00020</a> (2021-02-26; read as 2103.00020v1). ICML 2021. <span class="vtag">[R]</span></li>
+<li id="ref-whisper">Alec Radford, Jong Wook Kim, Tao Xu, Greg Brockman, Christine McLeavey, Ilya Sutskever. <em>Robust Speech Recognition via Large-Scale Weak Supervision</em>. arXiv:<a href="https://arxiv.org/abs/2212.04356">2212.04356</a> (2022-12-06; read as 2212.04356v1). ICML 2023. <span class="vtag">[R]</span></li>
+<li id="ref-qknorm">Alex Henry, Prudhvi Raj Dachapally, Shubham Pawar, Yuxuan Chen. <em>Query-Key Normalization for Transformers</em>. arXiv:<a href="https://arxiv.org/abs/2010.04245">2010.04245</a> (2020-10-08; read as 2010.04245v1). Findings of EMNLP 2020. <span class="vtag">[R]</span></li>
+<li id="ref-vit22b">Mostafa Dehghani, Josip Djolonga, Basil Mustafa, Piotr Padlewski, Jonathan Heek, Justin Gilmer, Andreas Steiner, Mathilde Caron, Robert Geirhos, Ibrahim Alabdulmohsin, Rodolphe Jenatton, Lucas Beyer, et al.. <em>Scaling Vision Transformers to 22 Billion Parameters</em>. arXiv:<a href="https://arxiv.org/abs/2302.05442">2302.05442</a> (2023-02-10; read as 2302.05442v1). ICML 2023. <span class="vtag">[R]</span><details><summary>Full author list (42)</summary>Mostafa Dehghani, Josip Djolonga, Basil Mustafa, Piotr Padlewski, Jonathan Heek, Justin Gilmer, Andreas Steiner, Mathilde Caron, Robert Geirhos, Ibrahim Alabdulmohsin, Rodolphe Jenatton, Lucas Beyer, Michael Tschannen, Anurag Arnab, Xiao Wang, Carlos Riquelme, Matthias Minderer, Joan Puigcerver, Utku Evci, Manoj Kumar, Sjoerd van Steenkiste, Gamaleldin F. Elsayed, Aravindh Mahendran, Fisher Yu, Avital Oliver, Fantine Huot, Jasmijn Bastings, Mark Patrick Collier, Alexey Gritsenko, Vighnesh Birodkar, Cristina Vasconcelos, Yi Tay, Thomas Mensink, Alexander Kolesnikov, Filip Pavetić, Dustin Tran, Thomas Kipf, Mario Lučić, Xiaohua Zhai, Daniel Keysers, Jeremiah Harmsen, Neil Houlsby</details></li>
+<li id="ref-bottleneck">Zhilin Yang, Zihang Dai, Ruslan Salakhutdinov, William W. Cohen. <em>Breaking the Softmax Bottleneck: A High-Rank RNN Language Model</em>. arXiv:<a href="https://arxiv.org/abs/1711.03953">1711.03953</a> (2017-11-10; read as 1711.03953v4). ICLR 2018. <span class="vtag">[R]</span></li>
+<li id="ref-selective">Yaniv Leviathan, Matan Kalman, Yossi Matias. <em>Selective Attention Improves Transformer</em>. arXiv:<a href="https://arxiv.org/abs/2410.02703">2410.02703</a> (2024-10-03; read as 2410.02703v2). ICLR 2025. <span class="vtag">[R]</span></li>
+<li id="ref-gu">Xiangming Gu, Tianyu Pang, Chao Du, Qian Liu, Fengzhuo Zhang, Cunxiao Du, Ye Wang, Min Lin. <em>When Attention Sink Emerges in Language Models: An Empirical View</em>. arXiv:<a href="https://arxiv.org/abs/2410.10781">2410.10781</a> (2024-10-14; read as 2410.10781v2). ICLR 2025. <span class="vtag">[R]</span></li>
+<li id="ref-roundround">Federico Barbero, Alex Vitvitskyi, Christos Perivolaropoulos, Razvan Pascanu, Petar Veličković. <em>Round and Round We Go! What makes Rotary Positional Encodings useful?</em>. arXiv:<a href="https://arxiv.org/abs/2410.06205">2410.06205</a> (2024-10-08; read as 2410.06205v3). ICLR 2025. <span class="vtag">[R]</span></li>
+<li id="ref-glasses">Federico Barbero, Andrea Banino, Steven Kapturowski, Dharshan Kumaran, João G. M. Araújo, Alex Vitvitskyi, Razvan Pascanu, Petar Veličković. <em>Transformers need glasses! Information over-squashing in language tasks</em>. arXiv:<a href="https://arxiv.org/abs/2406.04267">2406.04267</a> (2024-06-06; read as 2406.04267v2). NeurIPS 2024. <span class="vtag">[R]</span></li>
+<li id="ref-griffin">Soham De, Samuel L. Smith, Anushan Fernando, Aleksandar Botev, George Cristian-Muraru, Albert Gu, Ruba Haroun, Leonard Berrada, Yutian Chen, Srivatsan Srinivasan, Guillaume Desjardins, Arnaud Doucet, et al.. <em>Griffin: Mixing Gated Linear Recurrences with Local Attention for Efficient Language Models</em>. arXiv:<a href="https://arxiv.org/abs/2402.19427">2402.19427</a> (2024-02-29; read as 2402.19427v1).  <span class="vtag">[R]</span><details><summary>Full author list (17)</summary>Soham De, Samuel L. Smith, Anushan Fernando, Aleksandar Botev, George Cristian-Muraru, Albert Gu, Ruba Haroun, Leonard Berrada, Yutian Chen, Srivatsan Srinivasan, Guillaume Desjardins, Arnaud Doucet, David Budden, Yee Whye Teh, Razvan Pascanu, Nando De Freitas, Caglar Gulcehre</details></li>
+<li id="ref-infini">Tsendsuren Munkhdalai, Manaal Faruqui, Siddharth Gopal. <em>Leave No Context Behind: Efficient Infinite Context Transformers with Infini-attention</em>. arXiv:<a href="https://arxiv.org/abs/2404.07143">2404.07143</a> (2024-04-10; read as 2404.07143v2).  <span class="vtag">[R]</span></li>
+<li id="ref-ssmax">Ken M. Nakanishi. <em>Scalable-Softmax Is Superior for Attention</em>. arXiv:<a href="https://arxiv.org/abs/2501.19399">2501.19399</a> (2025-01-31; read as 2501.19399v1).  <span class="vtag">[R]</span></li>
+<li id="ref-sigmoidattn">Jason Ramapuram, Federico Danieli, Eeshan Dhekane, Floris Weers, Dan Busbridge, Pierre Ablin, Tatiana Likhomanenko, Jagrit Digani, Zijin Gu, Amitis Shidani, Russ Webb. <em>Theory, Analysis, and Best Practices for Sigmoid Self-Attention</em>. arXiv:<a href="https://arxiv.org/abs/2409.04431">2409.04431</a> (2024-09-06; read as 2409.04431v2). ICLR 2025. <span class="vtag">[R]</span></li>
+<li id="ref-yarn">Bowen Peng, Jeffrey Quesnelle, Honglu Fan, Enrico Shippole. <em>YaRN: Efficient Context Window Extension of Large Language Models</em>. arXiv:<a href="https://arxiv.org/abs/2309.00071">2309.00071</a> (2023-08-31; read as 2309.00071v3). ICLR 2024. <span class="vtag">[R]</span></li>
+<li id="ref-streamingllm">Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han, Mike Lewis. <em>Efficient Streaming Language Models with Attention Sinks</em>. arXiv:<a href="https://arxiv.org/abs/2309.17453">2309.17453</a> (2023-09-29; read as 2309.17453v4). ICLR 2024. <span class="vtag">[R]</span></li>
+<li id="ref-flashattn">Dao-AILab. <em>flash-attention, flash_attn/cute/interface.py and softmax.py (learnable_sink, rescale_threshold)</em>. <a href="https://github.com/Dao-AILab/flash-attention/tree/1dc8232fe209e2c48b1d3e677f26d68e4b856212">https://github.com/Dao-AILab/flash-attention/tree/1dc8232fe209e2c48b1d3e677f26d68e4b856212</a>. <span class="vtag">[C]</span></li>
+<li id="ref-gatedattn">Zihan Qiu, Zekun Wang, Bo Zheng, Zeyu Huang, Kaiyue Wen, Songlin Yang, Rui Men, Le Yu, Fei Huang, Suozhi Huang, Dayiheng Liu, Jingren Zhou, et al.. <em>Gated Attention for Large Language Models: Non-linearity, Sparsity, and Attention-Sink-Free</em>. arXiv:<a href="https://arxiv.org/abs/2505.06708">2505.06708</a> (2025-05-10; read as 2505.06708v1).  <span class="vtag">[R]</span><details><summary>Full author list (13)</summary>Zihan Qiu, Zekun Wang, Bo Zheng, Zeyu Huang, Kaiyue Wen, Songlin Yang, Rui Men, Le Yu, Fei Huang, Suozhi Huang, Dayiheng Liu, Jingren Zhou, Junyang Lin</details></li>
+<li id="ref-softpick">Zayd M. K. Zuhri, Erland Hilman Fuadi, Alham Fikri Aji. <em>Softpick: No Attention Sink, No Massive Activations with Rectified Softmax</em>. arXiv:<a href="https://arxiv.org/abs/2504.20966">2504.20966</a> (2025-04-29; read as 2504.20966v4). arXiv v4. <span class="vtag">[R]</span></li>
+<li id="ref-kvsink">Zunhai Su, Kehong Yuan. <em>KVSink: Understanding and Enhancing the Preservation of Attention Sinks in KV Cache Quantization for LLMs</em>. arXiv:<a href="https://arxiv.org/abs/2508.04257">2508.04257</a> (2025-08-06; read as 2508.04257v1). COLM 2025. <span class="vtag">[R]</span></li>
+<li id="ref-palm">Aakanksha Chowdhery, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, Hyung Won Chung, Charles Sutton, Sebastian Gehrmann, Parker Schuh, Kensen Shi, et al.. <em>PaLM: Scaling Language Modeling with Pathways</em>. arXiv:<a href="https://arxiv.org/abs/2204.02311">2204.02311</a> (2022-04-05; read as 2204.02311v5). JMLR 2023. <span class="vtag">[R]</span><details><summary>Full author list (67)</summary>Aakanksha Chowdhery, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, Hyung Won Chung, Charles Sutton, Sebastian Gehrmann, Parker Schuh, Kensen Shi, Sasha Tsvyashchenko, Joshua Maynez, Abhishek Rao, Parker Barnes, Yi Tay, Noam Shazeer, Vinodkumar Prabhakaran, Emily Reif, Nan Du, Ben Hutchinson, Reiner Pope, James Bradbury, Jacob Austin, Michael Isard, Guy Gur-Ari, Pengcheng Yin, Toju Duke, Anselm Levskaya, Sanjay Ghemawat, Sunipa Dev, Henryk Michalewski, Xavier Garcia, Vedant Misra, Kevin Robinson, Liam Fedus, Denny Zhou, Daphne Ippolito, David Luan, Hyeontaek Lim, Barret Zoph, Alexander Spiridonov, Ryan Sepassi, David Dohan, Shivani Agrawal, Mark Omernick, Andrew M. Dai, Thanumalayan Sankaranarayana Pillai, Marie Pellat, Aitor Lewkowycz, Erica Moreira, Rewon Child, Oleksandr Polozov, Katherine Lee, Zongwei Zhou, Xuezhi Wang, Brennan Saeta, Mark Diaz, Orhan Firat, Michele Catasta, Jason Wei, Kathy Meier-Hellstern, Douglas Eck, Jeff Dean, Slav Petrov, Noah Fiedel</details></li>
+<li id="ref-fa4">Ted Zadouri, Markus Hoehnerbach, Jay Shah, Timmy Liu, Vijay Thakkar, Tri Dao. <em>FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling</em>. arXiv:<a href="https://arxiv.org/abs/2603.05451">2603.05451</a> (2026-03-05; read as 2603.05451v1).  <span class="vtag">[R]</span></li>
+<li id="ref-softpickckpt">Zayd M. K. Zuhri. <em>zaydzuhri/vanilla-340M-4096-model and zaydzuhri/softpick-340M-4096-model (config.json and fla/ code read; weights not downloaded)</em>. <a href="https://huggingface.co/zaydzuhri/softpick-340M-4096-model">https://huggingface.co/zaydzuhri/softpick-340M-4096-model</a>. <span class="vtag">[C]</span></li>
+<li id="ref-vllm">vLLM project. <em>vllm, vllm/v1/sample/sampler.py</em>. <a href="https://github.com/vllm-project/vllm/tree/1fc9d008ebe840dca5c38bcc8769188e2a995478">https://github.com/vllm-project/vllm/tree/1fc9d008ebe840dca5c38bcc8769188e2a995478</a>. <span class="vtag">[C]</span></li>
+<li id="ref-sglang">SGLang project. <em>sglang, python/sglang/srt/layers/logits_processor.py and sampler.py</em>. <a href="https://github.com/sgl-project/sglang/tree/36273b916d508902dea2572a47c40297e6405821">https://github.com/sgl-project/sglang/tree/36273b916d508902dea2572a47c40297e6405821</a>. <span class="vtag">[C]</span></li></ol>
+<h2>Appendix A — Reproduction</h2>
+<pre><code class="language-bash">python3 -m venv venv &amp;&amp; . venv/bin/activate
+</code></pre>
+<pre><code class="language-bash">pip install -r requirements.txt
+</code></pre>
+<pre><code class="language-bash">cd code &amp;&amp; for e in e1_dispersion e2_temperature e3_random_logits e4_precision e5_cost_model census; do python $e.py | tee ../data/${e}_stdout.txt; done
+</code></pre>
+<pre><code class="language-bash">python e6_e7_probes.py --smoke
+</code></pre>
+<pre><code class="language-bash">python e6_e7_probes.py --text-file corpus.txt --max-n 8192
+</code></pre>
+<pre><code class="language-bash">python build_html.py
+</code></pre>
+<p>Every figure's raw data and stdout are published with this page under <code>data/</code> (for example <a href="data/e4_collapse.json">data/e4_collapse.json</a> and <a href="data/e4_precision_stdout.txt">data/e4_precision_stdout.txt</a>); <a href="requirements.txt">requirements.txt</a> lists the environment. The real-model run of <code>e6_e7_probes.py</code> needs the HF weight CDN to be reachable. <code>build_html.py</code> renders <code>report.md</code> and <code>blog.md</code> into <code>site/report.html</code> and <code>site/blog.html</code>, using <code>markdown</code> and <code>latex2mathml</code>, with references built from <code>sources/references.json</code> and <code>sources/arxiv_meta.json</code>.</p>
+<p><strong>Environment.</strong> Python 3.13.18; numpy 2.5.4; matplotlib 3.11.2; torch 2.15.0+cu132 (run on CPU); transformers 5.22.1; mpmath 1.3.0; 4 CPU cores. Pinned code revisions read: transformers <code>3568df44</code>, flash-attention <code>1dc8232f</code>, sglang <code>36273b91</code>, vllm <code>1fc9d008</code>, llama-models <code>0e0b8c51</code>.</p>
+<h2>Appendix B — Code listing</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="code/style.py">code/style.py</a></td>
+<td>shared plotting style and output paths</td>
+</tr>
+<tr>
+<td><a href="code/e1_dispersion.py">code/e1_dispersion.py</a></td>
+<td>E1 closed form vs float64 softmax</td>
+</tr>
+<tr>
+<td><a href="code/e2_temperature.py">code/e2_temperature.py</a></td>
+<td>E2 required Δ/T, family multipliers</td>
+</tr>
+<tr>
+<td><a href="code/e3_random_logits.py">code/e3_random_logits.py</a></td>
+<td>E3 Gaussian logits, paper's adaptive θ</td>
+</tr>
+<tr>
+<td><a href="code/e4_precision.py">code/e4_precision.py</a></td>
+<td>E4a/b/c collapse, cancellation, forward log-probs; Barron et al. fixes translated</td>
+</tr>
+<tr>
+<td><a href="code/e5_cost_model.py">code/e5_cost_model.py</a></td>
+<td>E5 analytic cost model for four configs</td>
+</tr>
+<tr>
+<td><a href="code/census.py">code/census.py</a></td>
+<td>Part B census data, table, heatmap, timeline</td>
+</tr>
+<tr>
+<td><a href="code/e6_e7_probes.py">code/e6_e7_probes.py</a></td>
+<td>E6/E7 real-model probes (not run; <code>--smoke</code> code check)</td>
+</tr>
+<tr>
+<td><a href="code/build_html.py">code/build_html.py</a></td>
+<td>renders report and blog to HTML with MathML and references</td>
+</tr>
+<tr>
+<td><code>sources/configs/*.json</code></td>
+<td>the 44 config.json files read</td>
+</tr>
+<tr>
+<td><code>sources/arxiv_meta.json</code></td>
+<td>arXiv API metadata (authors, dates) for every arXiv reference</td>
+</tr>
+</tbody>
+</table></div>
+</main>

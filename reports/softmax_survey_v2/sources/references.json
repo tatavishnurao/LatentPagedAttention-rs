@@ -1,0 +1,357 @@
+{
+ "arxiv": {
+  "velickovic": [
+   "2410.01104",
+   "ICML 2025 (PMLR 267). Read end to end."
+  ],
+  "barbero": [
+   "2504.02732",
+   "COLM 2025. Read end to end."
+  ],
+  "barron": [
+   "2610.31642",
+   "arXiv v3, 29 Oct 2026. Read end to end."
+  ],
+  "prieto": [
+   "2501.04697",
+   "ICLR 2025. Read end to end."
+  ],
+  "gptoss": [
+   "2508.10925",
+   "Model card."
+  ],
+  "ssmax": [
+   "2501.19399",
+   ""
+  ],
+  "yarn": [
+   "2309.00071",
+   "ICLR 2024."
+  ],
+  "gu": [
+   "2410.10781",
+   "ICLR 2025."
+  ],
+  "kvsink": [
+   "2508.04257",
+   "COLM 2025."
+  ],
+  "fa4": [
+   "2603.05451",
+   ""
+  ],
+  "streamingllm": [
+   "2309.17453",
+   "ICLR 2024."
+  ],
+  "gatedattn": [
+   "2505.06708",
+   ""
+  ],
+  "softpick": [
+   "2504.20966",
+   "arXiv v4."
+  ],
+  "sigmoidattn": [
+   "2409.04431",
+   "ICLR 2025."
+  ],
+  "selective": [
+   "2410.02703",
+   "ICLR 2025."
+  ],
+  "roundround": [
+   "2410.06205",
+   "ICLR 2025."
+  ],
+  "glasses": [
+   "2406.04267",
+   "NeurIPS 2024."
+  ],
+  "infini": [
+   "2404.07143",
+   ""
+  ],
+  "griffin": [
+   "2402.19427",
+   ""
+  ],
+  "recurrentgemma": [
+   "2404.07839",
+   ""
+  ],
+  "gemma1": [
+   "2403.08295",
+   ""
+  ],
+  "gemma2": [
+   "2408.00118",
+   ""
+  ],
+  "gemma3": [
+   "2503.19786",
+   ""
+  ],
+  "bottleneck": [
+   "1711.03953",
+   "ICLR 2018."
+  ],
+  "qknorm": [
+   "2010.04245",
+   "Findings of EMNLP 2020."
+  ],
+  "vit22b": [
+   "2302.05442",
+   "ICML 2023."
+  ],
+  "palm": [
+   "2204.02311",
+   "JMLR 2023."
+  ],
+  "fa1": [
+   "2205.14135",
+   "NeurIPS 2022."
+  ],
+  "gpt3": [
+   "2005.14165",
+   "NeurIPS 2020."
+  ],
+  "llama1": [
+   "2302.13971",
+   ""
+  ],
+  "llama2": [
+   "2307.09288",
+   ""
+  ],
+  "llama3": [
+   "2407.21783",
+   ""
+  ],
+  "mistral": [
+   "2310.06825",
+   ""
+  ],
+  "mixtral": [
+   "2401.04088",
+   ""
+  ],
+  "qwen2": [
+   "2407.10671",
+   ""
+  ],
+  "qwen3": [
+   "2505.09388",
+   ""
+  ],
+  "phi3": [
+   "2404.14219",
+   ""
+  ],
+  "olmo2": [
+   "2501.00656",
+   ""
+  ],
+  "falcon": [
+   "2311.16867",
+   ""
+  ],
+  "glm45": [
+   "2508.06471",
+   ""
+  ],
+  "dsv2": [
+   "2405.04434",
+   ""
+  ],
+  "dsv3": [
+   "2412.19437",
+   ""
+  ],
+  "kimik2": [
+   "2507.20534",
+   ""
+  ],
+  "mamba": [
+   "2312.00752",
+   ""
+  ],
+  "mamba2": [
+   "2405.21060",
+   "ICML 2024."
+  ],
+  "jamba": [
+   "2403.19887",
+   ""
+  ],
+  "jamba15": [
+   "2408.12570",
+   ""
+  ],
+  "rwkv6": [
+   "2404.05892",
+   "COLM 2024."
+  ],
+  "minimax": [
+   "2501.08313",
+   ""
+  ],
+  "bert": [
+   "1810.04805",
+   "NAACL 2019."
+  ],
+  "t5": [
+   "1910.10683",
+   "JMLR 2020."
+  ],
+  "vit": [
+   "2010.11929",
+   "ICLR 2021."
+  ],
+  "clip": [
+   "2103.00020",
+   "ICML 2021."
+  ],
+  "siglip": [
+   "2303.15343",
+   "ICCV 2023."
+  ],
+  "whisper": [
+   "2212.04356",
+   "ICML 2023."
+  ]
+ },
+ "manual": {
+  "hfconfigs": {
+   "authors": [
+    "Hugging Face Hub model repositories (various owners)"
+   ],
+   "title": "Official config.json files for the 44 repositories listed in sources/configs/ (read 2026-11-03)",
+   "url": "https://huggingface.co",
+   "tag": "C"
+  },
+  "hftransformers": {
+   "authors": [
+    "Hugging Face"
+   ],
+   "title": "transformers, modelling code for gemma2, gemma3, qwen3, qwen3_moe, qwen3_next, gpt_oss, llama4, deepseek_v3, mixtral, olmo2, glm4_moe, cohere, cohere2, minimax, jamba, recurrent_gemma, mamba2, phi3; modeling_rope_utils.py",
+   "url": "https://github.com/huggingface/transformers/tree/3568df44fff52979f1f9cecc7f729713e940d277",
+   "tag": "C"
+  },
+  "llamamodels": {
+   "authors": [
+    "Meta"
+   ],
+   "title": "llama-models: models/llama4/model.py, moe.py, args.py and MODEL_CARD.md",
+   "url": "https://github.com/meta-llama/llama-models/tree/0e0b8c519242d5833d8c11bffc1232b77ad7f301",
+   "tag": "C"
+  },
+  "flashattn": {
+   "authors": [
+    "Dao-AILab"
+   ],
+   "title": "flash-attention, flash_attn/cute/interface.py and softmax.py (learnable_sink, rescale_threshold)",
+   "url": "https://github.com/Dao-AILab/flash-attention/tree/1dc8232fe209e2c48b1d3e677f26d68e4b856212",
+   "tag": "C"
+  },
+  "sglang": {
+   "authors": [
+    "SGLang project"
+   ],
+   "title": "sglang, python/sglang/srt/layers/logits_processor.py and sampler.py",
+   "url": "https://github.com/sgl-project/sglang/tree/36273b916d508902dea2572a47c40297e6405821",
+   "tag": "C"
+  },
+  "vllm": {
+   "authors": [
+    "vLLM project"
+   ],
+   "title": "vllm, vllm/v1/sample/sampler.py",
+   "url": "https://github.com/vllm-project/vllm/tree/1fc9d008ebe840dca5c38bcc8769188e2a995478",
+   "tag": "C"
+  },
+  "cards": {
+   "authors": [
+    "Qwen",
+    "Cohere Labs",
+    "AI21 Labs"
+   ],
+   "title": "Model cards: Qwen/Qwen3-8B, CohereLabs/c4ai-command-r-v01, ai21labs/AI21-Jamba-1.5-Mini (README.md)",
+   "url": "https://huggingface.co/Qwen/Qwen3-8B",
+   "tag": "C"
+  },
+  "softpickckpt": {
+   "authors": [
+    "Zayd M. K. Zuhri"
+   ],
+   "title": "zaydzuhri/vanilla-340M-4096-model and zaydzuhri/softpick-340M-4096-model (config.json and fla/ code read; weights not downloaded)",
+   "url": "https://huggingface.co/zaydzuhri/softpick-340M-4096-model",
+   "tag": "C"
+  }
+ },
+ "order": [
+  "velickovic",
+  "barbero",
+  "barron",
+  "prieto",
+  "gptoss",
+  "ssmax",
+  "yarn",
+  "gu",
+  "kvsink",
+  "fa4",
+  "streamingllm",
+  "gatedattn",
+  "softpick",
+  "sigmoidattn",
+  "selective",
+  "roundround",
+  "glasses",
+  "infini",
+  "griffin",
+  "recurrentgemma",
+  "gemma1",
+  "gemma2",
+  "gemma3",
+  "bottleneck",
+  "qknorm",
+  "vit22b",
+  "palm",
+  "fa1",
+  "gpt3",
+  "llama1",
+  "llama2",
+  "llama3",
+  "mistral",
+  "mixtral",
+  "qwen2",
+  "qwen3",
+  "phi3",
+  "olmo2",
+  "falcon",
+  "glm45",
+  "dsv2",
+  "dsv3",
+  "kimik2",
+  "mamba",
+  "mamba2",
+  "jamba",
+  "jamba15",
+  "rwkv6",
+  "minimax",
+  "bert",
+  "t5",
+  "vit",
+  "clip",
+  "siglip",
+  "whisper",
+  "hfconfigs",
+  "hftransformers",
+  "llamamodels",
+  "flashattn",
+  "sglang",
+  "vllm",
+  "cards",
+  "softpickckpt"
+ ]
+}

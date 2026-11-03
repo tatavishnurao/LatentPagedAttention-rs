@@ -1,0 +1,34 @@
+{
+ "C113|float32": {
+  "first_exact_zero_gap": 20.67,
+  "paper_margin": 15.951501128704908
+ },
+ "C113|bfloat16": {
+  "first_exact_zero_gap": 10.29,
+  "paper_margin": 5.571501128704905
+ },
+ "C113|float16": {
+  "first_exact_zero_gap": 12.34,
+  "paper_margin": 7.621501128704906
+ },
+ "C113|float32-log(softmax)": {
+  "first_exact_zero_gap": 20.67,
+  "paper_margin": 15.951501128704908
+ },
+ "C151936|float32": {
+  "first_exact_zero_gap": 27.88,
+  "paper_margin": 15.948791923210992
+ },
+ "C151936|bfloat16": {
+  "first_exact_zero_gap": 17.44,
+  "paper_margin": 5.508791923210994
+ },
+ "C151936|float16": {
+  "first_exact_zero_gap": 19.53,
+  "paper_margin": 7.598791923210994
+ },
+ "C151936|float32-log(softmax)": {
+  "first_exact_zero_gap": 27.88,
+  "paper_margin": 15.948791923210992
+ }
+}

@@ -1,0 +1,11 @@
+# CPU-only PyTorch (recommended). Install it first, from the PyTorch CPU index:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
+# In the environment that produced this report that index was unreachable, so the PyPI wheel
+# torch==2.15.0 (+cu132 build) was installed and run on CPU instead; results are CPU results either way.
+torch==2.15.0
+numpy==2.5.4
+matplotlib==3.11.2
+mpmath==1.3.0            # E4b 50-digit reference
+transformers==5.22.1     # E6/E7 probes (code/e6_e7_probes.py)
+markdown                 # code/build_html.py
+latex2mathml             # code/build_html.py

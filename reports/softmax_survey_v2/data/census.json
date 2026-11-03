@@ -1,0 +1,1308 @@
+{
+ "sources": {
+  "cfg": "official config.json on the Hugging Face Hub (read in this session; sources/configs/)",
+  "code": "Hugging Face transformers reference code @3568df44 (or the vendor's own reference code where named)",
+  "paper": "technical report / paper full text (arXiv id in the row)",
+  "card": "model card README on the Hub"
+ },
+ "sites": [
+  "self-attention",
+  "cross-attention",
+  "vocabulary head",
+  "MoE router",
+  "contrastive loss"
+ ],
+ "mods": [
+  "QK-norm",
+  "logit soft-capping",
+  "length/temperature logit scaling",
+  "learned sink logit",
+  "attention output gate",
+  "local / sliding-window layers",
+  "linear-attention or SSM layers",
+  "sigmoid MoE router",
+  "sigmoid (non-softmax) loss",
+  "z-loss",
+  "vocab logit multiplier"
+ ],
+ "rows": [
+  {
+   "family": "GPT-2",
+   "group": "dense",
+   "date": "2019",
+   "attention": "MHA",
+   "context": 1024,
+   "vocab": 50257,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:openai-community/gpt2"
+   ],
+   "notes": "release year as cited in arXiv 2005.14165"
+  },
+  {
+   "family": "GPT-3",
+   "group": "dense",
+   "date": "2020-05",
+   "attention": "MHA; alternating dense / locally banded sparse",
+   "context": 2048,
+   "vocab": null,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "paper:2005.14165"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Llama 1",
+   "group": "dense",
+   "date": "2023-02",
+   "attention": "MHA",
+   "context": 2048,
+   "vocab": null,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "paper:2302.13971",
+    "paper:2307.09288 (Table 1)"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Llama 2",
+   "group": "dense",
+   "date": "2023-07",
+   "attention": "MHA (7B,13B); GQA (34B,70B)",
+   "context": 4096,
+   "vocab": 32000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "paper:2307.09288"
+   ],
+   "notes": "official config gated (403) in this session"
+  },
+  {
+   "family": "Llama 3.1",
+   "group": "dense",
+   "date": "2024-07",
+   "attention": "GQA (8 KV heads)",
+   "context": 131072,
+   "vocab": 128256,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:meta-llama/Llama-3.1-8B",
+    "paper:2407.21783"
+   ],
+   "notes": "rope_type llama3, factor 8: frequency change, no logit multiplier"
+  },
+  {
+   "family": "Mistral 7B",
+   "group": "dense",
+   "date": "2023-10",
+   "attention": "GQA (8 KV) + sliding window 4096",
+   "context": 32768,
+   "vocab": 32000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:mistralai/Mistral-7B-v0.1",
+    "paper:2310.06825"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Qwen2 / Qwen2.5",
+   "group": "dense",
+   "date": "2024-07",
+   "attention": "GQA; QKV bias",
+   "context": 131072,
+   "vocab": 152064,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:Qwen/Qwen2-7B",
+    "cfg:Qwen/Qwen2.5-7B",
+    "paper:2407.10671"
+   ],
+   "notes": "YaRN + Dual Chunk Attention for long context (report); YaRN not in the shipped config"
+  },
+  {
+   "family": "Qwen3 (dense)",
+   "group": "dense",
+   "date": "2025-05",
+   "attention": "GQA; QK-norm; no QKV bias",
+   "context": 40960,
+   "vocab": 151936,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:Qwen/Qwen3-8B",
+    "code:modeling_qwen3",
+    "paper:2505.09388",
+    "card:Qwen/Qwen3-8B"
+   ],
+   "notes": "32,768 native; 131,072 with static YaRN factor 4 (card, opt-in)"
+  },
+  {
+   "family": "Gemma 1",
+   "group": "dense",
+   "date": "2024-03",
+   "attention": "MHA (7B); MQA (2B)",
+   "context": 8192,
+   "vocab": 256000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/gemma-7b",
+    "paper:2403.08295"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Gemma 2",
+   "group": "dense",
+   "date": "2024-07",
+   "attention": "GQA; local 4096 / global alternating",
+   "context": 8192,
+   "vocab": 256000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 1,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/gemma-2-9b",
+    "code:modeling_gemma2",
+    "paper:2408.00118"
+   ],
+   "notes": "soft-cap 50 (attention), 30 (final logits)"
+  },
+  {
+   "family": "Gemma 3",
+   "group": "dense",
+   "date": "2025-03",
+   "attention": "GQA; 5 local (1024) : 1 global; QK-norm",
+   "context": 131072,
+   "vocab": 262144,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/gemma-3-1b-it",
+    "cfg:google/gemma-3-27b-it",
+    "code:modeling_gemma3",
+    "paper:2503.19786"
+   ],
+   "notes": "soft-capping replaced by QK-norm (report); 1B config has soft-capping null; 1B context 32K"
+  },
+  {
+   "family": "Phi-3-mini / Phi-4",
+   "group": "dense",
+   "date": "2024-04",
+   "attention": "MHA (Phi-3-mini); GQA 40/10 (Phi-4)",
+   "context": 16384,
+   "vocab": 100352,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": null,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:microsoft/Phi-3-mini-4k-instruct",
+    "cfg:microsoft/phi-4",
+    "paper:2404.14219"
+   ],
+   "notes": "Phi-3-mini config lists sliding_window 2047; whether it is active at 4K context not checked. Context/vocab shown: Phi-4"
+  },
+  {
+   "family": "OLMo 2",
+   "group": "dense",
+   "date": "2024-12",
+   "attention": "MHA; QK-norm",
+   "context": 4096,
+   "vocab": 100352,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": 1,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:allenai/OLMo-2-1124-7B",
+    "code:modeling_olmo2",
+    "paper:2501.00656"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Falcon",
+   "group": "dense",
+   "date": "2023-11",
+   "attention": "MQA (7B); multigroup (40B,180B)",
+   "context": 2048,
+   "vocab": 65024,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:tiiuae/falcon-7b",
+    "paper:2311.16867"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Command R",
+   "group": "dense",
+   "date": "2024-03",
+   "attention": "not verified (config gated)",
+   "context": 131072,
+   "vocab": null,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": null,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 1
+   },
+   "sources": [
+    "card:CohereLabs/c4ai-command-r-v01",
+    "code:modeling_cohere"
+   ],
+   "notes": "HF code multiplies vocab logits by logit_scale (default 0.0625); released value not read (gated)"
+  },
+  {
+   "family": "GLM-4.5",
+   "group": "MoE",
+   "date": "2025-08",
+   "attention": "GQA 96 q / 8 KV; partial RoPE; QK-norm",
+   "context": 131072,
+   "vocab": 151552,
+   "experts": "160 (+1 shared), top-8",
+   "router": "sigmoid + loss-free balance bias",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 1,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:zai-org/GLM-4.5",
+    "code:modeling_glm4_moe",
+    "paper:2508.06471"
+   ],
+   "notes": "router: sigmoid scores, no softmax (code)"
+  },
+  {
+   "family": "gpt-oss",
+   "group": "MoE",
+   "date": "2025-08",
+   "attention": "GQA 64 q / 8 KV; alternating banded window 128 / dense",
+   "context": 131072,
+   "vocab": 201088,
+   "experts": "128 (120b) / 32 (20b), top-4",
+   "router": "softmax over the selected top-4",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 1,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:openai/gpt-oss-20b",
+    "cfg:openai/gpt-oss-120b",
+    "code:modeling_gpt_oss",
+    "paper:2508.10925"
+   ],
+   "notes": "YaRN factor 32 in config (logits x1.813); per-head learned bias in the softmax denominator"
+  },
+  {
+   "family": "Mixtral 8x7B",
+   "group": "MoE",
+   "date": "2024-01",
+   "attention": "GQA (8 KV)",
+   "context": 32768,
+   "vocab": 32000,
+   "experts": "8, top-2",
+   "router": "softmax over top-2 logits",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:mistralai/Mixtral-8x7B-v0.1",
+    "code:modeling_mixtral",
+    "paper:2401.04088"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "DeepSeek-V2",
+   "group": "MoE",
+   "date": "2024-05",
+   "attention": "MLA (kv_lora 512)",
+   "context": 163840,
+   "vocab": 102400,
+   "experts": "160 (+2 shared), top-6",
+   "router": "softmax (scoring_func), group-limited greedy",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:deepseek-ai/DeepSeek-V2",
+    "paper:2405.04434"
+   ],
+   "notes": "YaRN factor 40, mscale_all_dim 0.707: softmax scale x1.590 (DeepSeek code path)"
+  },
+  {
+   "family": "DeepSeek-V3",
+   "group": "MoE",
+   "date": "2024-12",
+   "attention": "MLA (kv_lora 512)",
+   "context": 163840,
+   "vocab": 129280,
+   "experts": "256 (+1 shared), top-8",
+   "router": "sigmoid + bias (noaux_tc), normalised over selected",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 0,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 1,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:deepseek-ai/DeepSeek-V3",
+    "code:modeling_deepseek_v3",
+    "paper:2412.19437"
+   ],
+   "notes": "YaRN factor 40, mscale_all_dim 1: softmax scale x1.874"
+  },
+  {
+   "family": "Qwen3 MoE",
+   "group": "MoE",
+   "date": "2025-05",
+   "attention": "GQA (4 KV); QK-norm",
+   "context": 40960,
+   "vocab": 151936,
+   "experts": "128, top-8, no shared",
+   "router": "softmax, renormalised top-k",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:Qwen/Qwen3-30B-A3B",
+    "code:modeling_qwen3_moe",
+    "paper:2505.09388"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Llama 4 (Scout/Maverick)",
+   "group": "MoE",
+   "date": "2025-04",
+   "attention": "chunked local (8192) RoPE layers + global NoPE layers every 4th",
+   "context": "10M (Scout) / 1M (Maverick)",
+   "vocab": 202048,
+   "experts": "16 / 128 (+1 shared), top-1",
+   "router": "sigmoid of top-1 score",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 0,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 1,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "code:llama-models/models/llama4 @0e0b8c5",
+    "code:modeling_llama4",
+    "card:llama-models MODEL_CARD"
+   ],
+   "notes": "config gated (403): QK-norm, temperature tuning and vocab are HF config defaults, not the released config"
+  },
+  {
+   "family": "Kimi K2",
+   "group": "MoE",
+   "date": "2025-07",
+   "attention": "MLA, 64 heads",
+   "context": 131072,
+   "vocab": 163840,
+   "experts": "384 (+1 shared), top-8",
+   "router": "sigmoid + bias (noaux_tc)",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 0,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 1,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 1,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:moonshotai/Kimi-K2-Instruct",
+    "paper:2507.20534"
+   ],
+   "notes": "YaRN factor 32 (config); QK-Clip rescales W_q/W_k during training (not a forward-pass change)"
+  },
+  {
+   "family": "Mamba",
+   "group": "hybrid",
+   "date": "2023-12",
+   "attention": "none (selective SSM)",
+   "context": null,
+   "vocab": 50280,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 0,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:state-spaces/mamba-2.8b-hf",
+    "paper:2312.00752"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Mamba-2",
+   "group": "hybrid",
+   "date": "2024-05",
+   "attention": "none (SSD)",
+   "context": null,
+   "vocab": 50277,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 0,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:state-spaces/mamba2-2.7b",
+    "paper:2405.21060"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "RWKV-6 (Finch)",
+   "group": "hybrid",
+   "date": "2024-04",
+   "attention": "none (matrix-valued recurrence)",
+   "context": null,
+   "vocab": 65536,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 0,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:RWKV/v6-Finch-1B6-HF",
+    "paper:2404.05892"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "Jamba / Jamba-1.5",
+   "group": "hybrid",
+   "date": "2024-03",
+   "attention": "1 attention : 7 Mamba layers; no positional encoding",
+   "context": 262144,
+   "vocab": 65536,
+   "experts": "16, top-2, every 2nd layer",
+   "router": "softmax",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "paper:2403.19887",
+    "paper:2408.12570",
+    "card:ai21labs/AI21-Jamba-1.5-Mini",
+    "code:configuration_jamba/modeling_jamba"
+   ],
+   "notes": "config gated (403); layer ratios from paper and HF config defaults"
+  },
+  {
+   "family": "MiniMax-Text-01",
+   "group": "hybrid",
+   "date": "2025-01",
+   "attention": "7 lightning (linear) : 1 softmax attention, GQA 8 KV",
+   "context": "1M train / 4M inference",
+   "vocab": 200064,
+   "experts": "32, top-2",
+   "router": "softmax",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 1,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:MiniMaxAI/MiniMax-Text-01",
+    "code:modeling_minimax",
+    "paper:2501.08313"
+   ],
+   "notes": "sigmoid output gate is in the lightning-attention block (HF code)"
+  },
+  {
+   "family": "Qwen3-Next",
+   "group": "hybrid",
+   "date": "2025-09",
+   "attention": "3 Gated DeltaNet : 1 gated softmax attention; QK-norm",
+   "context": 262144,
+   "vocab": 151936,
+   "experts": "512 (+1 shared), top-10",
+   "router": "softmax, renormalised top-k",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": 1,
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 1,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 1,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:Qwen/Qwen3-Next-80B-A3B-Instruct",
+    "code:modeling_qwen3_next",
+    "paper:2505.06708 (gating method)"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "RecurrentGemma (Griffin)",
+   "group": "hybrid",
+   "date": "2024-04",
+   "attention": "2 RG-LRU : 1 local MQA attention (window 2048)",
+   "context": null,
+   "vocab": 256000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 1,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 1,
+    "linear-attention or SSM layers": 1,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/recurrentgemma-2b",
+    "paper:2404.07839",
+    "paper:2402.19427"
+   ],
+   "notes": "final-logit soft-cap 30 (config)"
+  },
+  {
+   "family": "BERT",
+   "group": "encoder/multimodal",
+   "date": "2018-10",
+   "attention": "bidirectional MHA",
+   "context": 512,
+   "vocab": 30522,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google-bert/bert-base-uncased",
+    "paper:1810.04805"
+   ],
+   "notes": "vocabulary softmax = MLM head (training)"
+  },
+  {
+   "family": "T5",
+   "group": "encoder/multimodal",
+   "date": "2019-10",
+   "attention": "encoder-decoder MHA; relative position bias",
+   "context": 512,
+   "vocab": 32128,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": 1,
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google-t5/t5-base",
+    "paper:1910.10683"
+   ],
+   "notes": ""
+  },
+  {
+   "family": "ViT",
+   "group": "encoder/multimodal",
+   "date": "2020-10",
+   "attention": "bidirectional MHA over patches",
+   "context": "197 tokens (224px/16)",
+   "vocab": "-",
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": "na",
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/vit-base-patch16-224",
+    "paper:2010.11929"
+   ],
+   "notes": "class-label softmax head instead of a vocabulary"
+  },
+  {
+   "family": "CLIP",
+   "group": "encoder/multimodal",
+   "date": "2021-02",
+   "attention": "ViT image encoder + causal text encoder",
+   "context": 77,
+   "vocab": 49408,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": "na",
+    "MoE router": "na",
+    "contrastive loss": 1
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:openai/clip-vit-base-patch32",
+    "paper:2103.00020"
+   ],
+   "notes": "symmetric softmax contrastive loss, learned temperature"
+  },
+  {
+   "family": "SigLIP",
+   "group": "encoder/multimodal",
+   "date": "2023-03",
+   "attention": "ViT image encoder + text encoder",
+   "context": null,
+   "vocab": 32000,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": "na",
+    "vocabulary head": "na",
+    "MoE router": "na",
+    "contrastive loss": 0
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 1,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:google/siglip-base-patch16-224",
+    "paper:2303.15343"
+   ],
+   "notes": "pairwise sigmoid loss replaces the softmax contrastive loss"
+  },
+  {
+   "family": "Whisper",
+   "group": "encoder/multimodal",
+   "date": "2022-12",
+   "attention": "encoder-decoder MHA",
+   "context": "30 s audio / 448 text tokens",
+   "vocab": 51866,
+   "experts": "-",
+   "router": "-",
+   "sites": {
+    "self-attention": 1,
+    "cross-attention": 1,
+    "vocabulary head": 1,
+    "MoE router": "na",
+    "contrastive loss": "na"
+   },
+   "mods": {
+    "QK-norm": 0,
+    "logit soft-capping": 0,
+    "length/temperature logit scaling": 0,
+    "learned sink logit": 0,
+    "attention output gate": 0,
+    "local / sliding-window layers": 0,
+    "linear-attention or SSM layers": 0,
+    "sigmoid MoE router": 0,
+    "sigmoid (non-softmax) loss": 0,
+    "z-loss": null,
+    "vocab logit multiplier": 0
+   },
+   "sources": [
+    "cfg:openai/whisper-large-v3",
+    "paper:2212.04356"
+   ],
+   "notes": ""
+  }
+ ],
+ "note": "Census of selected families; not a percentage of all architectures."
+}

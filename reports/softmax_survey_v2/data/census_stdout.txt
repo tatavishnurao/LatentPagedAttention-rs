@@ -1,0 +1,17 @@
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/census.json
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/census_heatmap.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/census_timeline.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/census_timeline.json
+2020-05  local / sliding-window layers        GPT-3
+2021-02  softmax contrastive loss             CLIP
+2023-03  sigmoid (non-softmax) loss           SigLIP
+2023-12  linear-attention or SSM layers       Mamba
+2024-01  softmax MoE router                   Mixtral 8x7B
+2024-03  vocab logit multiplier               Command R
+2024-04  logit soft-capping                   RecurrentGemma (Griffin)
+2024-05  length/temperature logit scaling     DeepSeek-V2
+2024-12  QK-norm                              OLMo 2
+2024-12  z-loss                               OLMo 2
+2024-12  sigmoid MoE router                   DeepSeek-V3
+2025-01  attention output gate                MiniMax-Text-01
+2025-08  learned sink logit                   gpt-oss

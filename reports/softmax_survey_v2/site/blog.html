@@ -1,0 +1,105 @@
+<title>Softmax Across Architectures</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one reading column (~72ch); figures may run wider; quiet technical-report styling. */
+:root{
+  --bg:#fbfbf9; --fg:#17191e; --muted:#596070; --rule:#dcdfe4; --accent:#1f5ea8;
+  --panel:#eff2f6; --plate:#ffffff; --code-bg:#edf0f4;
+  --t-proven:#1d6b46; --t-paper:#1f5ea8; --t-config:#6a4c93; --t-measured:#9a5b00; --t-inference:#8a3a3a;
+  --f-body:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-head:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14161a; --fg:#e6e7ea; --muted:#a2a8b3; --rule:#2d3139; --accent:#86b6f0;
+  --panel:#1c2026; --plate:#ffffff; --code-bg:#1f232a;
+  --t-proven:#6fd0a0; --t-paper:#86b6f0; --t-config:#c3a6ee; --t-measured:#f0b866; --t-inference:#f09a9a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14161a; --fg:#e6e7ea; --muted:#a2a8b3; --rule:#2d3139; --accent:#86b6f0;
+  --panel:#1c2026; --plate:#ffffff; --code-bg:#1f232a;
+  --t-proven:#6fd0a0; --t-paper:#86b6f0; --t-config:#c3a6ee; --t-measured:#f0b866; --t-inference:#f09a9a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:17px/1.62 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px}
+main{max-width:72ch;margin:0 auto;min-width:0}
+h1,h2,h3{font-family:var(--f-head);line-height:1.2;text-wrap:balance;letter-spacing:.005em}
+h1{font-size:2.1rem;margin:0 0 .3rem;font-weight:600}
+h2{font-size:1.45rem;margin:2.6rem 0 .6rem;padding-top:1rem;border-top:1px solid var(--rule);font-weight:600}
+h3{font-size:1.12rem;margin:1.8rem 0 .4rem;font-weight:600}
+h1+p strong{font-family:var(--f-head);font-weight:500;color:var(--muted);font-size:1.15rem}
+a{color:var(--accent);text-underline-offset:2px;overflow-wrap:anywhere}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+hr{border:0;border-top:1px solid var(--rule);margin:1.6rem 0}
+code{font-family:var(--f-mono);font-size:.84em;background:var(--code-bg);padding:.08em .3em;border-radius:3px}
+pre{background:var(--code-bg);padding:12px 14px;border-radius:6px;overflow-x:auto;font-size:.82rem;line-height:1.5}
+pre code{background:none;padding:0}
+.table-wrap{overflow-x:auto;margin:1rem 0}
+table{border-collapse:collapse;font-size:.84rem;line-height:1.4;min-width:560px;width:100%;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-family:var(--f-head);font-weight:600;font-size:.8rem;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+figure{margin:1.8rem 0;width:min(100vw - 32px, 1000px);position:relative;left:50%;transform:translateX(-50%)}
+figure .plate{background:var(--plate);border:1px solid var(--rule);border-radius:6px;padding:10px;overflow-x:auto}
+figure img{display:block;margin:0 auto;max-width:100%;height:auto}
+figcaption{max-width:72ch;margin:.7rem auto 0;font-size:.9rem;line-height:1.5;color:var(--muted)}
+figcaption strong{color:var(--fg);font-family:var(--f-head);font-weight:600}
+blockquote{background:var(--panel);border-radius:6px;padding:4px 18px;margin:1.4rem 0;font-size:.96rem}
+math{font-family:"STIX Two Math","Cambria Math","Latin Modern Math",serif;font-size:1.05em}
+.math-block{overflow-x:auto;margin:1rem 0;padding:2px 0}
+.tag{font-family:var(--f-mono);font-size:.72em;letter-spacing:.02em;white-space:nowrap;border:1px solid currentColor;border-radius:3px;padding:0 .3em;margin:0 .1em}
+.tag-proven{color:var(--t-proven)}.tag-paper{color:var(--t-paper)}.tag-config{color:var(--t-config)}
+.tag-measured{color:var(--t-measured)}.tag-inference{color:var(--t-inference)}
+.cite{font-family:var(--f-head);font-size:.86em;overflow-wrap:anywhere}
+ol.refs{font-size:.88rem;line-height:1.45;padding-left:2.2em}
+ol.refs li{margin:.45rem 0}
+ol.refs details{margin-top:.2rem;font-size:.82rem;color:var(--muted)}
+ol.refs summary{cursor:pointer;color:var(--accent)}
+.vtag{font-family:var(--f-mono);font-size:.78em;color:var(--muted)}
+.backlink{font-size:.9rem;color:var(--muted)}
+@media (max-width:520px){body{font-size:16px} h1{font-size:1.7rem}}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<main>
+<p class="backlink">Full technical report, with sources, methods and every number's data file: <a href="https://claude.ai/artifact/MGk1tCA5vUx2cCKo8efGqE">Where Softmax Lives</a></p>
+
+<h1>Softmax across 36 architectures, and three DeepMind claims checked</h1>
+<p><em>Tata Vishnu Vardhan Rao · November 2026 · code and data: <code>reports/softmax_survey_v2/</code></em></p>
+<p>I work on paged KV-cache attention, so I kept running into papers about "softmax problems". This is version 2 of my notes. This time I read the full text of every core paper, built a census of 36 model families from their configs and code, and reran the mechanisms on CPU. It is a survey with small measurements, not a new method. Claims are tagged <strong><span class="tag tag-proven">proven</span></strong>, <strong><span class="tag tag-paper">paper</span></strong>, <strong><span class="tag tag-config">config</span></strong>, <strong><span class="tag tag-measured">measured</span></strong> or <strong><span class="tag tag-inference">inference</span></strong>, as in the report.</p>
+<h2>Softmax is still everywhere, just less often in the router</h2>
+<p>Every generative family in the census keeps a softmax in its vocabulary head, including the non-attention ones such as Mamba and RWKV-6 <span class="tag tag-config">config</span>. What has changed is everything around it. Gemma 2 soft-capped its logits; Gemma 3 swapped that for QK-norm <span class="tag tag-paper">paper</span>. gpt-oss adds a learned sink logit to every head <span class="tag tag-paper">paper</span>. Qwen3-Next puts a sigmoid gate on its attention output <span class="tag tag-config">config</span>. DeepSeek-V3, Kimi K2, GLM-4.5 and Llama 4 route experts with a sigmoid instead of a softmax <span class="tag tag-config">config</span>.</p>
+<figure><div class="plate"><img alt="Census heatmap" src="figures/census_heatmap.png" loading="lazy"></div><figcaption><strong>Figure 1.</strong> Softmax sites and modifications for 36 selected families; ● present, ? unknown, – site does not exist. A census of the families listed, not a share of all architectures. Takeaway: the vocabulary softmax survives everywhere; the modifications cluster in 2024–2025.</figcaption></figure>
+<h2>Dispersion: sharp attention fades as context grows</h2>
+<p>Veličković et al. (Google DeepMind, ICML 2025) prove that with bounded logits, every softmax coefficient in a global head eventually falls toward 1/n <span class="tag tag-paper">paper</span>. The toy version is easy to see. Put one key at gap Δ above N − 1 identical keys. To hold weight α on it, you need Δ/T ≥ ln(N−1) + ln(α/(1−α)) <span class="tag tag-proven">proven</span>. Each factor-of-e increase in context costs one more logit unit.</p>
+<p>So which families ship something that grows with log N? I calibrated a toy head to hold 90% at 4k tokens and applied each family's real logit multiplier.</p>
+<figure><div class="plate"><img alt="E2" src="figures/e2_temperature.png" loading="lazy"></div><figcaption><strong>Figure 2.</strong> Required gap for weight ≥ α (left); the multiplier needed to hold α = 0.9 versus the multipliers families ship, relative to N = 4,096 (right). Toy best case. Takeaway: Llama 4&#x27;s length-dependent temperature tracks the requirement; constant YaRN factors buy a fixed amount of headroom.</figcaption></figure>
+<p>With no scaling, the head's weight falls to 0.22 at 128k and 0.004 at 10M <span class="tag tag-measured">measured</span>. Llama 4 multiplies queries on its global NoPE layers by 1 + 0.1·ln(⌊(pos+1)/8192⌋ + 1), according to Meta's reference code <span class="tag tag-config">config</span>. That keeps the toy head at 0.85–0.87 all the way to 10M <span class="tag tag-measured">measured</span>. YaRN's constant factor helps until about the length it was set for. With Qwen3's opt-in factor of 4, the head holds 0.86 at 128k and 0.44 at 1M <span class="tag tag-measured">measured</span>. Two caveats. This is one target against identical distractors. And for gpt-oss and DeepSeek, YaRN is in place during long-context training, so the learned gaps already absorb it <span class="tag tag-inference">inference</span>.</p>
+<h2>The paper's adaptive temperature switches off at long context</h2>
+<p>The paper also proposes an "ad-hoc" fix: sharpen each attention row by an amount set by a degree-4 polynomial in the row's entropy <span class="tag tag-paper">paper</span>. I ran that polynomial exactly as printed in their JAX code.</p>
+<figure><div class="plate"><img alt="E3" src="figures/e3_random_logits.png" loading="lazy"></div><figcaption><strong>Figure 3.</strong> Gaussian-logit rows: entropy versus N (a), max weight with and without the paper&#x27;s adaptive θ (b), and the polynomial itself (c). Takeaway: the polynomial sharpens only rows with entropy between 0.85 and 5.95 nats.</figcaption></figure>
+<p>It only sharpens rows whose entropy is between 0.85 and 5.95 nats <span class="tag tag-measured">measured</span>. Within that window it works well: a target planted 4σ above Gaussian distractors goes from 0.125 to 0.80 of the row at N = 235. From N = 861 the row entropy is above the window, β drops to 1, and nothing changes <span class="tag tag-measured">measured</span>. A uniform row over 4,096 keys already has 8.3 nats <span class="tag tag-proven">proven</span>. This fits the authors' description of the fix as fitted to their own task. It also means the polynomial cannot be dropped into long-context LLM heads unchanged <span class="tag tag-inference">inference</span>.</p>
+<h2>Collapse: where the gradient rounds to exactly zero</h2>
+<p>Barron, Gnanapragasam and Tschannen (Google DeepMind, 2026) describe two bugs <span class="tag tag-paper">paper</span>. <strong>Softmax Collapse</strong> happens when the correct class is so confident that its gradient rounds to 0 while the others' gradients do not. <strong>Softmax Cancellation</strong> happens in distillation: the gradient should be 0 when the student equals the teacher, but rounding leaves noise. The term "Softmax Collapse" comes from earlier work at Imperial College London by Prieto et al. <span class="tag tag-paper">paper</span>. I reproduced both in CPU PyTorch, with the paper's own fixed functions translated from JAX.</p>
+<figure><div class="plate"><img alt="E4a" src="figures/e4_collapse.png" loading="lazy"></div><figcaption><strong>Figure 4.</strong> Target-logit gradient versus logit gap, 113 classes, CPU PyTorch 2.15.0; solid built-in, dashed the paper&#x27;s fix. Grid step 0.01, refined to 0.001. Takeaway: each dtype has a sharp threshold; the fix removes it in fp32 and bf16.</figcaption></figure>
+<p>Some numbers I had wrong in v1, now corrected. All of them are specific to CPU PyTorch <span class="tag tag-measured">measured</span>:</p>
+<ul>
+<li><strong>float32.</strong> With 113 classes, the built-in gradient first hits zero at gap 20.661. That is ln(C−1) + ln(1/ε): paper margin 15.94, not the paper's 16.6. The paper's 16.6 is what I get with two classes.</li>
+<li><strong>bfloat16 and float16.</strong> Thresholds sit at ln(C−1) + ln(2/ε): paper margins of about 5.55 and 7.62.</li>
+<li><strong>The realistic setup.</strong> With bf16 logits and an fp32 loss (autocast), the bf16 cliff disappears and the fp32 cliff remains. v1's "20.75" was the first bf16-representable gap above 20.661.</li>
+<li><strong>The fix in float16.</strong> It still returns zero from gap 17.34 for every class count I tried, because each e^(z_j − z_t) underflows fp16 there.</li>
+</ul>
+<p>For cancellation, with 1,000 classes and the student equal to the teacher, the built-in gradient is 1.2×10⁻³ in pure bf16 and 9×10⁻⁹ in fp32, while the fix returns exactly 0 <span class="tag tag-measured">measured</span>. In bf16 the larger part of that error comes from storing the student's log-softmax in bf16, not the teacher's probabilities <span class="tag tag-measured">measured</span>.</p>
+<p><strong>Why a serving engineer should care.</strong> These are training bugs, but log-probabilities have a forward version of the same cliff. With a 151,936-token vocabulary, a bf16 log-softmax returns log p = 0 for any token with p ≳ 0.996 <span class="tag tag-measured">measured, synthetic logits</span>. I read the serving code. vLLM computes log-probs in float32 <span class="tag tag-config">config</span>. SGLang does too by default, but its RL on-policy mode deliberately computes them in bf16 to match a bf16 trainer <span class="tag tag-config">config</span>. That is the one path where this failure is expected.</p>
+<h2>Where decode attention overtakes the weight matmuls</h2>
+<figure><div class="plate"><img alt="E5" src="figures/e5_cost_model.png" loading="lazy"></div><figcaption><strong>Figure 5.</strong> Analytic cost model for four released configs (batch 1, bf16 KV): exp() work per decode token, decode attention FLOPs relative to weight-matmul FLOPs, and cache size. A model, not a measurement. Takeaway: the crossover ranges from ~4k tokens (MLA) to ~324k (Gemma 3&#x27;s 5:1 local/global).</figcaption></figure>
+<p>At exactly 32,768 tokens, the model gives <span class="tag tag-measured">measured, analytic model</span> these KV caches: Llama-3.1-8B 4.00 GiB, DeepSeek-V3 2.15 GiB, Gemma-3-27B 2.91 GiB, and Qwen3-Next 0.82 GiB including its DeltaNet state. DeepSeek-V3's weight-absorbed MLA decode does so much attention arithmetic per key that it overtakes its weight matmuls at about 4.3k tokens. It can afford that, because decode is memory-bound <span class="tag tag-inference">inference</span>. On a B200, FlashAttention-4 gives 8,192 tensor-core FLOPs per clock per SM against 16 exponentials, a ratio of 512. That exactly equals the 4d matmul FLOPs per score at d = 128 <span class="tag tag-paper">paper</span> <span class="tag tag-proven">proven</span>. That is why FA4 emulates part of exp2 on the FMA units.</p>
+<h2>What I could not do, and what is next</h2>
+<p>The real-model probes (attention entropy, first-token sink mass and needle retrieval on Qwen3-0.6B, Gemma-3-1B, SmolLM2-360M and a matched softmax/softpick pair) are written and smoke-tested. They did not run: this environment's network policy blocked the Hugging Face weight CDN. So every claim here about sinks in real models comes from the papers, not from me. All experiments are CPU toys or analytic models.</p>
+<p>On a GPU with SGLang, the next tests are:</p>
+<ul>
+<li>whether gpt-oss's learned sinks make "pin the first KV page" unnecessary under paged eviction;</li>
+<li>whether Llama-4-style log-length scaling, applied to global layers, keeps a real retrieval head's needle weight up at 128k;</li>
+<li>how often bf16 RL-mode log-probs return exactly 0 compared with fp32.</li>
+</ul>
+<p>The report says what would count as a positive result for each.</p>
+</main>
