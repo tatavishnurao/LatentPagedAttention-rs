@@ -24,7 +24,10 @@ def render(points, l2_mib, out, title, l2_label=None):
     plt = setup()
     fig, ax = plt.subplots(figsize=(5.2, 3.4), dpi=200)
     color = COLORS["c3_accurate"]
-    for kind, label in (("e4_timing", "E4 (B x N step)"), ("e3_timing", "E3 (single sequence)")):
+    for kind, label in (
+        ("e4_timing", "full step, cold L2 (B x N)"),
+        ("e3_timing", "single sequence, warm L2"),
+    ):
         pts = [p for p in points if p["kind"] == kind]
         if not pts:
             continue
@@ -70,8 +73,8 @@ def render(points, l2_mib, out, title, l2_label=None):
         color=INK["secondary"],
     )
     ax.set_xscale("log")
-    ax.set_xlabel("working set per layer, padded A3 (MiB, log scale)")
-    ax.set_ylabel("time ratio C3 accurate / padded A3")
+    ax.set_xlabel("working set per layer, GQA padded (MiB, log scale)")
+    ax.set_ylabel("time ratio, latent / GQA padded")
     ax.set_title(title, fontsize=9, loc="left")
     ax.legend(fontsize=7, loc="center right", bbox_to_anchor=(1.0, 0.62))
     fig.tight_layout()

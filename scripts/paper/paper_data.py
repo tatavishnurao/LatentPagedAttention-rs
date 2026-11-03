@@ -19,9 +19,9 @@ PRIMARY = "c3_accurate"
 COLORS = {"a3pad": "#2a78d6", "c3_accurate": "#eb6834", "c3_fast": "#1baf7a"}
 INK = {"primary": "#0b0b0b", "secondary": "#52514e", "grid": "#e4e3df", "surface": "#fcfcfb"}
 NAMES = {
-    "a3pad": "padded A3 (full KV)",
-    "c3_accurate": "C3 accurate (latent)",
-    "c3_fast": "C3 fast (latent)",
+    "a3pad": "GQA, padded (full KV)",
+    "c3_accurate": "Latent (hi/lo)",
+    "c3_fast": "Latent (FP16 q′)",
 }
 
 

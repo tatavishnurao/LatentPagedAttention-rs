@@ -32,6 +32,22 @@ PRIMARY_RUNS = {
     "instrument_failure": "local4060_b2r_e4n1024_20261101_051528",
 }
 MIB = float(1 << 20)
+# Paper names (2026-11-03 redraft). Internal names stay in the data files and the artifact README.
+KIND = {"e3_timing": "Single", "e4_timing": "Step"}
+SHORT = {"a3pad": "GQA-pad", "a3": "GQA-unpad", "c3_accurate": "Latent", "c3_fast": "Latent-fast"}
+
+
+def config_name(key):
+    """'e4_timing/B8_N8192' -> 'Step B8·N8192'; 'e3_timing/N8192' -> 'Single N8192'."""
+    kind, cfg = key.split("/")
+    return f"{KIND[kind]} {cfg.replace('_', '·')}"
+
+
+def cutile_version():
+    """(version, source) of the cutile crate from Cargo.lock."""
+    lock = (ROOT / "Cargo.lock").read_text()
+    m = re.search(r'name = "cutile"\nversion = "([^"]+)"\nsource = "([^"]+)"', lock)
+    return m.group(1), m.group(2)
 
 
 class Registry:
@@ -71,6 +87,23 @@ def config_sort_key(key):
 
 
 # ---- setup ----------------------------------------------------------------------------------
+def device_facts(reg):
+    """Driver-reported device attributes (reports/device_query_20261103) and the computed peak."""
+    src = ROOT / "reports" / "device_query_20261103" / "device_query.json"
+    d = load(src)
+    at = {k.replace("CU_DEVICE_ATTRIBUTE_", ""): v["value"] for k, v in d["attributes"].items()}
+    peak = d["derived"]["peak_dram_bandwidth_gb_per_s"]
+    return {
+        "sms": reg.add(at["MULTIPROCESSOR_COUNT"], src),
+        "l2_mib": reg.fmt(at["L2_CACHE_SIZE"] / (1 << 20), ".0f", src),
+        "bus_bits": reg.add(at["GLOBAL_MEMORY_BUS_WIDTH"], src),
+        "mem_clock_mhz": reg.fmt(at["MEMORY_CLOCK_RATE"] / 1000, ".0f", src),
+        "peak_gbps": reg.fmt(peak, ".1f", src),
+        "peak_gbps_int": reg.fmt(peak, ".0f", src),
+        "peak_gbps_exact": reg.add(f"{peak:g}", src),
+    }
+
+
 def setup_table(reg):
     run = LOCAL / "runs" / PRIMARY_RUNS["e4"][2]
     env = (run / "environment.txt").read_text().splitlines()
@@ -79,19 +112,61 @@ def setup_table(reg):
     args = load(run / "manifest.json")["args"]
     src_env, src_man = run / "environment.txt", run / "manifest.json"
     nvcc = next(line for line in env if line.startswith("Cuda compilation tools"))
+    cuda = nvcc.split(",")[1].strip().replace("release ", "CUDA ")
+    cutile, _ = cutile_version()
+    dev = device_facts(reg)
+    reg.add(cutile, ROOT / "Cargo.lock")
+    merged = LOCAL / "primary_merged_analysis.json"
+    results = load(merged)["results"]
+    e4 = {k: r for k, r in results.items() if k.startswith("e4_timing/")}
+    layers = sorted({r["layers"] for r in e4.values()})
+    eligible_layers = sorted(
+        {r["layers"] for r in e4.values() if r["c3_accurate"].get("claim_eligible")}
+    )
+    singles = sorted(r["seq"] for k, r in results.items() if k.startswith("e3_timing/"))
+    batches = sorted({r["batch"] for r in e4.values()})
+    seqs = sorted({r["seq"] for r in e4.values()})
+    lay_s = f"{reg.add(layers[0], merged)} to {reg.add(layers[-1], merged)}"
+    elig_s = "/".join(reg.add(x, merged) for x in eligible_layers)
     rows = [
-        ("GPU", f"{fields[0]} (compute capability {reg.add(fields[1], src_env)}), {LABEL}"),
-        ("Memory", reg.add(fields[4], src_env)),
-        ("Max SM / memory clock", f"{reg.add(fields[7], src_env)} / {reg.add(fields[8], src_env)}"),
-        ("Driver", f"{reg.add(fields[2], src_env)} (WSL2 kernel 6.6.87.2)"),
-        ("Toolkit", nvcc.split(",")[1].strip().replace("release ", "CUDA ")),
-        ("Shape (model_small)", "Hq 16, Hkv 4 (GQA group 4), head dim 64, latent 32, block 16"),
         (
-            "Timing protocol",
-            f"{reg.add(args['warmup'], src_man)} warm-up + {reg.add(args['iterations'], src_man)} "
-            f"timed iterations per process; >= {reg.add(args['min_cool'], src_man)} cool-start "
-            f"processes per configuration, at most {reg.add(args['max_attempts'], src_man)} "
-            f"attempts; cool-start below {reg.add(args['cool_c'], src_man)} C, abort at "
+            "GPU",
+            f"{fields[0]} (compute capability {reg.add(fields[1], src_env)}), "
+            f"{reg.add(fields[4], src_env)}",
+        ),
+        ("Max SM / memory clock", f"{reg.add(fields[7], src_env)} / {reg.add(fields[8], src_env)}"),
+        (
+            "Reported by the driver",
+            f"{dev['sms']} SMs, {dev['l2_mib']} MiB L2, {dev['bus_bits']}-bit memory bus, "
+            f"{dev['mem_clock_mhz']} MHz memory clock; peak 2 × {dev['mem_clock_mhz']} MHz × "
+            f"{dev['bus_bits']} bit / 8 = {dev['peak_gbps']} GB/s (computed, not measured)",
+        ),
+        (
+            "Software",
+            f"Driver {reg.add(fields[2], src_env)} under WSL2 (kernel 6.6.87.2), {cuda}, "
+            f"cuTile {cutile}",
+        ),
+        (
+            "Shape",
+            "16 query heads, 4 KV heads (group 4), head dim 64, latent dim 32, 16-token blocks; "
+            f"Step: {lay_s} layers ({elig_s} at every claim-eligible configuration)",
+        ),
+        (
+            "Grid",
+            "Single: N = "
+            + ", ".join(reg.add(n, merged) for n in singles)
+            + ". Step: B = "
+            + ", ".join(reg.add(b, merged) for b in batches)
+            + " by N = "
+            + ", ".join(reg.add(n, merged) for n in seqs),
+        ),
+        (
+            "Protocol",
+            f"{reg.add(args['warmup'], src_man)} warm-up and "
+            f"{reg.add(args['iterations'], src_man)} timed iterations per process; at least "
+            f"{reg.add(args['min_cool'], src_man)} cool-start "
+            f"processes (below {reg.add(args['cool_c'], src_man)} C) per configuration, at most "
+            f"{reg.add(args['max_attempts'], src_man)} attempts, abort at "
             f"{reg.add(args['abort_c'], src_man)} C",
         ),
     ]
@@ -101,22 +176,22 @@ def setup_table(reg):
 
 # ---- kernel variants ------------------------------------------------------------------------
 KERNELS = [
-    ("sass", "c3_split_model_small_sm_89.cubin", "C3 split (latent)"),
-    ("sass_c3_modes", "c3_split_accurate_model_small_sm_89.cubin", "C3 split, accurate (hi/lo q')"),
-    ("sass", "c3_reduce_model_small_sm_89.cubin", "C3 reduce"),
-    ("sass", "a3_split_model_small_sm_89.cubin", "A3 split, unpadded (4 query rows)"),
-    ("sass_a3_equal_treatment", "a3_split8_model_small_sm_89.cubin", "A3 split, 8-block steps"),
+    ("sass", "c3_split_model_small_sm_89.cubin", "Latent-fast split"),
+    ("sass_c3_modes", "c3_split_accurate_model_small_sm_89.cubin", "Latent split"),
+    ("sass", "c3_reduce_model_small_sm_89.cubin", "Latent reduce"),
+    ("sass", "a3_split_model_small_sm_89.cubin", "GQA-unpad split"),
+    (
+        "sass_a3_equal_treatment",
+        "a3_split8_model_small_sm_89.cubin",
+        "GQA-unpad split, 8-block steps",
+    ),
     (
         "sass_a3_equal_treatment",
         "a3_split_pad_model_small_sm_89_spec_occ4.cubin",
-        "A3 split, padded to 16 rows + occupancy(4)",
+        "GQA-pad split, occupancy hint",
     ),
-    (
-        "sass_a3_equal_treatment",
-        "a3_split_pad_model_small_sm_89.cubin",
-        "A3 split, padded, no hint",
-    ),
-    ("sass_a3_equal_treatment", "a3_reduce_pad_model_small_sm_89.cubin", "A3 reduce (padded)"),
+    ("sass_a3_equal_treatment", "a3_split_pad_model_small_sm_89.cubin", "GQA-pad split, no hint"),
+    ("sass_a3_equal_treatment", "a3_reduce_pad_model_small_sm_89.cubin", "GQA-pad reduce"),
 ]
 
 
@@ -136,13 +211,7 @@ def kernel_table(reg):
             )
         )
     return table(
-        [
-            "Kernel (model_small, sm_89)",
-            "HMMA (static)",
-            "Registers",
-            "Stack bytes",
-            "Theor. occ. %",
-        ],
+        ["Kernel (sm_89)", "HMMA", "Registers", "Stack B", "Occ. %"],
         rows,
     )
 
@@ -192,13 +261,7 @@ def numerics_tables(reg):
                 ]
             )
     scale = table(
-        [
-            "Inputs",
-            "N (splits)",
-            "C3 fast: total / kernel",
-            "C3 accurate: total / kernel",
-            "Padded A3: total / kernel",
-        ],
+        ["Inputs", "N (splits)"] + [SHORT[v] for v in ("c3_fast", "c3_accurate", "a3pad")],
         out,
     )
     emu_src = E3REP / "scale" / "emulate_c3_numerics.out"
@@ -236,7 +299,7 @@ def timing_table(reg):
     src = LOCAL / "primary_merged_analysis.json"
     data = load(src)
     runs = {r["label"]: r for r in data["runs"]}
-    rows, extra = [], []
+    rows, extra, bandwidth = [], [], []
     summary = {"eligible": [], "descriptive": [], "byte_ratios": [], "byte_ratios_eligible": []}
     for key in sorted(data["results"], key=config_sort_key):
         res = data["results"][key]
@@ -260,15 +323,13 @@ def timing_table(reg):
         else:
             status = "descriptive"
             summary["descriptive"].append(key)
-        kind, cfg = key.split("/")
-        name = ("E3 " if kind == "e3_timing" else "E4 ") + cfg
+        name = config_name(key)
         rows.append(
             (
                 name,
                 f"{reg.add(clean, src)} / {reg.add(thr, src)} / {reg.add(hot, src)}",
                 med_s,
-                geo,
-                ci,
+                geo if geo == "—" else f"{geo} {ci}",
                 status,
             )
         )
@@ -286,27 +347,38 @@ def timing_table(reg):
             modal_s = lo if lo == hi else f"{lo}–{hi}"
         peak = max(p["temp_max_inproc_c"] for p in procs)
         extra.append((name, ws, br, gb_s, modal_s, reg.add(peak, src)))
+        if clean:
+            bandwidth.append((name, ws, br, gb_s, modal_s))
     tab = table(
         [
-            "Config",
+            "Configuration",
             "Clean / THR / hot",
-            "Median µs, A3pad / C3acc",
-            "C3acc / A3pad",
-            "95 % CI",
+            "Median µs, GQA-pad / Latent",
+            "Latent / GQA-pad [95 % CI]",
             "Claim",
         ],
         rows,
     )
     tab_extra = table(
         [
-            "Config",
-            "A3pad MiB per layer",
-            "Byte ratio A3pad / C3",
-            "GB/s (analytic), A3pad / C3acc",
-            "Modal SM MHz, clean",
+            "Configuration",
+            "GQA-pad MiB per layer",
+            "Byte ratio",
+            "GB/s, GQA-pad / Latent",
+            "Modal SM MHz",
             "Max °C, all processes",
         ],
         extra,
+    )
+    tab_bw = table(
+        [
+            "Configuration",
+            "GQA-pad MiB per layer",
+            "Byte ratio",
+            "GB/s, GQA-pad / Latent",
+            "Modal SM MHz",
+        ],
+        bandwidth,
     )
     # Derived numbers used in the prose (computed here, never typed).
     reg.add(len(summary["eligible"]), src)
@@ -321,7 +393,7 @@ def timing_table(reg):
     for _, r in summary["eligible"]:
         reg.fmt(abs(1 - r) * 100, ".1f", src)
         reg.fmt(round(abs(1 - r) * 100), ".0f", src)
-    return tab, tab_extra, summary
+    return tab, tab_extra, tab_bw, summary
 
 
 def accurate_cost(reg):
@@ -345,26 +417,18 @@ def accurate_cost(reg):
 def sensitivity_table(reg):
     run = LOCAL / "runs" / PRIMARY_RUNS["sens"]
     rows = []
-    for fname, baseline in (
-        ("variants_analysis_vs_a3.json", "unpadded A3"),
-        ("variants_analysis.json", "padded A3"),
+    for fname, baseline, variants in (
+        ("variants_analysis_vs_a3.json", "a3", ("c3_accurate", "c3_fast")),
+        ("variants_analysis.json", "a3pad", ("c3_accurate", "c3_fast", "a3")),
     ):
         src = run / fname
         res = load(src)["results"]["e3_timing/N8192"]
-        for v, name in (
-            ("c3_accurate", "C3 accurate"),
-            ("c3_fast", "C3 fast"),
-            ("a3", "unpadded A3"),
-            ("a3pad", "padded A3"),
-        ):
-            if v in res and isinstance(res[v], dict) and "claim_eligible" in res[v]:
-                geo, ci = ratio_cell(reg, res[v], src)
-                rows.append(
-                    (f"{name} / {baseline}", geo, ci, reg.add(len(res["clean_processes"]), src))
-                )
-                if res[v].get("geomean_ratio_clean"):
-                    reg.fmt(abs(1 - res[v]["geomean_ratio_clean"]) * 100, ".1f", src)
-    return table(["E3 N=8192, one run (secondary)", "Ratio", "95 % CI", "Clean processes"], rows)
+        reg.add(len(res["clean_processes"]), src)
+        for v in variants:
+            geo, ci = ratio_cell(reg, res[v], src)
+            rows.append((f"{SHORT[v]} / {SHORT[baseline]}", f"{geo} {ci}"))
+            reg.fmt(abs(1 - res[v]["geomean_ratio_clean"]) * 100, ".1f", src)
+    return table(["Single N=8192, one run (secondary)", "Ratio [95 % CI]"], rows)
 
 
 def prelim_table(reg):
@@ -378,14 +442,20 @@ def prelim_table(reg):
         geo, ci = ratio_cell(reg, res["c3_accurate"], src)
         rows.append(
             (
-                key.split("/")[1],
+                config_name(key),
                 f"{reg.add(clean, src)} / {reg.add(thr, src)} / {reg.add(hot, src)}",
                 geo,
                 ci,
             )
         )
     return table(
-        ["E3 preliminary run (Brave open)", "Clean / THR / hot", "C3acc / A3pad", "95 % CI"], rows
+        [
+            "Single, preliminary run (Brave open)",
+            "Clean / THR / hot",
+            "Latent / GQA-pad",
+            "95 % CI",
+        ],
+        rows,
     )
 
 
@@ -412,13 +482,13 @@ def in_band(rows, component, ref):
 
 
 CHECKS = [
-    ("e4_B1_N1024_dryrun_VOID", "E4 B1_N1024", "none (per-sample reasons query)", "layer"),
-    ("e4_B1_N1024_10it_fix1", "E4 B1_N1024", "fix 1, 10 iterations", "layer"),
-    ("e3_N1024_50it_prefix", "E3 N=1024", "none (per-sample reasons query)", "pipeline"),
-    ("e3_N1024_50it_fix1", "E3 N=1024", "fix 1", "pipeline"),
-    ("e3_N8192_50it_prefix", "E3 N=8192", "none (per-sample reasons query)", "pipeline"),
-    ("e4_B1_N1024_50it_fix2", "E4 B1_N1024", "fix 2 (saturating re-warm)", "layer"),
-    ("e4_B8_N4096_50it_fix2", "E4 B8_N4096", "fix 2 (saturating re-warm)", "layer"),
+    ("e4_B1_N1024_dryrun_VOID", "e4_timing/B1_N1024", "no fix", "layer"),
+    ("e4_B1_N1024_10it_fix1", "e4_timing/B1_N1024", "fix 1", "layer"),
+    ("e3_N1024_50it_prefix", "e3_timing/N1024", "no fix", "pipeline"),
+    ("e3_N1024_50it_fix1", "e3_timing/N1024", "fix 1", "pipeline"),
+    ("e3_N8192_50it_prefix", "e3_timing/N8192", "no fix", "pipeline"),
+    ("e4_B1_N1024_50it_fix2", "e4_timing/B1_N1024", "fix 2", "layer"),
+    ("e4_B8_N4096_50it_fix2", "e4_timing/B8_N4096", "fix 2", "layer"),
 ]
 
 
@@ -432,7 +502,7 @@ def clock_table(reg):
         src = d / "samples.jsonl.xz"
         rows.append(
             (
-                cfg,
+                config_name(cfg),
                 fix,
                 reg.add(meta["iterations"], d / "timing_meta.json"),
                 reg.add(ref, d / "timing_meta.json"),
@@ -456,7 +526,7 @@ def clock_table(reg):
         hi = max(r["in_band_fraction"] for r in b1)
         rows.append(
             (
-                f"E4 B1_N1024 (campaign, {reg.add(len(b1), fail)} processes)",
+                f"{config_name('e4_timing/B1_N1024')}, {reg.add(len(b1), fail)} campaign processes",
                 "fix 1",
                 reg.add(iters, man),
                 "/".join(reg.add(x, fail) for x in refs),
@@ -464,9 +534,7 @@ def clock_table(reg):
                 f"{reg.fmt(lo, '.3f', fail)}–{reg.fmt(hi, '.3f', fail)}",
             )
         )
-    return table(
-        ["Process", "Harness fix", "Iterations", "Ref. MHz", "Modal MHz", "In-band fraction"], rows
-    )
+    return table(["Process", "Harness", "Iter.", "Ref. MHz", "Modal MHz", "In-band"], rows)
 
 
 def dryrun_slowdown(reg):
@@ -540,7 +608,7 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     reg = Registry()
     scale, emulation, _ = numerics_tables(reg)
-    timing, timing_extra, summary = timing_table(reg)
+    timing, timing_extra, timing_bw, summary = timing_table(reg)
     frags = {
         "tab_setup.md": setup_table(reg),
         "tab_kernels.md": kernel_table(reg),
@@ -548,6 +616,7 @@ def main(argv=None):
         "tab_numerics_emulation.md": emulation,
         "tab_timing.md": timing,
         "tab_timing_appendix.md": timing_extra,
+        "tab_bandwidth.md": timing_bw,
         "tab_sensitivity.md": sensitivity_table(reg),
         "tab_prelim.md": prelim_table(reg),
         "tab_clock_validity.md": clock_table(reg),
@@ -555,6 +624,7 @@ def main(argv=None):
     slow = dryrun_slowdown(reg)
     t1 = t1_slow_output(reg)
     nvml = nvml_latency(reg)
+    device = device_facts(reg)
     acc = accurate_cost(reg)
     for name, text in frags.items():
         (out / name).write_text(
@@ -574,6 +644,7 @@ def main(argv=None):
                 "void_dryrun_slowdown": slow,
                 "t1_slow_output": t1,
                 "t2_nvml_latency": nvml,
+                "device": device,
                 "c3_accurate_over_fast_e3_n8192": acc,
             },
             indent=1,

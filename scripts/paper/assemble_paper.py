@@ -38,9 +38,14 @@ FIGURE_PAGE = 0.25  # one single-column figure with caption, rough
 # Summed data-cell width (+2 per column) above which a table spans both columns.
 # UNMEASURED HEURISTIC: no template column width was measured.
 ONE_COLUMN_CHARS = 75
-TAG = re.compile(r"\s?\[(?:[MS]:[\w-]+(?:\s*,\s*[MS]:[\w-]+)*|H)\]")
+TAG_BODY = r"\[(?:[MS]:[\w-]+(?:\s*,\s*[MS]:[\w-]+)*|H)\]"
+# A tag mid-line takes one preceding space or tab with it; never a newline, which would merge a
+# paragraph that starts with a tag into the block before it.
+TAG = re.compile(r"[ \t]?" + TAG_BODY)
+LINE_START_TAG = re.compile(r"^" + TAG_BODY + r"[ \t]*", re.M)
 APPENDIX_HEADINGS = ("appendix",)
-IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
+# Image links: alt text may itself contain brackets (claim tags), so match the link target only.
+IMAGE = re.compile(r"^!\[.*\]\(([^)\s]+\.(?:png|jpe?g|pdf|svg))\)\s*$", re.M)
 # Evidence-key topics for the submission copy's "Evidence files" list. An unknown key fails, so a
 # new key in the paper must be placed here.
 EVIDENCE_TOPICS = (
@@ -48,6 +53,7 @@ EVIDENCE_TOPICS = (
     ("Numerics", ("M:scale", "M:emu")),
     ("SASS", ("M:sass",)),
     ("Instrument checks", ("M:void", "M:checks", "M:nvml", "M:t1")),
+    ("Device and profiler", ("M:dev", "M:ncu")),
     ("Sources (code and design documents)", ("S:rules", "S:kern", "S:e4", "S:harness")),
 )
 EVIDENCE_START = "**Evidence keys.**"
@@ -103,6 +109,7 @@ def strip_tags(text):
     """Submission copy: no claim tags, no HTML comments, no evidence keys."""
     text = evidence_list(text)
     text = re.sub(r"\n?<!--.*?-->\n?", "\n", text, flags=re.S)
+    text = LINE_START_TAG.sub("", text)
     text = TAG.sub("", text)
     return re.sub(r"\n{3,}", "\n\n", text)
 

@@ -60,6 +60,15 @@
   "other_median_ms_max": "0.15",
   "temperature_c": "62"
  },
+ "device": {
+  "sms": "24",
+  "l2_mib": "32",
+  "bus_bits": "128",
+  "mem_clock_mhz": "8001",
+  "peak_gbps": "256.0",
+  "peak_gbps_int": "256",
+  "peak_gbps_exact": "256.032"
+ },
  "c3_accurate_over_fast_e3_n8192": {
   "primary": {
    "run": "local4060_b1r_e3_20261101_051132",
