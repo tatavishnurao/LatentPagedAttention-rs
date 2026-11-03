@@ -46,3 +46,6 @@ reports/source_identified_campaign_*/
 # Large regenerable oracle dumps (up to ~43 MB each; reports/phase2/raw holds ~350 MB of them).
 reports/**/oracle_inputs_outputs.json
 paper/build/
+paper/ieee/*
+!paper/ieee/paper.tex
+!paper/ieee/paper.pdf
