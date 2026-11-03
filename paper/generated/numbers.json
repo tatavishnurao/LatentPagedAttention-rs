@@ -21,6 +21,9 @@
  "0.15": [
   "reports/nvml_latency_20261101/nvml_latency.json"
  ],
+ "0.2.0": [
+  "Cargo.lock"
+ ],
  "0.29": [
   "reports/local_4060_20261101/instrument_checks/e3_N1024_50it_prefix/samples.jsonl.xz"
  ],
@@ -119,7 +122,8 @@
   "reports/local_4060_20261101/runs/local4060_b1r_e3_20261101_051132/variants_analysis_vs_c3_fast.json"
  ],
  "1": [
-  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "1.00": [
   "reports/local_4060_20261101/instrument_checks/e3_N8192_50it_prefix/samples.jsonl.xz",
@@ -135,9 +139,6 @@
  "1.009": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
- "1.011": [
-  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
- ],
  "1.017": [
   "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
  ],
@@ -150,9 +151,6 @@
  "1.037": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
- "1.038": [
-  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
- ],
  "1.051": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
@@ -161,9 +159,6 @@
  ],
  "1.057": [
   "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_c3_fast.json"
- ],
- "1.078": [
-  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
  ],
  "1.088e-3": [
   "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
@@ -219,6 +214,9 @@
  ],
  "10.9": [
   "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis.json"
+ ],
+ "1024": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "1071": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
@@ -370,9 +368,6 @@
  "3.662e-4": [
   "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
  ],
- "3.8": [
-  "reports/local_4060_20261101/runs/local4060_e3a3sens_20261101_063414/variants_analysis_vs_a3.json"
- ],
  "3.824e-4": [
   "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
  ],
@@ -390,6 +385,9 @@
  ],
  "3105 MHz": [
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
+ ],
+ "32": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "321.5": [
   "reports/diagnosis_20261002/e0/seq1024_run1/clock_attributed_summary.json"
@@ -434,7 +432,8 @@
   "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
  ],
  "4096": [
-  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "41.7": [
   "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
@@ -519,6 +518,9 @@
  "62": [
   "reports/nvml_latency_20261101/nvml_latency.json"
  ],
+ "64": [
+  "reports/local_4060_20261101/primary_merged_analysis.json"
+ ],
  "7": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
@@ -585,6 +587,7 @@
  ],
  "8": [
   "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/primary_merged_analysis.json",
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
  ],
  "8.1": [
@@ -614,7 +617,8 @@
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
  ],
  "8192": [
-  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log"
+  "reports/e3_splitk_20261002/scale_c3_modes/scale_suite.log",
+  "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "89": [
   "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
