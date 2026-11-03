@@ -243,6 +243,7 @@
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "128": [
+  "reports/device_query_20261103/device_query.json",
   "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
  ],
  "13.2": [
@@ -320,6 +321,7 @@
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "24": [
+  "reports/device_query_20261103/device_query.json",
   "reports/e3_splitk_20261002/sass_c3_modes/e3_sass_summary.json",
   "reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/samples.jsonl.xz"
  ],
@@ -328,6 +330,15 @@
  ],
  "255": [
   "reports/e3_splitk_20261002/sass_a3_equal_treatment/e3_sass_summary.json"
+ ],
+ "256": [
+  "reports/device_query_20261103/device_query.json"
+ ],
+ "256.0": [
+  "reports/device_query_20261103/device_query.json"
+ ],
+ "256.032": [
+  "reports/device_query_20261103/device_query.json"
  ],
  "2580": [
   "reports/local_4060_20261101/primary_merged_analysis.json"
@@ -387,6 +398,7 @@
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"
  ],
  "32": [
+  "reports/device_query_20261103/device_query.json",
   "reports/local_4060_20261101/primary_merged_analysis.json"
  ],
  "321.5": [
@@ -609,6 +621,9 @@
   "reports/e3_splitk_20261002/sass/e3_sass_summary.json",
   "reports/local_4060_20261101/primary_merged_analysis.json",
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/manifest.json"
+ ],
+ "8001": [
+  "reports/device_query_20261103/device_query.json"
  ],
  "8001 MHz": [
   "reports/local_4060_20261101/runs/local4060_e4n8192_20261101_054853/environment.txt"

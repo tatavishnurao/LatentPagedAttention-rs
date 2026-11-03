@@ -47,6 +47,7 @@ Claims made earlier in this repository, in the paper brief or in a draft that th
 | M:prelim | `reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/` |
 | M:void | `reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/` |
 | M:checks | `reports/local_4060_20261101/instrument_checks/`; `reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/` |
+| M:dev | `reports/device_query_20261103/device_query.json` (driver-reported attributes via `cuDeviceGetAttribute`; peak bandwidth computed from them, not measured) |
 | M:nvml | `reports/nvml_latency_20261101/nvml_latency.json` (separate micro-measurement, not campaign data) |
 | M:t1 | `reports/diagnosis_20261002/e0/` (`seq1024_run1`, `seq1024_cool2`); `docs/DIAGNOSIS_2026-10-02.md` (Trap 1: one 1K run took 122 s of wall time against 5 s with output on ext4, modal SM clock 210 MHz, 79 % of samples low-clock; A1 context kernel 321.5 µs at idle clock against 43.0 µs at boost) |
 | M:sass | `reports/e3_splitk_20261002/sass/`, `sass_a3_equal_treatment/`, `sass_c3_modes/`; `docs/E3_RESULTS.md`; `docs/E3_SPLITK_DESIGN.md` (b) for the 256-output tile |
@@ -71,7 +72,9 @@ uv run --no-project --with matplotlib python scripts/paper/fig3_regime_map.py \
   reports/local_4060_20261101/primary_merged_analysis.json --l2-mib 32 \
   --l2-label $'L2 32 MiB: reference only,\nStep flushes L2 before each layer' --out $F/fig_regime_map.png
 uv run --no-project --with matplotlib python scripts/paper/fig2_roofline.py \
-  reports/local_4060_20261101/primary_merged_analysis.json --peak-gbps 256 --out $F/fig_roofline.png
+  reports/local_4060_20261101/primary_merged_analysis.json --peak-gbps 256.032 \\
+  --title "Step, cold L2; floor = 256 GB/s peak, driver-reported, not measured" --out $F/fig_roofline.png
+python3 scripts/paper/device_query.py --out <dir>/device_query.json      # driver attributes only, no context, no kernel
 python3 scripts/paper/nvml_latency.py --out <dir>/nvml_latency.json   # NVML calls only, no kernels
 ```
 

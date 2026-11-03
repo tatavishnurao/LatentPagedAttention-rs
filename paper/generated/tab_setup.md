@@ -3,6 +3,7 @@
 |---|---|
 | GPU | NVIDIA GeForce RTX 4060 Laptop GPU (compute capability 8.9), 8188 MiB |
 | Max SM / memory clock | 3105 MHz / 8001 MHz |
+| Reported by the driver | 24 SMs, 32 MiB L2, 128-bit memory bus, 8001 MHz memory clock; peak 2 × 8001 MHz × 128 bit / 8 = 256.0 GB/s (computed, not measured) |
 | Software | Driver 617.42 under WSL2 (kernel 6.6.87.2), CUDA 13.3, cuTile 0.2.0 |
 | Shape | 16 query heads, 4 KV heads (group 4), head dim 64, latent dim 32, 16-token blocks; Step: 4 to 64 layers (4 at every claim-eligible configuration) |
 | Grid | Single: N = 1024, 8192. Step: B = 1, 8, 32 by N = 1024, 4096, 8192 |

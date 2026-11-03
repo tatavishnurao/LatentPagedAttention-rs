@@ -3,7 +3,7 @@ title: "Compression Is Not Speedup: Measuring Paged Latent-Cache Decode Attentio
 author: "Anonymous authors (double-blind submission)"
 date: "Redraft for ISPASS 2027, 2026-11-03"
 abstract: |
-  Latent KV caches such as multi-head latent attention (MLA) store far fewer bytes per token than grouped-query attention (GQA), so on memory-bound decode they are expected to run proportionally faster. We test that expectation with two paged split-K decode kernels written in the same tile language, checked against the same references, and timed under the same protocol on one laptop RTX 4060. In the four configurations with enough valid processes to support a claim, the latent kernel moves 7.3 to 13.2 times fewer bytes, yet it takes between 13.5 % less and 3.0 % more time per step than a padded GQA baseline (95 % bootstrap confidence intervals throughout). Neither kernel is bandwidth-bound: the latent kernel reaches at most 11.5 GB/s of a nominal 256 GB/s. Getting even this answer required three fixes to the measurement, because the host cannot lock GPU clocks. A 20.8 ms telemetry call left the GPU idling between short kernels, so 73 % of one process's samples ran at 210 MHz while a modal-clock validity check passed it; a 10-iteration check of the first fix then passed where the 50-iteration run collapsed. We also show that the latent kernel's large error on heavy-tailed inputs comes from FP16 rounding of the projected query, not from accumulation, and that a fair GQA baseline needs query-row padding to reach tensor cores.
+  Latent KV caches such as multi-head latent attention (MLA) store far fewer bytes per token than grouped-query attention (GQA), so on memory-bound decode they are expected to run proportionally faster. We test that expectation with two paged split-K decode kernels written in the same tile language, checked against the same references, and timed under the same protocol on one laptop RTX 4060. In the four configurations with enough valid processes to support a claim, the latent kernel moves 7.3 to 13.2 times fewer bytes, yet it takes between 13.5 % less and 3.0 % more time per step than a padded GQA baseline (95 % bootstrap confidence intervals throughout). Neither kernel is bandwidth-bound: the latent kernel reaches at most 11.5 GB/s of a 256 GB/s theoretical peak. Getting even this answer required three fixes to the measurement, because the host cannot lock GPU clocks. A 20.8 ms telemetry call left the GPU idling between short kernels, so 73 % of one process's samples ran at 210 MHz while a modal-clock validity check passed it; a 10-iteration check of the first fix then passed where the 50-iteration run collapsed. We also show that the latent kernel's large error on heavy-tailed inputs comes from FP16 rounding of the projected query, not from accumulation, and that a fair GQA baseline needs query-row padding to reach tensor cores.
 ---
 
 <!--
@@ -48,7 +48,7 @@ Paged attention [1] stores the cache in fixed-size blocks reached through a per-
 
 ## The platform
 
-We use one laptop RTX 4060 (Ada, sm_89, 8 GB) under WSL2. Tensor-core use is decided by the cuTile compiler, not by the kernel author (Section 6, the baseline). Under WSL2 GPU clocks cannot be locked, which is the standard defence against clock variation in GPU benchmarking [12]. We therefore validate every process from measured clocks instead (Section 4). Nothing in this paper is a cloud or data-centre result.
+We use one laptop RTX 4060 (Ada, sm_89, 8 GB) under WSL2; the driver reports 24 SMs, a 32 MiB L2 and a 128-bit memory bus at 8001 MHz [M:dev]. Tensor-core use is decided by the cuTile compiler, not by the kernel author (Section 6, the baseline). Under WSL2 GPU clocks cannot be locked, which is the standard defence against clock variation in GPU benchmarking [12]. We therefore validate every process from measured clocks instead (Section 4). Nothing in this paper is a cloud or data-centre result.
 
 # Kernels and benchmarks
 
@@ -123,17 +123,17 @@ Table 4 gives every configuration of the primary dataset, including the descript
 
 Four configurations are claim-eligible. The latent kernel takes 10.7 % less time at Single N=8192, 0.893 [0.860, 0.936]; every process there had an in-band fraction of 1.0, and a preliminary run taken with one extra application open agrees, 0.888 [0.869, 0.914] [M:prelim]. It takes 13.5 % less time at Step B8·N8192, 0.865 [0.842, 0.916], and 3.0 % more at Step B32·N4096, 1.030 [1.009, 1.051]. At Step B32·N8192 it is 0.972 [0.915, 1.029]: no difference shown and no parity claimed. The other seven configurations, all at B=1 or N=1024 plus B8·N4096, had fewer than 5 clean processes and are descriptive only.
 
-![Time ratio, Latent / GQA-pad, with 95 % CI against GQA-pad working set per layer. Filled: claim-eligible; hollow: fewer than 5 clean processes; configurations with no clean process have no point. Dotted: the ratio if both kernels ran at the same achieved bandwidth (1 / byte ratio). The L2 line is a reference only, since Step flushes L2 before each layer.](../reports/local_4060_20261101/figures/fig_regime_map.png)
+![Time ratio, Latent / GQA-pad, with 95 % CI against GQA-pad working set per layer. Filled: claim-eligible; hollow: fewer than 5 clean processes; configurations with no clean process have no point. Dotted: the ratio if both kernels ran at the same achieved bandwidth (1 / byte ratio). The L2 line (32 MiB, reported by the driver [M:dev]) is a reference only, since Step flushes L2 before each layer.](../reports/local_4060_20261101/figures/fig_regime_map.png)
 
 ## Where the time goes
 
-If both kernels were limited by DRAM bandwidth, the ratio would sit near the reciprocal of the byte ratio, the dotted line in Figure 4. Every point is far above it. Achieved analytic bandwidth (Table 5, Figure 5) shows why: GQA-pad reaches 60.5 to 97.1 GB/s and Latent 5.2 to 11.5 GB/s, against a nominal 256 GB/s that we did not measure. Neither kernel is near the bandwidth roof, and Latent is an order of magnitude further from it, so the bytes it saves are not the bytes that set its time.
+If both kernels were limited by DRAM bandwidth, the ratio would sit near the reciprocal of the byte ratio, the dotted line in Figure 4. Every point is far above it. Achieved analytic bandwidth (Table 5, Figure 5) shows why: GQA-pad reaches 60.5 to 97.1 GB/s and Latent 5.2 to 11.5 GB/s, against a theoretical peak of 256.0 GB/s, computed as 2 × memory clock × bus width / 8 from the driver-reported 8001 MHz and 128 bits [M:dev]; we did not measure DRAM bandwidth. Neither kernel is near the bandwidth roof, and Latent is an order of magnitude further from it, so the bytes it saves are not the bytes that set its time.
 
 <!-- include: generated/tab_bandwidth.md -->
 
 *Table 5: Analytic bytes and achieved bandwidth for configurations with clean processes [M:timing]. GB/s is analytic bytes divided by the clean median time, not measured DRAM traffic. Across all 11 configurations the byte ratio is 3.5 to 13.2.*
 
-![Clean median Step time against analytic bytes per step. The dashed floor is the nominal 256 GB/s of the memory interface, not measured on this host.](../reports/local_4060_20261101/figures/fig_roofline.png)
+![Clean median Step time against analytic bytes per step. The dashed floor is the 256 GB/s theoretical peak computed from driver-reported memory clock and bus width, not a measured bandwidth.](../reports/local_4060_20261101/figures/fig_roofline.png)
 
 [H] At these sizes the latent kernel is limited by something other than bytes. One candidate is parallelism: GQA-pad launches one CTA per (split, KV head) and Latent one per split, so Latent has a quarter as many CTAs to fill the GPU, and the two kernels fill it differently as B and N change. Others are launch overhead and the per-CTA projection. We did not test any of these; a profiler run is the next step (Section 7).
 
@@ -158,7 +158,7 @@ Because Step flushes L2 before every layer [S:e4], *L2 capacity is not an axis o
 # Limitations and what we do not claim
 
 - **One laptop GPU under WSL2.** No second GPU, no native Linux host, no data-centre part. Clocks cannot be locked; every exclusion comes from measured clocks, and 7 of 11 configurations lost too many processes. No B=1 result exists: B=1 processes ran mostly at 2595 MHz with some reads near 1890 MHz, and the modal-clock rule excluded them. Loosening the rule after seeing the data would be post hoc, so we did not.
-- **No profiler data.** Bytes are analytic, and 256 GB/s is a nominal specification. We have no Nsight profile and no measured DRAM traffic, so the explanation in Section 6 (where the time goes) is a hypothesis.
+- **No profiler data.** Bytes are analytic, and the 256 GB/s peak is computed from driver-reported values, not measured. We have no Nsight profile and no measured DRAM traffic, so the explanation in Section 6 (where the time goes) is a hypothesis.
 - **Narrow grid.** Context lengths up to 8192 (earlier 32K runs hit thermal slowdown), one synthetic shape, FP16 storage, no RoPE, no model checkpoint, and no external baseline such as FlashInfer [7] on identical inputs.
 - **Harness versions.** Primary Single data predate fix 2; Single and Step are never pooled. A start-of-timing transient is visible in at least one clean Step trace (Figure 2c) and was not excluded; ratios of medians absorb most of it.
 - **The NVML latency** was measured idle on one driver; its behaviour under load or on native Linux is unknown.

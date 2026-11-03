@@ -1,0 +1,56 @@
+{
+ "what": "device attributes reported by the CUDA driver; no context, no kernel",
+ "host_label": "laptop RTX 4060, WSL2, not a cloud result",
+ "date_utc": "2026-11-03T10:02:11+00:00",
+ "host": {
+  "uname": "Linux DESKTOP-37459PM 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64"
+ },
+ "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+ "cuda_driver_api_version": 13040,
+ "total_mem_bytes": 8585216000,
+ "attributes": {
+  "CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT": {
+   "enum": 16,
+   "value": 24,
+   "unit": "count"
+  },
+  "CU_DEVICE_ATTRIBUTE_CLOCK_RATE": {
+   "enum": 13,
+   "value": 1890000,
+   "unit": "kHz"
+  },
+  "CU_DEVICE_ATTRIBUTE_MEMORY_CLOCK_RATE": {
+   "enum": 36,
+   "value": 8001000,
+   "unit": "kHz"
+  },
+  "CU_DEVICE_ATTRIBUTE_GLOBAL_MEMORY_BUS_WIDTH": {
+   "enum": 37,
+   "value": 128,
+   "unit": "bits"
+  },
+  "CU_DEVICE_ATTRIBUTE_L2_CACHE_SIZE": {
+   "enum": 38,
+   "value": 33554432,
+   "unit": "bytes"
+  },
+  "CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR": {
+   "enum": 75,
+   "value": 8,
+   "unit": ""
+  },
+  "CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR": {
+   "enum": 76,
+   "value": 9,
+   "unit": ""
+  }
+ },
+ "derived": {
+  "l2_cache_mib": 32.0,
+  "peak_dram_bandwidth_formula": "2 * MEMORY_CLOCK_RATE[kHz] * 1e3 * BUS_WIDTH[bits] / 8",
+  "peak_dram_bandwidth_bytes_per_s": 256032000000.0,
+  "peak_dram_bandwidth_gb_per_s": 256.032,
+  "note": "theoretical peak computed from reported values, not a measured bandwidth"
+ },
+ "git_commit": "27cd288611b0e2f189971196c2673587cd1ab005"
+}

@@ -87,6 +87,23 @@ def config_sort_key(key):
 
 
 # ---- setup ----------------------------------------------------------------------------------
+def device_facts(reg):
+    """Driver-reported device attributes (reports/device_query_20261103) and the computed peak."""
+    src = ROOT / "reports" / "device_query_20261103" / "device_query.json"
+    d = load(src)
+    at = {k.replace("CU_DEVICE_ATTRIBUTE_", ""): v["value"] for k, v in d["attributes"].items()}
+    peak = d["derived"]["peak_dram_bandwidth_gb_per_s"]
+    return {
+        "sms": reg.add(at["MULTIPROCESSOR_COUNT"], src),
+        "l2_mib": reg.fmt(at["L2_CACHE_SIZE"] / (1 << 20), ".0f", src),
+        "bus_bits": reg.add(at["GLOBAL_MEMORY_BUS_WIDTH"], src),
+        "mem_clock_mhz": reg.fmt(at["MEMORY_CLOCK_RATE"] / 1000, ".0f", src),
+        "peak_gbps": reg.fmt(peak, ".1f", src),
+        "peak_gbps_int": reg.fmt(peak, ".0f", src),
+        "peak_gbps_exact": reg.add(f"{peak:g}", src),
+    }
+
+
 def setup_table(reg):
     run = LOCAL / "runs" / PRIMARY_RUNS["e4"][2]
     env = (run / "environment.txt").read_text().splitlines()
@@ -97,6 +114,7 @@ def setup_table(reg):
     nvcc = next(line for line in env if line.startswith("Cuda compilation tools"))
     cuda = nvcc.split(",")[1].strip().replace("release ", "CUDA ")
     cutile, _ = cutile_version()
+    dev = device_facts(reg)
     reg.add(cutile, ROOT / "Cargo.lock")
     merged = LOCAL / "primary_merged_analysis.json"
     results = load(merged)["results"]
@@ -117,6 +135,12 @@ def setup_table(reg):
             f"{reg.add(fields[4], src_env)}",
         ),
         ("Max SM / memory clock", f"{reg.add(fields[7], src_env)} / {reg.add(fields[8], src_env)}"),
+        (
+            "Reported by the driver",
+            f"{dev['sms']} SMs, {dev['l2_mib']} MiB L2, {dev['bus_bits']}-bit memory bus, "
+            f"{dev['mem_clock_mhz']} MHz memory clock; peak 2 × {dev['mem_clock_mhz']} MHz × "
+            f"{dev['bus_bits']} bit / 8 = {dev['peak_gbps']} GB/s (computed, not measured)",
+        ),
         (
             "Software",
             f"Driver {reg.add(fields[2], src_env)} under WSL2 (kernel 6.6.87.2), {cuda}, "
@@ -600,6 +624,7 @@ def main(argv=None):
     slow = dryrun_slowdown(reg)
     t1 = t1_slow_output(reg)
     nvml = nvml_latency(reg)
+    device = device_facts(reg)
     acc = accurate_cost(reg)
     for name, text in frags.items():
         (out / name).write_text(
@@ -619,6 +644,7 @@ def main(argv=None):
                 "void_dryrun_slowdown": slow,
                 "t1_slow_output": t1,
                 "t2_nvml_latency": nvml,
+                "device": device,
                 "c3_accurate_over_fast_e3_n8192": acc,
             },
             indent=1,
