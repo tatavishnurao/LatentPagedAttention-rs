@@ -40,7 +40,8 @@ FIGURE_PAGE = 0.25  # one single-column figure with caption, rough
 ONE_COLUMN_CHARS = 75
 TAG = re.compile(r"\s?\[(?:[MS]:[\w-]+(?:\s*,\s*[MS]:[\w-]+)*|H)\]")
 APPENDIX_HEADINGS = ("appendix",)
-IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
+# Image links: alt text may itself contain brackets (claim tags), so match the link target only.
+IMAGE = re.compile(r"^!\[.*\]\(([^)\s]+\.(?:png|jpe?g|pdf|svg))\)\s*$", re.M)
 # Evidence-key topics for the submission copy's "Evidence files" list. An unknown key fails, so a
 # new key in the paper must be placed here.
 EVIDENCE_TOPICS = (

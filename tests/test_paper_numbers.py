@@ -120,3 +120,12 @@ def test_paper_images_resolve_from_repo_root_in_builds():
     full = ap.assemble(ROOT / "paper" / "paper.md")
     links = ap.check_images(full, ROOT)
     assert links and all(p.startswith("reports/") for p in links)
+
+
+def test_image_check_handles_brackets_in_captions(tmp_path):
+    ap = load("assemble_paper")
+    (tmp_path / "fig.png").write_bytes(b"")
+    text = "![Caption with a tag [M:sass] and [1].](fig.png)\n"
+    assert ap.check_images(text, tmp_path) == ["fig.png"]
+    full = ap.assemble(ROOT / "paper" / "paper.md")
+    assert len(ap.check_images(full, ROOT)) == full.count("\n![")
