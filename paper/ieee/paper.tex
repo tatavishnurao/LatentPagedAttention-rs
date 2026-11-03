@@ -248,7 +248,7 @@ At these sizes the latent kernel is limited by something other than bytes. One c
 
 \subsection{The baseline: why padding, and what it costs}
 
-cuTile decides whether an \texttt{mma} lowers to tensor-core HMMA instructions. In our compile-only SASS probes (sm\_89, 4 warps per CTA), only 16-row tiles with at least 512 outputs got HMMA. GQA-unpad has 4 query rows per KV head and compiled to no HMMA; widening its step to 512 score outputs still gave none and added 616 bytes of stack spills, and a 16 × 16 tile (256 outputs) also fell back. Padding to 16 rows gave 40 static HMMA without spills, at 4 times the multiply-adds (Table~\ref{tab:6}). Only 4 and 16 rows and 256 and 512 outputs were tested, so the threshold between them is not established. FlashDecoding++ {[}17{]} reports the same problem for the flat GEMMs of decode, where padding with zeros cost previous designs more than half their performance.
+cuTile decides whether an \texttt{mma} lowers to tensor-core HMMA instructions. In our compile-only SASS probes (sm\_89, 4 warps per CTA), only 16-row tiles with at least 512 outputs got HMMA. GQA-unpad has 4 query rows per KV head and compiled to no HMMA; widening its step to 512 score outputs still gave none and added 616 bytes of stack spills, and a 16 × 16 tile (256 outputs) also fell back. Padding to 16 rows gave 40 static HMMA without spills, at 4 times the multiply-adds (Table~\ref{tab:6}). Only 4 and 16 rows and 256 and 512 outputs were tested, so the threshold between them is not established. FlashDecoding++ {[}17{]} pads for a similar reason: it pads the M dimension of flat decode GEMMs to 8, matching tensor-core tile shapes, rather than the 64 of previous designs.
 
 \begin{table}[t]
 \centering
@@ -324,20 +324,24 @@ On one consumer GPU, with both kernels built from the same tools and held to the
 
 The kernels, harnesses, raw per-sample data, analysis scripts and the scripts that regenerate every table and figure from committed data will be released on acceptance. Tables and figures regenerate on a CPU only; GPU runs are documented with their commands, harness versions and commits.
 
+\section*{Acknowledgment}
+
+AI assistants (Anthropic\textquotesingle s Claude) were used to write and test code and measurement harnesses, to draft and revise the text, and to produce figures. All measurements come from the authors\textquotesingle{} own runs on the hardware described, every number in the paper is generated from committed result files, and every citation was read at its source before being cited.
+
 \begin{thebibliography}{99}
-\bibitem{r1} Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica. Efficient Memory Management for Large Language Model Serving with PagedAttention. arXiv:2309.06180 (arXiv comment, unverified: SOSP 2023).
+\bibitem{r1} Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica. Efficient Memory Management for Large Language Model Serving with PagedAttention. arXiv:2309.06180.
 \bibitem{r2} DeepSeek-AI. DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model. arXiv:2405.04434.
-\bibitem{r3} Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, Sumit Sanghai. GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints. arXiv:2305.13245 (arXiv comment, unverified: EMNLP 2023).
-\bibitem{r4} Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu. KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache. arXiv:2402.02750 (arXiv comment, unverified: ICML 2024).
-\bibitem{r5} Tao Ji, Bin Guo, Yuanbin Wu, Qipeng Guo, Lixing Shen, Zhan Chen, Xipeng Qiu, Qi Zhang, Tao Gui. Towards Economical Inference: Enabling DeepSeek\textquotesingle s Multi-Head Latent Attention in Any Transformer-based LLMs. arXiv:2502.14837 (arXiv comment, unverified: ACL 2025).
+\bibitem{r3} Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, Sumit Sanghai. GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints. arXiv:2305.13245.
+\bibitem{r4} Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu. KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache. arXiv:2402.02750.
+\bibitem{r5} Tao Ji, Bin Guo, Yuanbin Wu, Qipeng Guo, Lixing Shen, Zhan Chen, Xipeng Qiu, Qi Zhang, Tao Gui. Towards Economical Inference: Enabling DeepSeek\textquotesingle s Multi-Head Latent Attention in Any Transformer-based LLMs. arXiv:2502.14837.
 \bibitem{r6} Fanxu Meng, Pingzhi Tang, Xiaojuan Tang, Zengwei Yao, Xing Sun, Muhan Zhang. TransMLA: Multi-Head Latent Attention Is All You Need. arXiv:2502.07864.
-\bibitem{r7} Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci, Vinod Grover, Arvind Krishnamurthy, Luis Ceze. FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving. arXiv:2501.01005 (arXiv comment, unverified: MLSys 2025).
+\bibitem{r7} Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci, Vinod Grover, Arvind Krishnamurthy, Luis Ceze. FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving. arXiv:2501.01005.
 \bibitem{r8} Tri Dao. FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning. arXiv:2307.08691.
 \bibitem{r9} Todd Mytkowicz, Amer Diwan, Matthias Hauswirth, Peter F. Sweeney. Producing Wrong Data Without Doing Anything Obviously Wrong! ASPLOS \textquotesingle09, pp. 265-276. DOI 10.1145/1508244.1508275.
 \bibitem{r10} Xinxin Mei, Qiang Wang, Xiaowen Chu. A Survey and Measurement Study of GPU DVFS on Energy Conservation. arXiv:1610.01784.
 \bibitem{r11} Daniel Velicka, Ondrej Vysocky, Lubomir Riha. Methodology for GPU Frequency Switching Latency Measurement. arXiv:2502.20075.
 \bibitem{r12} NVIDIA. Nsight Compute CLI documentation, option \texttt{-\/-clock-control}, version v2026.3.1. \url{https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html} (accessed 2026-11-01).
-\bibitem{r13} Edd Barrett, Carl Friedrich Bolz-Tereick, Rebecca Killick, Sarah Mount, Laurence Tratt. Virtual Machine Warmup Blows Hot and Cold. arXiv:1602.00602; DOI 10.1145/3133876 (arXiv journal-ref, unverified: OOPSLA 2017, pp. 52:1-52:27).
+\bibitem{r13} Edd Barrett, Carl Friedrich Bolz-Tereick, Rebecca Killick, Sarah Mount, Laurence Tratt. Virtual Machine Warmup Blows Hot and Cold. arXiv:1602.00602; DOI 10.1145/3133876.
 \bibitem{r14} Tri Dao, Daniel Haziza, Francisco Massa, Grigory Sizov. Flash-Decoding for long-context inference. PyTorch blog, October 13, 2023. \url{https://pytorch.org/blog/flash-decoding/} (accessed 2026-11-02).
 \bibitem{r15} NVIDIA Corporation. NVIDIA CUDA Tile. NVIDIA Developer, no date or version given. \url{https://developer.nvidia.com/cuda/tile} (accessed 2026-11-02).
 \bibitem{r16} NVIDIA Corporation. NVML API Reference Guide, Device Queries (docs build Sep 09, 2026; no NVML version stated). \url{https://docs.nvidia.com/deploy/nvml-api/latest/api/group__nvmlDeviceQueries.html} (accessed 2026-11-02).

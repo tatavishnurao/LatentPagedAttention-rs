@@ -142,6 +142,8 @@ def build(src, out_dir):
         n += 1
         return f"{m.group(0)}\\label{{sec:{n}}}"
 
+    # IEEE style: the acknowledgment is an unnumbered section (and takes no label).
+    latex = latex.replace("\\section{Acknowledgment}", "\\section*{Acknowledgment}")
     latex = re.sub(r"\\section\{[^}]*\}", label, latex)
     caps = [f[3] for f in floats.values()]
     caps_tex = pandoc_many([urls_to_autolinks(c) for c in caps])

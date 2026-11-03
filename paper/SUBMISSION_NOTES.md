@@ -26,32 +26,20 @@ under 7 of the 9 allowed pages. IEEEtran conference class unmodified (packages f
 graphics, table rules and URLs only); page numbers on. Template caveat: the CFP points to the IEEE
 templates page; `IEEEtran.cls` from the Ubuntu `texlive-publishers` package was used, not a file downloaded from that page.
 
-## 1. AI-use disclosure (draft, needs your approval before it goes into the acknowledgments)
+## Decisions taken (2026-11-03)
 
-> Acknowledgments. AI assistants (Anthropic's Claude) were used to write and test code and
-> measurement harnesses, to draft and revise the text, and to produce figures. All measurements
-> come from the authors' own runs on the hardware described, every number in the paper is generated
-> from committed result files, and the authors checked every citation against its source.
+- **AI-use acknowledgment:** approved with the last clause changed to "every citation was read at
+  its source before being cited"; it is in the paper as an unnumbered Acknowledgment section.
+- **arXiv title:** "Fewer Bytes, Same Time: Paged Latent-Cache Decode and Clock-Validity Traps on a
+  Laptop GPU". The submission title stays "Compression Is Not Speedup: Measuring Paged Latent-Cache
+  Decode Attention on a Consumer GPU".
+- **Reference [2]:** stays the corporate author "DeepSeek-AI", as its arXiv page lists it.
+- **Wide tables:** Tables 2, 3 and 5 span both columns, approved.
+- **Page numbers:** on, approved.
+- **Venue strings:** all unverified ones removed; references give arXiv IDs and DOIs only, except
+  [9] (ASPLOS '09, confirmed via its DOI record).
 
-Check before approving: the product name, whether "every citation against its source" is true for
-you (the agents read each source; you have not re-read them), and whether you want the
-acknowledgments to also thank anyone else.
+## Still needed
 
-## 2. arXiv title (proposal; the CFP recommends a different title)
-
-Proposed: **"Fewer Bytes, Same Time: Paged Latent-Cache Decode and Clock-Validity Traps on a
-Laptop GPU"**
-
-Submission title stays "Compression Is Not Speedup: Measuring Paged Latent-Cache Decode Attention
-on a Consumer GPU".
-
-## 3. Decisions still needed
-
-- **Reference [2], DeepSeek-V2.** Cited as the corporate author "DeepSeek-AI", exactly as its arXiv
-  page lists it ("DeepSeek-AI and 156 other authors"). The CFP says "References must list all
-  authors"; 157 names would need reading from the paper itself, and would take several column
-  inches. Your call: corporate author only, or the full list.
-- **Wide tables.** Tables 2, 3 and 5 span both columns in addition to Table 4, because in one column
-  they overflowed by 72-111 pt. Alternative: shorter cells or splitting them.
-- **Author line, affiliation, email** for the camera-ready (the submission stays anonymous).
-- **Abstract registration** by 2026-12-11.
+- Author line, affiliation and email for the camera-ready (the submission stays anonymous).
+- Abstract registration by 2026-12-11; full paper by 2026-12-18 (AoE).

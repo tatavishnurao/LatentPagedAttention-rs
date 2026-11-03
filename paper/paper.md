@@ -139,7 +139,7 @@ If both kernels were limited by DRAM bandwidth, the ratio would sit near the rec
 
 ## The baseline: why padding, and what it costs
 
-cuTile decides whether an `mma` lowers to tensor-core HMMA instructions. In our compile-only SASS probes (sm_89, 4 warps per CTA), only 16-row tiles with at least 512 outputs got HMMA [M:sass]. GQA-unpad has 4 query rows per KV head and compiled to no HMMA; widening its step to 512 score outputs still gave none and added 616 bytes of stack spills, and a 16 × 16 tile (256 outputs) also fell back. Padding to 16 rows gave 40 static HMMA without spills, at 4 times the multiply-adds (Table 6). Only 4 and 16 rows and 256 and 512 outputs were tested, so the threshold between them is not established. FlashDecoding++ [17] reports the same problem for the flat GEMMs of decode, where padding with zeros cost previous designs more than half their performance.
+cuTile decides whether an `mma` lowers to tensor-core HMMA instructions. In our compile-only SASS probes (sm_89, 4 warps per CTA), only 16-row tiles with at least 512 outputs got HMMA [M:sass]. GQA-unpad has 4 query rows per KV head and compiled to no HMMA; widening its step to 512 score outputs still gave none and added 616 bytes of stack spills, and a 16 × 16 tile (256 outputs) also fell back. Padding to 16 rows gave 40 static HMMA without spills, at 4 times the multiply-adds (Table 6). Only 4 and 16 rows and 256 and 512 outputs were tested, so the threshold between them is not established. FlashDecoding++ [17] pads for a similar reason: it pads the M dimension of flat decode GEMMs to 8, matching tensor-core tile shapes, rather than the 64 of previous designs.
 
 <!-- include: generated/tab_kernels.md -->
 
@@ -178,21 +178,25 @@ On one consumer GPU, with both kernels built from the same tools and held to the
 
 The kernels, harnesses, raw per-sample data, analysis scripts and the scripts that regenerate every table and figure from committed data will be released on acceptance. Tables and figures regenerate on a CPU only; GPU runs are documented with their commands, harness versions and commits.
 
+# Acknowledgment
+
+AI assistants (Anthropic's Claude) were used to write and test code and measurement harnesses, to draft and revise the text, and to produce figures. All measurements come from the authors' own runs on the hardware described, every number in the paper is generated from committed result files, and every citation was read at its source before being cited.
+
 # References
 
-[1] Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica. Efficient Memory Management for Large Language Model Serving with PagedAttention. arXiv:2309.06180 (arXiv comment, unverified: SOSP 2023).
+[1] Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica. Efficient Memory Management for Large Language Model Serving with PagedAttention. arXiv:2309.06180.
 
 [2] DeepSeek-AI. DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model. arXiv:2405.04434.
 
-[3] Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, Sumit Sanghai. GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints. arXiv:2305.13245 (arXiv comment, unverified: EMNLP 2023).
+[3] Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, Sumit Sanghai. GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints. arXiv:2305.13245.
 
-[4] Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu. KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache. arXiv:2402.02750 (arXiv comment, unverified: ICML 2024).
+[4] Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu. KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache. arXiv:2402.02750.
 
-[5] Tao Ji, Bin Guo, Yuanbin Wu, Qipeng Guo, Lixing Shen, Zhan Chen, Xipeng Qiu, Qi Zhang, Tao Gui. Towards Economical Inference: Enabling DeepSeek's Multi-Head Latent Attention in Any Transformer-based LLMs. arXiv:2502.14837 (arXiv comment, unverified: ACL 2025).
+[5] Tao Ji, Bin Guo, Yuanbin Wu, Qipeng Guo, Lixing Shen, Zhan Chen, Xipeng Qiu, Qi Zhang, Tao Gui. Towards Economical Inference: Enabling DeepSeek's Multi-Head Latent Attention in Any Transformer-based LLMs. arXiv:2502.14837.
 
 [6] Fanxu Meng, Pingzhi Tang, Xiaojuan Tang, Zengwei Yao, Xing Sun, Muhan Zhang. TransMLA: Multi-Head Latent Attention Is All You Need. arXiv:2502.07864.
 
-[7] Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci, Vinod Grover, Arvind Krishnamurthy, Luis Ceze. FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving. arXiv:2501.01005 (arXiv comment, unverified: MLSys 2025).
+[7] Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci, Vinod Grover, Arvind Krishnamurthy, Luis Ceze. FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving. arXiv:2501.01005.
 
 [8] Tri Dao. FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning. arXiv:2307.08691.
 
@@ -204,7 +208,7 @@ The kernels, harnesses, raw per-sample data, analysis scripts and the scripts th
 
 [12] NVIDIA. Nsight Compute CLI documentation, option `--clock-control`, version v2026.3.1. https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html (accessed 2026-11-01).
 
-[13] Edd Barrett, Carl Friedrich Bolz-Tereick, Rebecca Killick, Sarah Mount, Laurence Tratt. Virtual Machine Warmup Blows Hot and Cold. arXiv:1602.00602; DOI 10.1145/3133876 (arXiv journal-ref, unverified: OOPSLA 2017, pp. 52:1-52:27).
+[13] Edd Barrett, Carl Friedrich Bolz-Tereick, Rebecca Killick, Sarah Mount, Laurence Tratt. Virtual Machine Warmup Blows Hot and Cold. arXiv:1602.00602; DOI 10.1145/3133876.
 
 [14] Tri Dao, Daniel Haziza, Francisco Massa, Grigory Sizov. Flash-Decoding for long-context inference. PyTorch blog, October 13, 2023. https://pytorch.org/blog/flash-decoding/ (accessed 2026-11-02).
 
@@ -214,4 +218,4 @@ The kernels, harnesses, raw per-sample data, analysis scripts and the scripts th
 
 [17] Ke Hong, Guohao Dai, Jiaming Xu, Qiuli Mao, Xiuhong Li, Jun Liu, Kangdi Chen, Yuhan Dong, Yu Wang. FlashDecoding++: Faster Large Language Model Inference on GPUs. arXiv:2311.01282.
 
-<!-- Reference details read at the source: [1], [2], [4], [5], [7] full author lists from their arXiv abstract pages on 2026-11-03 ([2] lists the corporate author "DeepSeek-AI and 156 other authors"); venue strings are the arXiv comments and are marked unverified; [17] title and authors read on its arXiv page on 2026-11-03. -->
+<!-- Reference details read at the source: [1], [2], [4], [5], [7] full author lists from their arXiv abstract pages on 2026-11-03 ([2] lists the corporate author "DeepSeek-AI and 156 other authors"); no venue string is given unless confirmed at the source ([9] by its Crossref record); [17] title and authors read on its arXiv page on 2026-11-03. -->
