@@ -47,6 +47,7 @@ Claims made earlier in this repository, in the paper brief or in a draft that th
 | M:prelim | `reports/local_4060_20261101/runs/local4060_b1_e3_20261101_043331/` |
 | M:void | `reports/local_4060_20261101/instrument_checks/e4_B1_N1024_dryrun_VOID/` |
 | M:checks | `reports/local_4060_20261101/instrument_checks/`; `reports/local_4060_20261101/runs/local4060_b2r_e4n1024_20261101_051528/` |
+| M:ncu | `reports/ncu_20261103/` (`PLAN.md` declared before the attempt; `README.md`: `ERR_NVGPUCTRPERM`, no profile) |
 | M:dev | `reports/device_query_20261103/device_query.json` (driver-reported attributes via `cuDeviceGetAttribute`; peak bandwidth computed from them, not measured) |
 | M:nvml | `reports/nvml_latency_20261101/nvml_latency.json` (separate micro-measurement, not campaign data) |
 | M:t1 | `reports/diagnosis_20261002/e0/` (`seq1024_run1`, `seq1024_cool2`); `docs/DIAGNOSIS_2026-10-02.md` (Trap 1: one 1K run took 122 s of wall time against 5 s with output on ext4, modal SM clock 210 MHz, 79 % of samples low-clock; A1 context kernel 321.5 µs at idle clock against 43.0 µs at boost) |

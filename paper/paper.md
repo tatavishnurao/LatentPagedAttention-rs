@@ -158,7 +158,7 @@ Because Step flushes L2 before every layer [S:e4], *L2 capacity is not an axis o
 # Limitations and what we do not claim
 
 - **One laptop GPU under WSL2.** No second GPU, no native Linux host, no data-centre part. Clocks cannot be locked; every exclusion comes from measured clocks, and 7 of 11 configurations lost too many processes. No B=1 result exists: B=1 processes ran mostly at 2595 MHz with some reads near 1890 MHz, and the modal-clock rule excluded them. Loosening the rule after seeing the data would be post hoc, so we did not.
-- **No profiler data.** Bytes are analytic, and the 256 GB/s peak is computed from driver-reported values, not measured. We have no Nsight profile and no measured DRAM traffic, so the explanation in Section 6 (where the time goes) is a hypothesis.
+- **No profiler data.** Bytes are analytic, and the 256 GB/s peak is computed from driver-reported values, not measured. We have no Nsight profile (performance-counter access is denied under WSL2 on this host, `ERR_NVGPUCTRPERM` [M:ncu]) and no measured DRAM traffic, so the explanation in Section 6 (where the time goes) is a hypothesis.
 - **Narrow grid.** Context lengths up to 8192 (earlier 32K runs hit thermal slowdown), one synthetic shape, FP16 storage, no RoPE, no model checkpoint, and no external baseline such as FlashInfer [7] on identical inputs.
 - **Harness versions.** Primary Single data predate fix 2; Single and Step are never pooled. A start-of-timing transient is visible in at least one clean Step trace (Figure 2c) and was not excluded; ratios of medians absorb most of it.
 - **The NVML latency** was measured idle on one driver; its behaviour under load or on native Linux is unknown.

@@ -49,7 +49,7 @@ EVIDENCE_TOPICS = (
     ("Numerics", ("M:scale", "M:emu")),
     ("SASS", ("M:sass",)),
     ("Instrument checks", ("M:void", "M:checks", "M:nvml", "M:t1")),
-    ("Device", ("M:dev",)),
+    ("Device and profiler", ("M:dev", "M:ncu")),
     ("Sources (code and design documents)", ("S:rules", "S:kern", "S:e4", "S:harness")),
 )
 EVIDENCE_START = "**Evidence keys.**"
