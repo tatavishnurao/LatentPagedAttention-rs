@@ -183,6 +183,8 @@ def build(src, out_dir):
         + f"\\title{{{title_tex}}}\n"
         + f"\\author{{\\IEEEauthorblockN{{{author_tex}}}}}\n"
         + "\\maketitle\n"
+        # ISPASS 2027 CFP: "Please number the pages of the submission." No layout change.
+        + "\\thispagestyle{plain}\\pagestyle{plain}\n"
         + f"\\begin{{abstract}}\n{abstract_tex}\n\\end{{abstract}}\n\n"
         + latex
         + "\n"
