@@ -1,0 +1,143 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#fff}
+svg{font-family:"DejaVu Sans",Arial,sans-serif}
+.t{font-size:15px;fill:#111}
+.s{font-size:12.5px;fill:#333}
+.h{font-size:17px;font-weight:700;fill:#111}
+.m{font-size:12.5px;fill:#555;font-style:italic}
+.b{fill:#fff;stroke:#333;stroke-width:1.4}
+.mem{fill:#eef3fb;stroke:#2a78d6;stroke-width:1.6}
+.lat{fill:#fdf0ea;stroke:#eb6834;stroke-width:1.6}
+.pad{fill:#e9e9e9;stroke:#888;stroke-width:1;stroke-dasharray:4 3}
+.cta{fill:none;stroke:#999;stroke-width:1.2;stroke-dasharray:6 4}
+.a{stroke:#333;stroke-width:1.6;fill:none;marker-end:url(#ar)}
+.ab{stroke:#2a78d6;stroke-width:3;fill:none;marker-end:url(#arb)}
+.al{stroke:#eb6834;stroke-width:3;fill:none;marker-end:url(#arl)}
+.bb{font-size:14px;font-weight:700}
+</style></head><body>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560">
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#333"/></marker>
+<marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2a78d6"/></marker>
+<marker id="arl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#eb6834"/></marker>
+</defs>
+
+<!-- ===== (a) GQA ===== -->
+<text x="20" y="30" class="h">(a) GQA split-K, padded (baseline)</text>
+<text x="20" y="52" class="s">grid = S splits × 4 KV heads; each CTA serves the 4 query heads of one KV head</text>
+
+<rect x="20" y="80" width="170" height="150" class="mem" rx="4"/>
+<text x="105" y="104" class="t" text-anchor="middle">DRAM, paged</text>
+<text x="105" y="128" class="s" text-anchor="middle">K and V of KV head h</text>
+<text x="105" y="148" class="s" text-anchor="middle">2 × 64 FP16 per token</text>
+<text x="105" y="168" class="s" text-anchor="middle">gathered via block table</text>
+<text x="105" y="210" class="bb" text-anchor="middle" fill="#2a78d6">256 B/token/head</text>
+
+<rect x="230" y="70" width="440" height="230" class="cta" rx="6"/>
+<text x="660" y="90" class="m" text-anchor="end">one CTA, two-block steps (32 tokens)</text>
+
+<rect x="245" y="105" width="120" height="70" class="b" rx="3"/>
+<text x="305" y="128" class="t" text-anchor="middle">q: 4 rows</text>
+<rect x="257" y="140" width="96" height="24" class="pad"/>
+<text x="305" y="157" class="s" text-anchor="middle">+12 zero rows</text>
+
+<rect x="400" y="105" width="120" height="70" class="b" rx="3"/>
+<text x="460" y="130" class="t" text-anchor="middle">S = q Kᵀ</text>
+<text x="460" y="152" class="s" text-anchor="middle">16 × 32, HMMA</text>
+
+<rect x="545" y="105" width="110" height="70" class="b" rx="3"/>
+<text x="600" y="130" class="t" text-anchor="middle">online</text>
+<text x="600" y="150" class="t" text-anchor="middle">softmax</text>
+
+<rect x="400" y="205" width="255" height="70" class="b" rx="3"/>
+<text x="527" y="230" class="t" text-anchor="middle">acc += P V</text>
+<text x="527" y="252" class="s" text-anchor="middle">16 × 64 FP32 (12 rows discarded)</text>
+
+<path d="M365,140 L398,140" class="a"/>
+<path d="M520,140 L543,140" class="a"/>
+<path d="M600,175 L600,203" class="a"/>
+<path d="M190,130 C 300,60 380,90 398,128" class="ab"/>
+<path d="M190,185 C 300,250 330,240 398,240" class="ab"/>
+
+<rect x="700" y="205" width="120" height="70" class="b" rx="3"/>
+<text x="760" y="230" class="t" text-anchor="middle">partials</text>
+<text x="760" y="252" class="s" text-anchor="middle">(acc, m, ℓ)</text>
+<path d="M655,240 L698,240" class="a"/>
+<rect x="850" y="205" width="140" height="70" class="b" rx="3"/>
+<text x="920" y="230" class="t" text-anchor="middle">reduce</text>
+<text x="920" y="252" class="s" text-anchor="middle">log-sum-exp</text>
+<path d="M820,240 L848,240" class="a"/>
+<rect x="1020" y="205" width="120" height="70" class="b" rx="3"/>
+<text x="1080" y="230" class="t" text-anchor="middle">out</text>
+<text x="1080" y="252" class="s" text-anchor="middle">4 heads × 64</text>
+<path d="M990,240 L1018,240" class="a"/>
+
+<rect x="1170" y="80" width="210" height="195" fill="#f6f8fc" stroke="#2a78d6" rx="4"/>
+<text x="1275" y="110" class="t" text-anchor="middle">cache bytes per token,</text>
+<text x="1275" y="130" class="t" text-anchor="middle">all 4 KV heads</text>
+<text x="1275" y="178" class="bb" text-anchor="middle" fill="#2a78d6" style="font-size:30px">1024 B</text>
+<text x="1275" y="210" class="s" text-anchor="middle">4 × MACs from padding</text>
+<text x="1275" y="230" class="s" text-anchor="middle">40 static HMMA</text>
+<text x="1275" y="250" class="s" text-anchor="middle">128 registers</text>
+
+<!-- ===== (b) Latent ===== -->
+<line x1="20" y1="315" x2="1380" y2="315" stroke="#ddd"/>
+<text x="20" y="345" class="h">(b) Latent split-K, hi/lo (primary latent kernel)</text>
+<text x="20" y="367" class="s">grid = S splits; each CTA serves all 16 query heads, which share one latent tile</text>
+
+<rect x="20" y="390" width="170" height="150" class="lat" rx="4"/>
+<text x="105" y="414" class="t" text-anchor="middle">DRAM, paged</text>
+<text x="105" y="438" class="s" text-anchor="middle">latent c, shared</text>
+<text x="105" y="458" class="s" text-anchor="middle">32 FP16 per token</text>
+<text x="105" y="478" class="s" text-anchor="middle">gathered via block table</text>
+<text x="105" y="520" class="bb" text-anchor="middle" fill="#eb6834">64 B/token</text>
+
+<rect x="230" y="380" width="440" height="170" class="cta" rx="6"/>
+<text x="660" y="400" class="m" text-anchor="end">one CTA, two-block steps (32 tokens)</text>
+
+<rect x="245" y="415" width="130" height="70" class="b" rx="3"/>
+<text x="310" y="437" class="t" text-anchor="middle">q′ = q Pᴷ</text>
+<text x="310" y="457" class="s" text-anchor="middle">16 × 32, FP32,</text>
+<text x="310" y="475" class="s" text-anchor="middle">once per CTA</text>
+
+<rect x="400" y="415" width="120" height="70" class="b" rx="3"/>
+<text x="460" y="437" class="t" text-anchor="middle">S = q′ₕᵢ cᵀ</text>
+<text x="460" y="457" class="t" text-anchor="middle">+ q′ₗₒ cᵀ</text>
+<text x="460" y="477" class="s" text-anchor="middle">2 HMMA, FP32 acc</text>
+
+<rect x="545" y="415" width="110" height="70" class="b" rx="3"/>
+<text x="600" y="440" class="t" text-anchor="middle">online</text>
+<text x="600" y="460" class="t" text-anchor="middle">softmax</text>
+
+<rect x="400" y="500" width="255" height="40" class="b" rx="3"/>
+<text x="527" y="525" class="t" text-anchor="middle">acc += P c   (16 × 32 FP32)</text>
+
+<path d="M375,450 L398,450" class="a"/>
+<path d="M520,450 L543,450" class="a"/>
+<path d="M600,485 L600,498" class="a"/>
+<path d="M190,440 C 300,380 380,400 398,440" class="al"/>
+<path d="M190,500 C 300,530 340,522 398,520" class="al"/>
+
+<rect x="700" y="490" width="120" height="55" class="b" rx="3"/>
+<text x="760" y="512" class="t" text-anchor="middle">partials</text>
+<text x="760" y="532" class="s" text-anchor="middle">(acc, m, ℓ)</text>
+<path d="M655,520 L698,520" class="a"/>
+<rect x="850" y="470" width="140" height="80" class="b" rx="3"/>
+<text x="920" y="494" class="t" text-anchor="middle">reduce</text>
+<text x="920" y="514" class="s" text-anchor="middle">log-sum-exp, then</text>
+<text x="920" y="532" class="s" text-anchor="middle">× Pⱽ once per head</text>
+<path d="M820,517 L848,517" class="a"/>
+<rect x="1020" y="490" width="120" height="55" class="b" rx="3"/>
+<text x="1080" y="512" class="t" text-anchor="middle">out</text>
+<text x="1080" y="532" class="s" text-anchor="middle">16 heads × 64</text>
+<path d="M990,517 L1018,517" class="a"/>
+
+<rect x="1170" y="350" width="210" height="195" fill="#fdf6f2" stroke="#eb6834" rx="4"/>
+<text x="1275" y="380" class="t" text-anchor="middle">cache bytes per token,</text>
+<text x="1275" y="400" class="t" text-anchor="middle">all heads</text>
+<text x="1275" y="448" class="bb" text-anchor="middle" fill="#eb6834" style="font-size:30px">64 B</text>
+<text x="1275" y="478" class="s" text-anchor="middle">16× fewer cache bytes;</text>
+<text x="1275" y="498" class="s" text-anchor="middle">3.5–13.2× fewer in total</text>
+<text x="1275" y="518" class="s" text-anchor="middle">(projections, partials)</text>
+<text x="1275" y="538" class="s" text-anchor="middle">24 HMMA, 95 registers</text>
+</svg></body></html>
