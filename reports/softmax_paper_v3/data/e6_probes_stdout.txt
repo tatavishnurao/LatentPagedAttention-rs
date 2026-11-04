@@ -23,3 +23,11 @@ smollm2-360m N=512: 8s; sink_rate(0.3)=0.710; top1 answer [True, True, True]
 smollm2-360m N=1024: 16s; sink_rate(0.3)=0.722; top1 answer [True, True, True]
 smollm2-360m N=2048: 40s; sink_rate(0.3)=0.617; top1 answer [True, True, True]
 smollm2-360m N=4096: 131s; sink_rate(0.3)=0.424; top1 answer [True, True, True]
+smollm2-360m N=8192: 792s; sink_rate(0.3)=0.410; top1 answer [True, True, True]
+  N=256: fixed head L24H10 w=0.9613 D=8.75; best w=0.9613 D=8.75; top1=1.00 p(answer)=0.726
+  N=512: fixed head L24H10 w=0.9660 D=9.58; best w=0.9660 D=9.58; top1=1.00 p(answer)=0.810
+  N=1024: fixed head L24H10 w=0.8817 D=8.94; best w=0.8817 D=8.94; top1=1.00 p(answer)=0.577
+  N=2048: fixed head L24H10 w=0.9162 D=10.02; best w=0.9162 D=10.02; top1=1.00 p(answer)=0.816
+  N=4096: fixed head L24H10 w=0.3150 D=7.54; best w=0.7164 D=9.24; top1=1.00 p(answer)=0.611
+  N=8192: fixed head L24H10 w=0.0923 D=6.73; best w=0.9159 D=11.40; top1=1.00 p(answer)=0.675
+qwen3-0.6b N=256: 6s; sink_rate(0.3)=0.743; top1 answer [True, True, True]
