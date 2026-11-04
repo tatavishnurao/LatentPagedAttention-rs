@@ -1,0 +1,83 @@
+{
+ "device": "cpu",
+ "torch": "2.15.0+cu132",
+ "gpu": null,
+ "rows": [
+  {
+   "C": 113,
+   "dtype": "float32",
+   "setup": "pure",
+   "grad_first_zero_gap": 20.661,
+   "paper_margin": 15.942501128704908,
+   "logp_first_zero_gap": 20.661
+  },
+  {
+   "C": 113,
+   "dtype": "bfloat16",
+   "setup": "pure",
+   "grad_first_zero_gap": 10.282,
+   "paper_margin": 5.563501128704906,
+   "logp_first_zero_gap": 10.282
+  },
+  {
+   "C": 113,
+   "dtype": "bfloat16",
+   "setup": "upcast",
+   "grad_first_zero_gap": 20.688,
+   "paper_margin": 15.969501128704906
+  },
+  {
+   "C": 113,
+   "dtype": "float16",
+   "setup": "pure",
+   "grad_first_zero_gap": 12.34,
+   "paper_margin": 7.621501128704906,
+   "logp_first_zero_gap": 12.34
+  },
+  {
+   "C": 113,
+   "dtype": "float16",
+   "setup": "upcast",
+   "grad_first_zero_gap": 20.665,
+   "paper_margin": 15.946501128704906
+  },
+  {
+   "C": 151936,
+   "dtype": "float32",
+   "setup": "pure",
+   "grad_first_zero_gap": 27.874,
+   "paper_margin": 15.942791923210992,
+   "logp_first_zero_gap": 27.874
+  },
+  {
+   "C": 151936,
+   "dtype": "bfloat16",
+   "setup": "pure",
+   "grad_first_zero_gap": 17.438,
+   "paper_margin": 5.506791923210992,
+   "logp_first_zero_gap": 17.438
+  },
+  {
+   "C": 151936,
+   "dtype": "bfloat16",
+   "setup": "upcast",
+   "grad_first_zero_gap": 27.813,
+   "paper_margin": 15.881791923210992
+  },
+  {
+   "C": 151936,
+   "dtype": "float16",
+   "setup": "pure",
+   "grad_first_zero_gap": 19.524,
+   "paper_margin": 7.592791923210994,
+   "logp_first_zero_gap": 19.524
+  },
+  {
+   "C": 151936,
+   "dtype": "float16",
+   "setup": "upcast",
+   "grad_first_zero_gap": 27.868,
+   "paper_margin": 15.936791923210992
+  }
+ ]
+}

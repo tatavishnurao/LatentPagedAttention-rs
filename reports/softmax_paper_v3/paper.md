@@ -2,9 +2,11 @@
 
 **A reproduction and measurement study**
 
-*Tata Vishnu Vardhan Rao · Anurag University, Hyderabad · November 2026 · preprint · code, data and logs published with this page*
+*Tata Vishnu Vardhan Rao · Anurag University, Hyderabad · November 2026 · **working draft** · code, data and logs published with this page*
 
-> **Abstract.** ⟦ABSTRACT⟧
+> **Draft status (4 Nov 2026).** This draft uses every result available in the session so far. Real-model results cover the matched vanilla/softpick 340M pair only; SmolLM2-360M, Qwen3-0.6B and Gemma-3-1B-it are still running, and E7 (log-prob precision on real text) has not run yet. Sections that depend on them are marked **Pending**. The GPU experiments (B4–B6) are scripts that have not been run.
+
+> **Abstract.** Serving engines compute softmax in every attention head and in the vocabulary head. We re-test four published claims about it: dispersion with growing context and an adaptive-temperature fix, first-token attention sinks, Softmax Collapse, and Softmax Cancellation. We use fine-grid CPU reproductions and the papers' own published code. Three findings: the published collapse cliffs (5.5, 16.6, 36.7) are two-class values, and CPU PyTorch collapses up to 2.1 nats earlier with ≥113 classes; the adaptive-temperature polynomial only acts for row entropies of 0.85–5.95 nats; in a matched 340M pair, the softmax model's sink rate falls from 0.63 to 0.11 between 256 and 4,096 tokens, while softpick shows none. We also locate where vLLM and SGLang compute returned log-probabilities; SGLang's RL on-policy mode uses bfloat16. Code, data and validation logs are released.
 
 ## 1 Introduction
 
@@ -29,11 +31,11 @@ This paper re-tests the four claims and measures the related behaviour in five o
 
 | # | Claim (paraphrased) | Source | What we test | Verdict |
 |---|---|---|---|---|
-| C1a | With bounded logits, every global-attention coefficient is Θ(1/n) as items n grow | [@velickovic, Lemma 2.1, Thm. 2.2] | Closed form vs float64; five real models | ⟦V1a⟧ |
-| C1b | Adaptive temperature, set from row entropy by a fitted polynomial, sharpens attention at inference | [@velickovic, §3, Fig. 4, Table 1] | The printed polynomial on synthetic rows | ⟦V1b⟧ |
-| C2 | Strong first-token sinks are common; a non-normalised attention removes them | [@barbero, Table 1; @gu, §7; @softpick, Fig. 1] | Sink rate and first-token mass in five models | ⟦V2⟧ |
-| C3 | Cross-entropy's target gradient rounds to zero beyond a cliff c ≈ 5.5 (bf16), 16.6 (fp32), 36.7 (fp64); the log-space fix removes it | [@barron, §1–2, Fig. 1a] | Built-in vs fixed, three dtypes, C ∈ {2, 113, 1000, 32000, 151936} | ⟦V3⟧ |
-| C4 | Soft-target cross-entropy has a non-zero gradient at z_S = z_T; the fix returns 0 | [@barron, §3, Fig. 1b] | Built-in vs fixed vs float64/mpmath reference | ⟦V4⟧ |
+| C1a | With bounded logits, every global-attention coefficient is Θ(1/n) as items n grow | [@velickovic, Lemma 2.1, Thm. 2.2] | Closed form vs float64; five real models | Pending (2 of 5 models): the fixed-gap law does not describe a single head; other heads take over |
+| C1b | Adaptive temperature, set from row entropy by a fitted polynomial, sharpens attention at inference | [@velickovic, §3, Fig. 4, Table 1] | The printed polynomial on synthetic rows | Holds inside the fitted regime; inactive above 5.95 nats |
+| C2 | Strong first-token sinks are common; a non-normalised attention removes them | [@barbero, Table 1; @gu, §7; @softpick, Fig. 1] | Sink rate and first-token mass in five models | Holds in the matched pair (softmax 62.6% at 256 tokens vs softpick 0%); 3 models pending |
+| C3 | Cross-entropy's target gradient rounds to zero beyond a cliff c ≈ 5.5 (bf16), 16.6 (fp32), 36.7 (fp64); the log-space fix removes it | [@barron, §1–2, Fig. 1a] | Built-in vs fixed, three dtypes, C ∈ {2, 113, 1000, 32000, 151936} | Holds for C = 2; earlier cliff for C ≥ 113 on CPU |
+| C4 | Soft-target cross-entropy has a non-zero gradient at z_S = z_T; the fix returns 0 | [@barron, §3, Fig. 1b] | Built-in vs fixed vs float64/mpmath reference | Holds |
 
 ## 3 Methodology and metrics
 
@@ -107,27 +109,66 @@ Natural text comes from three Project Gutenberg books (3 passages per point). Ne
 
 ### 5.1 C2 — Attention sinks
 
-⟦E6_SINKS⟧
+![E6a](figures/e6_sinks.png "Figure 3. Sink rate (share of heads with mean weight on token 0 above 0.3) and mean first-token mass vs context length, last 64 queries, 3 Gutenberg passages per point, CPU fp32. Draft: vanilla-340M and softpick-340M only. Takeaway: the softmax model's sink weakens as context grows; softpick has none at any length.")
+
+**Verdict (matched pair): holds.**
+- **The softmax model has strong sinks.** At 256 tokens, 62.6% of vanilla-340M's heads put more than 0.3 of their weight on token 0. That is close to the 63.41% the softpick authors report for their 340M softmax model [@softpick, Fig. 1]. Their averaging may differ from ours, which uses the last 64 queries.
+- **The sink weakens as context grows.** The sink rate falls to 60.2%, 52.6%, 36.9% and 10.6% at 512, 1,024, 2,048 and 4,096 tokens. Mean first-token mass falls from 0.382 to 0.088. Gu et al. also report their sink metric decreasing with sequence length [@gu, Fig. 3].
+- **Strong sinks (ε = 0.8) are rare.** They cover 0.6% of heads at 256 tokens and none beyond, below the 45.97% reported for Llama 3.1 8B [@barbero, Table 1]. These are much smaller models, so we do not read this as a contradiction.
+- **Softpick has no sinks.** Its sink rate is 0.0% at every length, and its first-token mass is at most 0.001 [@softpick, Fig. 1].
+- **Pending:** SmolLM2-360M (sink rate 0.733 at 256 tokens and 0.424 at 4,096 in the running log), Qwen3-0.6B and Gemma-3-1B-it.
 
 ### 5.2 C1a — Dispersion in real heads
 
-⟦E6_NEEDLE⟧
+![E6c](figures/e6_needle.png "Figure 4. Final-query weight on the planted answer tokens vs context length (3 depths per point). (a) The head that is best at N = 256, tracked across N; dotted: the fixed-gap law with Δ fitted at N = 256. (b) The best head at each N. Draft: matched 340M pair only. Takeaway: a fixed head disperses faster than the law predicts in the softmax model, but other heads take over.")
+
+**Verdict (matched pair): dispersion holds for a fixed head; retrieval survives through head switching.**
+- **The fixed-gap law fails for the softmax model.** Under the law, the fitted gap $\Delta_N$ of a fixed head would stay constant. In vanilla-340M the best head at 256 tokens (layer 21, head 13) falls from weight 0.782 to 0.0019 at 4,096 tokens, and $\Delta_N$ falls from 6.82 to 2.03. That is faster dispersion than the law predicts.
+- **Other heads take over.** The best head at each N keeps weight 0.69–0.78, its $\Delta_N$ rises from 6.82 to 9.51, and the model's top-1 prediction is the answer at all 15 needle positions.
+- **Softpick's fixed head holds longer.** Layer 20, head 11 keeps 0.69, 0.63, 0.51 and 0.50 up to 2,048 tokens ($\Delta_N$ 6.34 → 7.62), then falls to 0.074 at 4,096. At 4,096 the top-1 answer rate drops to 2 of 3. Softpick weights need not sum to one, so its needle weights are not directly comparable to softmax weights.
+- **Attention entropy is not reported in this draft.** The softpick entropies in the current data were computed before rows were renormalised. A corrected re-run is queued.
 
 ### 5.3 Log-probability precision and serving engines
 
-⟦E7⟧
+**Serving-engine code (read at pinned commits).**
+- **vLLM** returns `logits.log_softmax(dim=-1, dtype=torch.float32)` [@vllm, sampler.py].
+- **SGLang** casts logits to float32. Greedy requests use `log_softmax`, and standard sampling returns `torch.log(probs)` [@sglang, logits_processor.py and sampler.py].
+- **The exception:** with `--rl-on-policy-target` (and deterministic inference, temperature sampling without top-k/top-p), SGLang casts logits to bfloat16 and computes `log_softmax` in bfloat16 [@sglang, sampler.py and server_arguments.mdx].
+
+**Synthetic precision thresholds** (from E4c, `data/e4_forward_logprob.json`; Qwen's 151,936-token vocabulary):
+- bfloat16 `log_softmax` returns exactly 0 once the target leads by a gap of 17.44, i.e. paper margin 5.51, which corresponds to p ≳ 0.996.
+- fp32 `log_softmax` and fp32 `log(softmax)` do so only at a gap of 27.88 (margin 15.95).
+
+**Pending:** E7 on real text (exact-zero rate among tokens with p > 0.9, per method), and B4 (returned log-probs from running servers, GPU).
 
 ## 6 Implications for serving
 
-⟦IMPLICATIONS⟧
+Each item is labelled *established* (measured here or shown in a cited source) or *inference*.
+
+**Table 4.** Places where a standard computation returns a misleading value.
+
+| Computation | What goes wrong | Where | Status |
+|---|---|---|---|
+| Collapse cliff quoted as 16.6 (fp32) | With ≥113 classes, CPU PyTorch collapses at margin 15.94 | Training losses | established (Table 3) |
+| Adaptive temperature from [@velickovic, Fig. 4] | Inactive above 5.95 nats of row entropy | Long-context heads | established (§4.3) |
+| bf16 `log_softmax` of returned log-probs | log p = 0 for p ≳ 0.996 | SGLang RL on-policy mode | established in code and on synthetic logits; real-model rate pending |
+| "Keep the first page" eviction heuristics | Sink mass falls with context in vanilla-340M; absent in softpick | Paged KV eviction | inference from the matched pair; test in B5 |
+
+- **KV eviction.** Window-only eviction breaks unless the first tokens are kept [@streamingllm, §3] (established). In the matched pair, the sink's mass shrinks as context grows and is absent with softpick. So the value of pinning the first page may depend on context length and on the attention function (inference; B5 tests it).
+- **Long-context retrieval.** One retrieval head does disperse with N, but the model compensates by switching heads. A probe that tracks a single head would overstate the loss of retrieval ability (established in the pair).
+- **Log-prob APIs.** Default vLLM and SGLang paths are float32. Users of SGLang's RL on-policy mode should expect exact zeros for confident tokens (established in code; the size of the effect on real text is pending).
 
 ## 7 Threats to validity
 
-⟦THREATS⟧
+- **Hardware and kernels.** All thresholds are CPU PyTorch 2.15.0 results. The B6 script checks CUDA.
+- **Scale.** The real models are 340M–1B parameters, probed at ≤8,192 tokens. Sink behaviour in 8B–405B models comes from the cited papers.
+- **Sample size.** Three passages and three needle depths per context length. No confidence intervals in this draft.
+- **Definitions.** Our sink rate averages over the last 64 queries; Gu et al. and the softpick authors average differently.
+- **Implementation.** The fixes are our translations of published JAX listings. The 340M models are loaded through a mapping onto Llama, validated against an independent forward pass.
 
 ## 8 Artifact availability
 
-⟦ARTIFACT⟧
+Code, raw JSON, stdout logs and validation results are published with this page and in `reports/softmax_paper_v3/` of the author's repository. Validation: `data/validate_models.json`. GPU scripts with a pre-registered criterion for B5: `code/gpu/`. The companion technical report holds the survey, the census of 36 model families and the E1–E5 experiments [@v2report].
 
 ## References
 
