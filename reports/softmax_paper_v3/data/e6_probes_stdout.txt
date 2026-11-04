@@ -20,3 +20,4 @@ softpick-340m N=4096: 558s; sink_rate(0.3)=0.000; top1 answer [False, True, True
   N=4096: fixed head L20H11 w=0.0737 D=5.79; best w=0.6349 D=8.87; top1=0.67 p(answer)=0.383
 smollm2-360m N=256: 4s; sink_rate(0.3)=0.733; top1 answer [True, True, True]
 smollm2-360m N=512: 8s; sink_rate(0.3)=0.710; top1 answer [True, True, True]
+smollm2-360m N=1024: 16s; sink_rate(0.3)=0.722; top1 answer [True, True, True]
