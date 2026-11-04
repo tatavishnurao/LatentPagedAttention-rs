@@ -1,0 +1,8 @@
+adaptive-theta polynomial sharpens (beta>1) only for H in [0.849, 5.945] nats; max beta 2.421 at H=4.412
+sigma=1.0: H(65536)=10.590 vs lnN-s^2/2=10.590; max_w N=64 0.107 -> N=65536 0.0008; adaptive max_w(65536)=0.0008 (mean beta 1.000); trials at 65536 = 30
+sigma=2.0: H(65536)=9.103 vs lnN-s^2/2=9.090; max_w N=64 0.300 -> N=65536 0.0136; adaptive max_w(65536)=0.0136 (mean beta 1.000); trials at 65536 = 30
+sigma=4.0: H(65536)=4.646 vs lnN-s^2/2=3.090; max_w N=64 0.588 -> N=65536 0.2077; adaptive max_w(65536)=0.6102 (mean beta 2.176); trials at 65536 = 30
+planted target at 4.0 sigma: w(N=235)=0.125->adaptive 0.798; adaptive off (beta=1) from N=861; w(65536)=0.0005->adaptive 0.0005 (mean beta 1.000)
+planted target at 6.0 sigma: w(N=235)=0.512->adaptive 0.996; adaptive off (beta=1) from N=1328; w(65536)=0.0037->adaptive 0.0037 (mean beta 1.000)
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e3_random_logits.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e3_random_logits.json

@@ -1,0 +1,54 @@
+{
+ "local / sliding-window layers": {
+  "date": "2020-05",
+  "family": "GPT-3"
+ },
+ "softmax contrastive loss": {
+  "date": "2021-02",
+  "family": "CLIP"
+ },
+ "sigmoid (non-softmax) loss": {
+  "date": "2023-03",
+  "family": "SigLIP"
+ },
+ "linear-attention or SSM layers": {
+  "date": "2023-12",
+  "family": "Mamba"
+ },
+ "softmax MoE router": {
+  "date": "2024-01",
+  "family": "Mixtral 8x7B"
+ },
+ "vocab logit multiplier": {
+  "date": "2024-03",
+  "family": "Command R"
+ },
+ "logit soft-capping": {
+  "date": "2024-04",
+  "family": "RecurrentGemma (Griffin)"
+ },
+ "length/temperature logit scaling": {
+  "date": "2024-05",
+  "family": "DeepSeek-V2"
+ },
+ "QK-norm": {
+  "date": "2024-12",
+  "family": "OLMo 2"
+ },
+ "z-loss": {
+  "date": "2024-12",
+  "family": "OLMo 2"
+ },
+ "sigmoid MoE router": {
+  "date": "2024-12",
+  "family": "DeepSeek-V3"
+ },
+ "attention output gate": {
+  "date": "2025-01",
+  "family": "MiniMax-Text-01"
+ },
+ "learned sink logit": {
+  "date": "2025-08",
+  "family": "gpt-oss"
+ }
+}

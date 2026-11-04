@@ -1,0 +1,11 @@
+alpha=0.5: max |bisect-closed| = 1.78e-15; required Delta/T at N=65536: 11.090
+alpha=0.9: max |bisect-closed| = 1.42e-14; required Delta/T at N=65536: 13.288
+alpha=0.99: max |bisect-closed| = 1.71e-13; required Delta/T at N=65536: 15.685
+none (RoPE rescaling only): N=32768: c=1.000 need=1.198 closed=0.00 w=0.529; N=131072: c=1.000 need=1.330 closed=0.00 w=0.219; N=1048576: c=1.000 need=1.527 closed=0.00 w=0.034; N=10485760: c=1.000 need=1.746 closed=0.00 w=0.004
+static YaRN s=4 (Qwen3 card): N=32768: c=1.296 need=1.198 closed=1.50 w=0.962; N=131072: c=1.296 need=1.330 closed=0.90 w=0.864; N=1048576: c=1.296 need=1.527 closed=0.56 w=0.443; N=10485760: c=1.296 need=1.746 closed=0.40 w=0.074
+YaRN s=32 (gpt-oss, Kimi K2): N=32768: c=1.813 need=1.198 closed=4.11 w=1.000; N=131072: c=1.813 need=1.330 closed=2.47 w=0.999; N=1048576: c=1.813 need=1.527 closed=1.54 w=0.995; N=10485760: c=1.813 need=1.746 closed=1.09 w=0.948
+YaRN s=40 (DeepSeek-V3): N=32768: c=1.874 need=1.198 closed=4.42 w=1.000; N=131072: c=1.874 need=1.330 closed=2.65 w=1.000; N=1048576: c=1.874 need=1.527 closed=1.66 w=0.997; N=10485760: c=1.874 need=1.746 closed=1.17 w=0.972
+Llama 4 temp. tuning (NoPE): N=32768: c=1.161 need=1.198 closed=0.81 w=0.859; N=131072: c=1.283 need=1.330 closed=0.86 w=0.847; N=1048576: c=1.486 need=1.527 closed=0.92 w=0.853; N=10485760: c=1.716 need=1.746 closed=0.96 w=0.867
+log-length ln N / ln L: N=32768: c=1.250 need=1.198 closed=1.26 w=0.940; N=131072: c=1.417 need=1.330 closed=1.26 w=0.957; N=1048576: c=1.667 need=1.527 closed=1.26 w=0.975; N=10485760: c=1.943 need=1.746 closed=1.26 w=0.986
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e2_temperature.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e2_temperature.json

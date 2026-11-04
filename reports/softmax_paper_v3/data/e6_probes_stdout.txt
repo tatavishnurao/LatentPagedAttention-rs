@@ -1,0 +1,14 @@
+vanilla-340m N=256: 4s; sink_rate(0.3)=0.626; top1 answer [True, True, True]
+vanilla-340m N=512: 7s; sink_rate(0.3)=0.602; top1 answer [True, True, True]
+vanilla-340m N=1024: 18s; sink_rate(0.3)=0.526; top1 answer [True, True, True]
+vanilla-340m N=2048: 73s; sink_rate(0.3)=0.369; top1 answer [True, True, True]
+vanilla-340m N=4096: 272s; sink_rate(0.3)=0.106; top1 answer [True, True, True]
+  N=256: fixed head L21H13 w=0.7821 D=6.82; best w=0.7821 D=6.82; top1=1.00 p(answer)=0.810
+  N=512: fixed head L21H13 w=0.3642 D=5.68; best w=0.6984 D=7.08; top1=1.00 p(answer)=0.640
+  N=1024: fixed head L21H13 w=0.1328 D=5.05; best w=0.7716 D=8.15; top1=1.00 p(answer)=0.876
+  N=2048: fixed head L21H13 w=0.0456 D=4.58; best w=0.6929 D=8.44; top1=1.00 p(answer)=0.865
+  N=4096: fixed head L21H13 w=0.0019 D=2.03; best w=0.7670 D=9.51; top1=1.00 p(answer)=0.757
+softpick-340m N=256: 4s; sink_rate(0.3)=0.000; top1 answer [True, True, True]
+softpick-340m N=512: 9s; sink_rate(0.3)=0.000; top1 answer [True, True, True]
+softpick-340m N=1024: 28s; sink_rate(0.3)=0.000; top1 answer [True, True, True]
+softpick-340m N=2048: 198s; sink_rate(0.3)=0.000; top1 answer [True, True, True]

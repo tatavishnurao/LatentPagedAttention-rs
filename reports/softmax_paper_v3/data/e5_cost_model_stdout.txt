@@ -1,0 +1,6 @@
+Llama-3.1-8B (GQA): linear 15.01 GFLOP/token; growing KV bytes per context token 131072 B; at n=32,768: KV+state 4.000 GiB, decode exp 3.355e+07, decode attn 17.18 GFLOP (attn/linear 1.14); decode crossover n=28628; prefill (amortised) crossover n=57255
+DeepSeek-V3 (MLA): linear 73.25 GFLOP/token; growing KV bytes per context token 70272 B; at n=32,768: KV+state 2.145 GiB, decode exp 2.559e+08, decode attn 556.74 GFLOP (attn/linear 7.60); decode crossover n=4311; prefill (amortised) crossover n=29316
+Gemma-3-27B (5 local : 1 global): linear 54.02 GFLOP/token; growing KV bytes per context token 81920 B; at n=32,768: KV+state 2.906 GiB, decode exp 1.219e+07, decode attn 6.24 GFLOP (attn/linear 0.12); decode crossover n=324358; prefill (amortised) crossover n=648724
+Qwen3-Next-80B-A3B (3 DeltaNet : 1 attn): linear 7.24 GFLOP/token; growing KV bytes per context token 24576 B; at n=32,768: KV+state 0.820 GiB, decode exp 6.291e+06, decode attn 6.44 GFLOP (attn/linear 0.89); decode crossover n=36814; prefill (amortised) crossover n=73628
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e5_cost_model.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e5_cost_model.json

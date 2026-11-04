@@ -1,0 +1,417 @@
+{
+ "refs": {
+  "velickovic": {
+   "arxiv": "2410.01104",
+   "venue": "ICML 2025, PMLR 267",
+   "summary": "Proves that when logits are bounded, every softmax coefficient of a global attention head decays as \u0398(1/n) as the number of items grows (Lemma 2.1, Theorem 2.2), and proposes an ad-hoc adaptive temperature set from row entropy by a fitted degree-4 polynomial (Fig. 4)."
+  },
+  "barbero": {
+   "arxiv": "2504.02732",
+   "venue": "COLM 2025",
+   "summary": "Argues that the first-token attention sink lets deep decoder Transformers limit over-mixing; measures strong-sink heads across Llama 3.1 8B, 70B and 405B (Table 1) and shows how pre-training packing and the \u27e8bos\u27e9 token shape the sink (Table 2)."
+  },
+  "barron": {
+   "arxiv": "2610.31642",
+   "venue": "arXiv preprint",
+   "summary": "Names two numerical bugs in standard softmax and cross-entropy: Softmax Collapse, where the target gradient rounds to zero beyond a precision cliff, and Softmax Cancellation, a non-zero gradient when student and teacher logits are equal; gives log-space JAX fixes for both."
+  },
+  "prieto": {
+   "arxiv": "2501.04697",
+   "venue": "ICLR 2025",
+   "summary": "Introduces the term Softmax Collapse for floating-point absorption that zeroes the loss and correct-class gradient in grokking tasks without regularisation, and proposes StableMax and \u22a5Grad to avoid it."
+  },
+  "gu": {
+   "arxiv": "2410.10781",
+   "venue": "ICLR 2025",
+   "summary": "Ablates pre-training factors and finds that attention sinks emerge after effective optimisation, behave like key biases, and do not emerge with unnormalised sigmoid attention in models up to 1B parameters."
+  },
+  "streamingllm": {
+   "arxiv": "2309.17453",
+   "venue": "ICLR 2024",
+   "summary": "Shows that window attention fails once the initial tokens are evicted, and that keeping 4 initial 'attention sink' tokens plus a recent window restores stable generation over millions of tokens."
+  },
+  "softpick": {
+   "arxiv": "2504.20966",
+   "venue": "arXiv preprint",
+   "summary": "Replaces softmax in attention with softpick, a rectified function whose weights need not sum to one; reports a 0% sink rate against 63.41% for matched 340M softmax models (Fig. 1)."
+  },
+  "gatedattn": {
+   "arxiv": "2505.06708",
+   "venue": "arXiv preprint",
+   "summary": "Adds a query-dependent sigmoid gate to the attention output; in its baseline comparison the average share of attention on the first token falls from 46.7% to 4.8% across layers."
+  },
+  "gptoss": {
+   "arxiv": "2508.10925",
+   "venue": "Model card",
+   "summary": "OpenAI's model card for gpt-oss-120b and gpt-oss-20b: alternating banded-window (128 tokens) and dense attention, GQA with 8 KV heads, YaRN to 131,072 tokens, and a learned per-head bias in the softmax denominator (\u00a72.2)."
+  },
+  "kvsink": {
+   "arxiv": "2508.04257",
+   "venue": "COLM 2025",
+   "summary": "Studies how attention sinks interact with KV-cache quantisation; predicts sink tokens that can occur beyond the first positions and outperforms the Preserve-First-N strategy."
+  },
+  "yarn": {
+   "arxiv": "2309.00071",
+   "venue": "arXiv preprint",
+   "summary": "Context-window extension for RoPE models combining 'NTK-by-parts' interpolation with an attention temperature, recommended as sqrt(1/t) = 0.1 ln(s) + 1 for a scale factor s (Eq. 15)."
+  },
+  "ssmax": {
+   "arxiv": "2501.19399",
+   "venue": "arXiv preprint",
+   "summary": "Proposes Scalable-Softmax, which multiplies attention logits by s\u00b7log n so the maximum weight does not fade as the input length n grows (Eq. 2)."
+  },
+  "fa4": {
+   "arxiv": "2603.05451",
+   "venue": "arXiv preprint",
+   "summary": "FlashAttention for Blackwell GPUs: a roofline in which the exponential unit and tensor cores are balanced for 128\u00d7128\u00d7128 tiles (Table 1); emulates part of exp2 on FMA units and skips online-softmax rescaling unless the running max grows by more than \u03c4 = 8 (\u00a73.1.4)."
+  },
+  "bottleneck": {
+   "arxiv": "1711.03953",
+   "venue": "ICLR 2018",
+   "summary": "Shows that a softmax output layer over distributed embeddings is rank-limited (the softmax bottleneck) and proposes a Mixture of Softmaxes."
+  },
+  "etalon": {
+   "arxiv": "2407.07000",
+   "venue": "arXiv preprint",
+   "summary": "Identifies pitfalls of TTFT, TBT, TPOT and normalised latency for evaluating LLM inference, and proposes fluidity-index, a deadline-based metric (\u00a73.1, \u00a74)."
+  },
+  "measbias": {
+   "arxiv": "2605.24217",
+   "venue": "arXiv preprint",
+   "summary": "Argues that single-process asyncio benchmark clients add client-side queueing that inflates TTFT and TPOT at high load, lists reproducibility anti-patterns (\u00a74) and proposes a multi-process framework and the NTPOT metric."
+  },
+  "vidur": {
+   "arxiv": "2405.05465",
+   "venue": "MLSys 2024",
+   "summary": "A simulator for LLM inference that predicts request latency from operator profiles; reports fidelity against real vLLM runs on static and dynamic traces (Figs. 3\u20134) and uses it for configuration search."
+  },
+  "distserve": {
+   "arxiv": "2401.09670",
+   "venue": "OSDI 2024",
+   "summary": "Disaggregates prefill and decode onto separate GPUs and optimises goodput, defined as the maximum request rate served while meeting a TTFT/TPOT SLO-attainment goal (\u00a71)."
+  },
+  "lmcache": {
+   "arxiv": "2510.09665",
+   "venue": "arXiv preprint",
+   "summary": "A KV-cache layer that offloads and shares KV caches across queries and engines (vLLM, SGLang), with evaluation scenarios in Table 4 and component-wise and sensitivity studies (\u00a78)."
+  },
+  "mlenergy": {
+   "arxiv": "2505.06371",
+   "venue": "NeurIPS 2025 Datasets and Benchmarks",
+   "summary": "A benchmark and leaderboard for inference energy built on four stated design principles (\u00a72), with measurements across 40 model architectures and 6 tasks."
+  },
+  "lico": {
+   "arxiv": "2410.13989",
+   "venue": "TMLR 2024 (ML Reproducibility Challenge 2024)",
+   "summary": "Reproducibility study of the LICO interpretability method, organised as numbered claims tested one by one; the authors were mostly unable to reproduce the original results."
+  },
+  "memctx": {
+   "arxiv": "2609.24238",
+   "venue": "BlackboxNLP 2026 Reproducibility Challenge, EMNLP 2026",
+   "summary": "Replicates and stress-tests a study of how language models arbitrate between memorised and in-context facts across 31 models in four families, confirming most original findings and reporting where they fail."
+  },
+  "tailcache": {
+   "arxiv": "2510.15152",
+   "venue": "arXiv preprint",
+   "summary": "Tail-Optimized LRU for prompt caching: a two-line change to LRU with an optimality proof, reducing P90 TTFT by up to 27.5% and 200 ms SLO violations by up to 38.9% on WildChat."
+  },
+  "sglang": {
+   "title": "SGLang: python/sglang/srt/layers/sampler.py, logits_processor.py; docs/advanced_features/server_arguments.mdx",
+   "authors": [
+    "SGLang project"
+   ],
+   "venue": "Source code at commit 36273b9",
+   "url": "https://github.com/sgl-project/sglang/tree/36273b916d508902dea2572a47c40297e6405821",
+   "summary": "Read for how log-probabilities are computed: logits are cast to float32, greedy requests use log_softmax, standard sampling returns torch.log(probs), and --rl-on-policy-target computes log_softmax in bfloat16."
+  },
+  "vllm": {
+   "title": "vLLM: vllm/v1/sample/sampler.py",
+   "authors": [
+    "vLLM project"
+   ],
+   "venue": "Source code at commit 1fc9d00",
+   "url": "https://github.com/vllm-project/vllm/tree/1fc9d008ebe840dca5c38bcc8769188e2a995478",
+   "summary": "Read for compute_logprobs, which returns logits.log_softmax(dim=-1, dtype=torch.float32)."
+  },
+  "hftransformers": {
+   "title": "Hugging Face transformers: modelling code and the attention / mask interfaces",
+   "authors": [
+    "Hugging Face"
+   ],
+   "venue": "transformers 5.22.1 (code @3568df44 read for v2)",
+   "url": "https://github.com/huggingface/transformers/tree/3568df44fff52979f1f9cecc7f729713e940d277",
+   "summary": "Reference implementations used for the probes; eager attention computes softmax in float32 and adds the mask as a large negative finite value."
+  },
+  "flashattn": {
+   "title": "flash-attention: flash_attn/cute/interface.py and softmax.py",
+   "authors": [
+    "Dao-AILab"
+   ],
+   "venue": "Source code at commit 1dc8232",
+   "url": "https://github.com/Dao-AILab/flash-attention/tree/1dc8232fe209e2c48b1d3e677f26d68e4b856212",
+   "summary": "Read for learnable_sink, folded into the softmax normaliser as one extra column with no value vector, and rescale_threshold = 8.0."
+  },
+  "llama4code": {
+   "title": "llama-models: models/llama4/model.py, moe.py, args.py, MODEL_CARD.md",
+   "authors": [
+    "Meta"
+   ],
+   "venue": "Source code at commit 0e0b8c5",
+   "url": "https://github.com/meta-llama/llama-models/tree/0e0b8c519242d5833d8c11bffc1232b77ad7f301",
+   "summary": "Reference code for Llama 4: on NoPE layers the query is scaled by 1 + 0.1\u00b7ln(floor((pos+1)/8192) + 1) ('attention temperature tuning'); router uses a sigmoid on the top-1 score."
+  },
+  "softpickckpt": {
+   "title": "vanilla-340M-4096-model and softpick-340M-4096-model checkpoints (config.json, fla/ code)",
+   "authors": [
+    "Zayd M. K. Zuhri"
+   ],
+   "venue": "Hugging Face Hub model repositories",
+   "url": "https://huggingface.co/zaydzuhri/softpick-340M-4096-model",
+   "summary": "The softpick authors' matched 340M softmax and softpick models (24 layers, 16 heads of dim 64, 32k Llama-2 vocabulary), used for the sink comparison."
+  },
+  "v2report": {
+   "title": "Where Softmax Lives in Modern Models (technical report, version 2)",
+   "authors": [
+    "Tata Vishnu Vardhan Rao"
+   ],
+   "venue": "Technical report, November 2026",
+   "url": "https://claude.ai/artifact/MGk1tCA5vUx2cCKo8efGqE",
+   "summary": "Companion technical report: source-checked survey, census of 36 families, CPU reproductions E1\u2013E5 with code and data.",
+   "tag": "self"
+  },
+  "sigmoidattn": {
+   "arxiv": "2409.04431",
+   "venue": "arXiv preprint",
+   "summary": "Studies sigmoid in place of softmax attention; proposes a bias b = \u2212log n for sequence length n (App. E) and FlashSigmoid, reported 17% faster than FlashAttention-2 kernels on H100."
+  },
+  "selective": {
+   "arxiv": "2410.02703",
+   "venue": "ICLR 2025",
+   "summary": "Selective Attention, a parameter-free change that reduces attention to unneeded context elements; reports quality equal to standard Transformers with about 2\u00d7 more attention heads and parameters."
+  },
+  "roundround": {
+   "arxiv": "2410.06205",
+   "venue": "ICLR 2025",
+   "summary": "Analyses how Gemma 7B uses RoPE and finds that it builds positional attention patterns from RoPE's highest frequencies."
+  },
+  "glasses": {
+   "arxiv": "2406.04267",
+   "venue": "NeurIPS 2024",
+   "summary": "Proves a representational-collapse effect in decoder-only Transformers, in which distinct inputs give arbitrarily close final-token representations, worsened by low-precision formats; links it to over-squashing."
+  },
+  "infini": {
+   "arxiv": "2404.07143",
+   "venue": "arXiv preprint",
+   "summary": "Infini-attention: adds a compressive linear-attention memory to softmax attention for unbounded context; evaluated on 1M-token passkey retrieval and 500K-token summarisation."
+  },
+  "griffin": {
+   "arxiv": "2402.19427",
+   "venue": "arXiv preprint",
+   "summary": "Griffin: a hybrid of gated linear recurrences (RG-LRU) and local attention."
+  },
+  "recurrentgemma": {
+   "arxiv": "2404.07839",
+   "venue": "Technical report (arXiv)",
+   "summary": "RecurrentGemma technical report: Griffin architecture with a 2,048-token local attention window and a fixed-size state (Table 1)."
+  },
+  "gemma1": {
+   "arxiv": "2403.08295",
+   "venue": "Technical report (arXiv)",
+   "summary": "Gemma technical report: the 7B model uses multi-head attention and the 2B model multi-query attention; 256k vocabulary."
+  },
+  "gemma2": {
+   "arxiv": "2408.00118",
+   "venue": "Technical report (arXiv)",
+   "summary": "Gemma 2 technical report: alternating local (4,096) and global (8,192) attention and logit soft-capping at 50 (attention) and 30 (final layer)."
+  },
+  "gemma3": {
+   "arxiv": "2503.19786",
+   "venue": "Technical report (arXiv)",
+   "summary": "Gemma 3 technical report: 5:1 interleaving of local (1,024-token window) and global layers, 128K context, and QK-norm replacing Gemma 2's soft-capping."
+  },
+  "qknorm": {
+   "arxiv": "2010.04245",
+   "venue": "Findings of EMNLP 2020",
+   "summary": "Proposes normalising queries and keys before the dot product (QK-norm) with a learnable scale."
+  },
+  "vit22b": {
+   "arxiv": "2302.05442",
+   "venue": "arXiv preprint",
+   "summary": "Scales a vision Transformer to 22B parameters with parallel layers, query/key (QK) normalisation and omitted biases, for efficiency and training stability."
+  },
+  "palm": {
+   "arxiv": "2204.02311",
+   "venue": "Technical report (arXiv)",
+   "summary": "PaLM technical report: uses multi-query attention and an auxiliary z-loss of 10\u207b\u2074\u00b7log\u00b2Z to keep the softmax normaliser log Z close to 0."
+  },
+  "fa1": {
+   "arxiv": "2205.14135",
+   "venue": "arXiv preprint",
+   "summary": "FlashAttention: exact attention computed in tiles with an online softmax (running max and sum), never writing the attention matrix to memory."
+  },
+  "gpt3": {
+   "arxiv": "2005.14165",
+   "venue": "arXiv preprint",
+   "summary": "GPT-3: 2,048-token context and alternating dense and locally banded sparse attention patterns (\u00a72.1)."
+  },
+  "llama1": {
+   "arxiv": "2302.13971",
+   "venue": "Technical report (arXiv)",
+   "summary": "LLaMA technical report: decoder-only models trained on public data; Table 1 of the Llama 2 report lists its 2k context."
+  },
+  "llama2": {
+   "arxiv": "2307.09288",
+   "venue": "Technical report (arXiv)",
+   "summary": "Llama 2 technical report: 4k context, a 32k-token vocabulary, and grouped-query attention for the 34B and 70B models (Table 1)."
+  },
+  "llama3": {
+   "arxiv": "2407.21783",
+   "venue": "Technical report (arXiv)",
+   "summary": "The Llama 3 Herd of Models: grouped-query attention with 8 KV heads and an attention mask that blocks attention between documents in a sequence."
+  },
+  "mistral": {
+   "arxiv": "2310.06825",
+   "venue": "Technical report (arXiv)",
+   "summary": "Mistral 7B: grouped-query attention and sliding-window attention (window 4,096) with a rolling-buffer cache."
+  },
+  "mixtral": {
+   "arxiv": "2401.04088",
+   "venue": "Technical report (arXiv)",
+   "summary": "Mixtral of Experts: router G(x) = Softmax(TopK(x\u00b7W_g)) choosing 2 of 8 experts per token."
+  },
+  "qwen2": {
+   "arxiv": "2407.10671",
+   "venue": "Technical report (arXiv)",
+   "summary": "Qwen2 technical report: GQA with QKV bias; Dual Chunk Attention with YaRN for long context."
+  },
+  "qwen3": {
+   "arxiv": "2505.09388",
+   "venue": "Technical report (arXiv)",
+   "summary": "Qwen3 technical report: removes QKV bias and adds QK-norm; MoE models use 128 experts with 8 active and no shared experts."
+  },
+  "phi3": {
+   "arxiv": "2404.14219",
+   "venue": "Technical report (arXiv)",
+   "summary": "Phi-3 technical report: phi-3-mini has a 4K default context and a 128K LongRoPE variant; phi-3-small alternates dense and blocksparse attention layers."
+  },
+  "olmo2": {
+   "arxiv": "2501.00656",
+   "venue": "Technical report (arXiv)",
+   "summary": "OLMo 2 technical report: adopts QK-norm (RMSNorm on queries and keys) and z-loss regularisation for training stability."
+  },
+  "falcon": {
+   "arxiv": "2311.16867",
+   "venue": "Technical report (arXiv)",
+   "summary": "The Falcon series: multi-query attention (extended to multigroup for larger models) and a 65,024-token vocabulary."
+  },
+  "glm45": {
+   "arxiv": "2508.06471",
+   "venue": "Technical report (arXiv)",
+   "summary": "GLM-4.5 technical report: GQA with partial RoPE, QK-norm, and MoE with loss-free balance routing and sigmoid gates."
+  },
+  "dsv2": {
+   "arxiv": "2405.04434",
+   "venue": "Technical report (arXiv)",
+   "summary": "DeepSeek-V2 technical report: Multi-head Latent Attention (MLA) and DeepSeekMoE with device-limited routing."
+  },
+  "dsv3": {
+   "arxiv": "2412.19437",
+   "venue": "Technical report (arXiv)",
+   "summary": "DeepSeek-V3 technical report: MLA, sigmoid affinity scores normalised over the selected experts, auxiliary-loss-free load balancing; 37B activated parameters."
+  },
+  "kimik2": {
+   "arxiv": "2507.20534",
+   "venue": "Technical report (arXiv)",
+   "summary": "Kimi K2 technical report: an MLA-based MoE model trained with MuonClip, whose QK-Clip rescales query and key weights to bound attention logits."
+  },
+  "mamba": {
+   "arxiv": "2312.00752",
+   "venue": "arXiv preprint",
+   "summary": "Mamba: a selective state-space model with no attention layers."
+  },
+  "mamba2": {
+   "arxiv": "2405.21060",
+   "venue": "ICML 2024",
+   "summary": "Mamba-2 and structured state-space duality (SSD), linking SSMs and linear attention."
+  },
+  "jamba": {
+   "arxiv": "2403.19887",
+   "venue": "arXiv preprint",
+   "summary": "Jamba: interleaves attention and Mamba layers (1:7), uses MoE every other layer with 16 experts and top-2 routing, and no explicit positional encoding."
+  },
+  "jamba15": {
+   "arxiv": "2408.12570",
+   "venue": "Technical report (arXiv)",
+   "summary": "Jamba-1.5: hybrid Transformer-Mamba models at scale with a 256K context."
+  },
+  "rwkv6": {
+   "arxiv": "2404.05892",
+   "venue": "arXiv preprint",
+   "summary": "Eagle and Finch: RWKV-5/6 with matrix-valued states and data-dependent recurrence; no softmax attention."
+  },
+  "minimax": {
+   "arxiv": "2501.08313",
+   "venue": "Technical report (arXiv)",
+   "summary": "MiniMax-01: one softmax-attention block after every seven lightning (linear) attention blocks, 32-expert MoE, 1M-token training context."
+  },
+  "bert": {
+   "arxiv": "1810.04805",
+   "venue": "arXiv preprint",
+   "summary": "BERT: bidirectional Transformer encoder pre-trained with masked language modelling."
+  },
+  "t5": {
+   "arxiv": "1910.10683",
+   "venue": "JMLR 2020",
+   "summary": "T5: encoder-decoder Transformer with relative position biases, framing all NLP tasks as text-to-text."
+  },
+  "vit": {
+   "arxiv": "2010.11929",
+   "venue": "ICLR 2021",
+   "summary": "Vision Transformer: patches as tokens with a class token and bidirectional self-attention."
+  },
+  "clip": {
+   "arxiv": "2103.00020",
+   "venue": "arXiv preprint",
+   "summary": "CLIP: contrastive image-text pre-training with a softmax over the batch's similarity matrix and a learned temperature."
+  },
+  "siglip": {
+   "arxiv": "2303.15343",
+   "venue": "ICCV 2023",
+   "summary": "SigLIP: replaces CLIP's softmax contrastive loss with a pairwise sigmoid loss with learned temperature and bias."
+  },
+  "whisper": {
+   "arxiv": "2212.04356",
+   "venue": "arXiv preprint",
+   "summary": "Whisper: an encoder-decoder speech recognition model with self- and cross-attention."
+  },
+  "hfconfigs": {
+   "title": "Official config.json files for the 44 Hugging Face Hub repositories in sources/configs/",
+   "authors": [
+    "Hugging Face Hub repository owners"
+   ],
+   "venue": "Read 2026-11-03",
+   "url": "https://huggingface.co",
+   "summary": "Model configurations read for the census: attention type, context length, vocabulary, experts, router function, RoPE scaling, soft-capping and window settings."
+  },
+  "llamamodels": {
+   "title": "llama-models: models/llama4/model.py, moe.py, args.py, MODEL_CARD.md",
+   "authors": [
+    "Meta"
+   ],
+   "venue": "Source code at commit 0e0b8c5",
+   "url": "https://github.com/meta-llama/llama-models/tree/0e0b8c519242d5833d8c11bffc1232b77ad7f301",
+   "summary": "Reference code for Llama 4: on NoPE layers the query is scaled by 1 + 0.1\u00b7ln(floor((pos+1)/8192) + 1) ('attention temperature tuning'); router uses a sigmoid on the top-1 score."
+  },
+  "cards": {
+   "title": "Model cards: Qwen/Qwen3-8B, CohereLabs/c4ai-command-r-v01, ai21labs/AI21-Jamba-1.5-Mini",
+   "authors": [
+    "Qwen",
+    "Cohere Labs",
+    "AI21 Labs"
+   ],
+   "venue": "Hugging Face Hub README files, read 2026-11-03",
+   "url": "https://huggingface.co/Qwen/Qwen3-8B",
+   "summary": "Read for context lengths and long-context settings (e.g. Qwen3: 32,768 native, 131,072 with YaRN factor 4)."
+  }
+ }
+}

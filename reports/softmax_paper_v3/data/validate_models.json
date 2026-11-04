@@ -1,0 +1,44 @@
+{
+ "qwen3-0.6b": {
+  "ppl_1024_eager": 31.572488657818493,
+  "max_abs_logit_diff_probe_vs_eager": 0.0,
+  "logit_scale_max_abs": 27.929058074951172,
+  "bos_prepended": false,
+  "first_token": "Frank"
+ },
+ "gemma3-1b-it": {
+  "ppl_1024_eager": 39.918646456732226,
+  "max_abs_logit_diff_probe_vs_eager": 0.0,
+  "logit_scale_max_abs": 41.83992004394531,
+  "bos_prepended": true,
+  "first_token": "<bos>"
+ },
+ "smollm2-360m": {
+  "ppl_1024_eager": 17.00332587821295,
+  "max_abs_logit_diff_probe_vs_eager": 0.0,
+  "logit_scale_max_abs": 29.298969268798828,
+  "bos_prepended": false,
+  "first_token": "Frank"
+ },
+ "vanilla-340m": {
+  "ppl_1024_eager": 17.286444764022225,
+  "max_abs_logit_diff_probe_vs_eager": 0.0,
+  "logit_scale_max_abs": 38.99131393432617,
+  "max_abs_logit_diff_mapped_vs_fla_reference": 0.0,
+  "bos_prepended": true,
+  "first_token": "<s>"
+ },
+ "softpick-340m": {
+  "ppl_1024_eager": 17.126637576238505,
+  "max_abs_logit_diff_probe_vs_eager": 0.0,
+  "logit_scale_max_abs": 37.46356964111328,
+  "max_abs_logit_diff_mapped_vs_fla_reference": 0.0,
+  "bos_prepended": true,
+  "first_token": "<s>"
+ },
+ "_sensitivity_check": {
+  "softpick-340m_mapped_vs_reference_with_softmax_instead_of_softpick_max_abs_logit_diff": 30.885374069213867,
+  "softpick-340m_mapped_vs_correct_reference_max_abs_logit_diff": 0.0,
+  "note": "Zero differences above are bitwise agreement (same operation order), not a broken comparison: swapping the attention function in the reference gives a 30.9-logit difference."
+ }
+}

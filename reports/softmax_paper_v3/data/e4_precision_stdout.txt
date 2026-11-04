@@ -1,0 +1,66 @@
+C2|float32|pure              loss dtype torch.float32   first g_t==0 at gap 16.636 (paper margin 16.636); pred ln(C-1)+ln(1/eps)=15.942, +ln(2/eps)=16.636; last nonzero 16.63; contiguous True
+C2|float32|upcast            loss dtype torch.float32   first g_t==0 at gap 16.636 (paper margin 16.636); pred ln(C-1)+ln(1/eps)=15.942, +ln(2/eps)=16.636; last nonzero 16.63; contiguous True
+C2|float32|fixed             loss dtype torch.float32   first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=15.942, +ln(2/eps)=16.636; last nonzero None; contiguous None
+C2|bfloat16|pure             loss dtype torch.bfloat16  first g_t==0 at gap 5.547 (paper margin 5.547); pred ln(C-1)+ln(1/eps)=4.852, +ln(2/eps)=5.545; last nonzero 5.54; contiguous True
+C2|bfloat16|upcast           loss dtype torch.float32   first g_t==0 at gap 16.688 (paper margin 16.688); pred ln(C-1)+ln(1/eps)=4.852, +ln(2/eps)=5.545; last nonzero 16.68; contiguous True
+C2|bfloat16|fixed            loss dtype torch.bfloat16  first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=4.852, +ln(2/eps)=5.545; last nonzero None; contiguous None
+C2|bfloat16|autocast         loss dtype torch.float32   first g_t==0 at gap 16.688 (paper margin 16.688); pred ln(C-1)+ln(1/eps)=4.852, +ln(2/eps)=5.545; last nonzero 16.68; contiguous True
+C2|float16|pure              loss dtype torch.float16   first g_t==0 at gap 7.624 (paper margin 7.624); pred ln(C-1)+ln(1/eps)=6.931, +ln(2/eps)=7.625; last nonzero 7.62; contiguous True
+C2|float16|upcast            loss dtype torch.float32   first g_t==0 at gap 16.633 (paper margin 16.633); pred ln(C-1)+ln(1/eps)=6.931, +ln(2/eps)=7.625; last nonzero 16.63; contiguous True
+C2|float16|fixed             loss dtype torch.float16   first g_t==0 at gap 17.336 (paper margin 17.336); pred ln(C-1)+ln(1/eps)=6.931, +ln(2/eps)=7.625; last nonzero 17.33; contiguous True
+C2|float16|autocast          loss dtype torch.float32   first g_t==0 at gap 16.633 (paper margin 16.633); pred ln(C-1)+ln(1/eps)=6.931, +ln(2/eps)=7.625; last nonzero 16.63; contiguous True
+C113|float32|pure            loss dtype torch.float32   first g_t==0 at gap 20.661 (paper margin 15.943); pred ln(C-1)+ln(1/eps)=20.661, +ln(2/eps)=21.354; last nonzero 20.66; contiguous True
+C113|float32|upcast          loss dtype torch.float32   first g_t==0 at gap 20.661 (paper margin 15.943); pred ln(C-1)+ln(1/eps)=20.661, +ln(2/eps)=21.354; last nonzero 20.66; contiguous True
+C113|float32|fixed           loss dtype torch.float32   first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=20.661, +ln(2/eps)=21.354; last nonzero None; contiguous None
+C113|bfloat16|pure           loss dtype torch.bfloat16  first g_t==0 at gap 10.282 (paper margin 5.564); pred ln(C-1)+ln(1/eps)=9.571, +ln(2/eps)=10.264; last nonzero 10.28; contiguous True
+C113|bfloat16|upcast         loss dtype torch.float32   first g_t==0 at gap 20.688 (paper margin 15.97); pred ln(C-1)+ln(1/eps)=9.571, +ln(2/eps)=10.264; last nonzero 20.68; contiguous True
+C113|bfloat16|fixed          loss dtype torch.bfloat16  first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=9.571, +ln(2/eps)=10.264; last nonzero None; contiguous None
+C113|bfloat16|autocast       loss dtype torch.float32   first g_t==0 at gap 20.688 (paper margin 15.97); pred ln(C-1)+ln(1/eps)=9.571, +ln(2/eps)=10.264; last nonzero 20.68; contiguous True
+C113|float16|pure            loss dtype torch.float16   first g_t==0 at gap 12.34 (paper margin 7.622); pred ln(C-1)+ln(1/eps)=11.650, +ln(2/eps)=12.343; last nonzero 12.33; contiguous True
+C113|float16|upcast          loss dtype torch.float32   first g_t==0 at gap 20.665 (paper margin 15.947); pred ln(C-1)+ln(1/eps)=11.650, +ln(2/eps)=12.343; last nonzero 20.66; contiguous True
+C113|float16|fixed           loss dtype torch.float16   first g_t==0 at gap 17.336 (paper margin 12.618); pred ln(C-1)+ln(1/eps)=11.650, +ln(2/eps)=12.343; last nonzero 17.33; contiguous True
+C113|float16|autocast        loss dtype torch.float32   first g_t==0 at gap 20.665 (paper margin 15.947); pred ln(C-1)+ln(1/eps)=11.650, +ln(2/eps)=12.343; last nonzero 20.66; contiguous True
+C1000|float32|pure           loss dtype torch.float32   first g_t==0 at gap 22.851 (paper margin 15.944); pred ln(C-1)+ln(1/eps)=22.849, +ln(2/eps)=23.542; last nonzero 22.85; contiguous True
+C1000|float32|upcast         loss dtype torch.float32   first g_t==0 at gap 22.851 (paper margin 15.944); pred ln(C-1)+ln(1/eps)=22.849, +ln(2/eps)=23.542; last nonzero 22.85; contiguous True
+C1000|float32|fixed          loss dtype torch.float32   first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=22.849, +ln(2/eps)=23.542; last nonzero None; contiguous None
+C1000|bfloat16|pure          loss dtype torch.bfloat16  first g_t==0 at gap 12.469 (paper margin 5.562); pred ln(C-1)+ln(1/eps)=11.759, +ln(2/eps)=12.452; last nonzero 12.46; contiguous True
+C1000|bfloat16|upcast        loss dtype torch.float32   first g_t==0 at gap 22.813 (paper margin 15.906); pred ln(C-1)+ln(1/eps)=11.759, +ln(2/eps)=12.452; last nonzero 22.81; contiguous True
+C1000|bfloat16|fixed         loss dtype torch.bfloat16  first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=11.759, +ln(2/eps)=12.452; last nonzero None; contiguous None
+C1000|bfloat16|autocast      loss dtype torch.float32   first g_t==0 at gap 22.813 (paper margin 15.906); pred ln(C-1)+ln(1/eps)=11.759, +ln(2/eps)=12.452; last nonzero 22.81; contiguous True
+C1000|float16|pure           loss dtype torch.float16   first g_t==0 at gap 14.528 (paper margin 7.621); pred ln(C-1)+ln(1/eps)=13.838, +ln(2/eps)=14.531; last nonzero 14.52; contiguous True
+C1000|float16|upcast         loss dtype torch.float32   first g_t==0 at gap 22.852 (paper margin 15.945); pred ln(C-1)+ln(1/eps)=13.838, +ln(2/eps)=14.531; last nonzero 22.85; contiguous True
+C1000|float16|fixed          loss dtype torch.float16   first g_t==0 at gap 17.336 (paper margin 10.429); pred ln(C-1)+ln(1/eps)=13.838, +ln(2/eps)=14.531; last nonzero 17.33; contiguous True
+C1000|float16|autocast       loss dtype torch.float32   first g_t==0 at gap 22.852 (paper margin 15.945); pred ln(C-1)+ln(1/eps)=13.838, +ln(2/eps)=14.531; last nonzero 22.85; contiguous True
+C32000|float32|pure          loss dtype torch.float32   first g_t==0 at gap 26.316 (paper margin 15.943); pred ln(C-1)+ln(1/eps)=26.316, +ln(2/eps)=27.009; last nonzero 26.31; contiguous True
+C32000|float32|fixed         loss dtype torch.float32   first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=26.316, +ln(2/eps)=27.009; last nonzero None; contiguous None
+C32000|bfloat16|pure         loss dtype torch.bfloat16  first g_t==0 at gap 15.907 (paper margin 5.534); pred ln(C-1)+ln(1/eps)=15.225, +ln(2/eps)=15.919; last nonzero 15.9; contiguous True
+C32000|bfloat16|fixed        loss dtype torch.bfloat16  first g_t==0 at gap None (paper margin None); pred ln(C-1)+ln(1/eps)=15.225, +ln(2/eps)=15.919; last nonzero None; contiguous None
+C32000|float16|pure          loss dtype torch.float16   first g_t==0 at gap 17.961 (paper margin 7.588); pred ln(C-1)+ln(1/eps)=17.305, +ln(2/eps)=17.998; last nonzero 17.96; contiguous True
+C32000|float16|fixed         loss dtype torch.float16   first g_t==0 at gap 17.336 (paper margin 6.963); pred ln(C-1)+ln(1/eps)=17.305, +ln(2/eps)=17.998; last nonzero 17.33; contiguous True
+C=113 float32: fixed g_t max rel err (normal range) 3.15e-07; built-in 1.00e+00; fixed g_t first exactly 0 at gap None
+C=113 bfloat16: fixed g_t max rel err (normal range) 9.67e-03; built-in 1.00e+00; fixed g_t first exactly 0 at gap None
+C=113 float16: fixed g_t max rel err (normal range) 5.12e-02; built-in 1.00e+00; fixed g_t first exactly 0 at gap 17.34
+fp16: sigma(ln(112)-gap) first 0 at gap 22.05499999999609 ; exp(-gap) first 0 at gap 17.335999999998705
+   eps=0 floor decomposition (float32): only_teacher_probs_in_dtype=9.02e-09, only_student_logsoftmax_in_dtype=4.64e-09, both_(=built-in_formula)=5.56e-09
+float32: eps=0 ||g|| all-dtype=9.138e-09, teacher-fp32=9.138e-09, fixed=0.000e+00 | at eps=1.0e-03: ||g_exact||=1.74e-04, all-dtype=1.02e-08, teacher-fp32=1.02e-08, fixed=1.20e-11 | ||softmax64(zT) - softmax_float32(zT)||=9.02e-09; fp32 ||softmax - exp(log_softmax)||=5.28e-09
+   mpmath vs float64-naive reference: eps=0.0: max|diff|=0.0e+00 (||ref||=0.0e+00), eps=1e-06: max|diff|=2.3e-17 (||ref||=1.8e-07), eps=0.001: max|diff|=2.6e-17 (||ref||=1.7e-04)
+   eps=0 floor decomposition (bfloat16): only_teacher_probs_in_dtype=3.29e-04, only_student_logsoftmax_in_dtype=1.08e-03, both_(=built-in_formula)=1.29e-03
+bfloat16: eps=0 ||g|| all-dtype=1.224e-03, teacher-fp32=2.161e-08, autocast=2.161e-08, fixed=0.000e+00 | at eps=1.0e-03: ||g_exact||=4.87e-07, all-dtype=1.22e-03, teacher-fp32=7.50e-09, autocast=7.50e-09, fixed=1.76e-08 | ||softmax64(zT) - softmax_bfloat16(zT)||=3.29e-04; fp32 ||softmax - exp(log_softmax)||=2.14e-08
+   mpmath vs float64-naive reference: eps=0.0: max|diff|=0.0e+00 (||ref||=0.0e+00), eps=1e-06: max|diff|=0.0e+00 (||ref||=0.0e+00), eps=0.001: max|diff|=1.6e-17 (||ref||=4.9e-07)
+   eps=0 floor decomposition (float16): only_teacher_probs_in_dtype=4.12e-05, only_student_logsoftmax_in_dtype=2.10e-04, both_(=built-in_formula)=2.32e-04
+float16: eps=0 ||g|| all-dtype=2.269e-04, teacher-fp32=0.000e+00, fixed=0.000e+00 | at eps=1.0e-03: ||g_exact||=1.13e-04, all-dtype=2.06e-04, teacher-fp32=4.21e-07, fixed=4.89e-07 | ||softmax64(zT) - softmax_float16(zT)||=4.12e-05; fp32 ||softmax - exp(log_softmax)||=6.87e-09
+   mpmath vs float64-naive reference: eps=0.0: max|diff|=0.0e+00 (||ref||=0.0e+00), eps=1e-06: max|diff|=9.8e-18 (||ref||=2.1e-11), eps=0.001: max|diff|=1.9e-17 (||ref||=1.1e-04)
+E4c C=113 float32: log p_target first exactly 0 at gap 20.67 (paper margin 15.95)
+E4c C=113 bfloat16: log p_target first exactly 0 at gap 10.29 (paper margin 5.57)
+E4c C=113 float16: log p_target first exactly 0 at gap 12.34 (paper margin 7.62)
+E4c C=113 float32-log(softmax): log p_target first exactly 0 at gap 20.67 (paper margin 15.95)
+E4c C=151936 float32: log p_target first exactly 0 at gap 27.88 (paper margin 15.95)
+E4c C=151936 bfloat16: log p_target first exactly 0 at gap 17.44 (paper margin 5.51)
+E4c C=151936 float16: log p_target first exactly 0 at gap 19.53 (paper margin 7.6)
+E4c C=151936 float32-log(softmax): log p_target first exactly 0 at gap 27.88 (paper margin 15.95)
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e4_collapse.json
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e4_cancellation.json
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/data/e4_forward_logprob.json
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e4_collapse.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_survey_v2/figures/e4_cancellation.png
+bf16 rounding of gaps [20.661, 20.6875, 20.688] -> [20.625, 20.75, 20.75] ; bf16 spacing at 20 = 0.125

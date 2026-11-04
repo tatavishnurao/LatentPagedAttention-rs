@@ -1,0 +1,14 @@
+# CPU-only PyTorch (recommended). Install first, from the PyTorch CPU index:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
+# The cloud session that produced these results could not reach that index and used the PyPI wheel
+# torch==2.15.0 (+cu132 build) on CPU. All CPU results are CPU results either way.
+torch==2.15.0
+numpy==2.5.4
+matplotlib==3.11.2
+mpmath==1.3.0            # E4b 50-digit reference (code/v2/e4_precision.py)
+transformers==5.22.1     # E6/E7 probes and model loading
+safetensors              # loading the softpick/vanilla 340M checkpoints
+huggingface_hub          # downloading model weights
+markdown                 # code/build_html.py
+latex2mathml             # code/build_html.py
+# GPU scripts only (code/gpu/): requests, sglang, vllm
