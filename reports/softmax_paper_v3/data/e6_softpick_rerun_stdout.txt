@@ -1,0 +1,1 @@
+softpick-340m N=256: 4s; sink_rate(0.3)=0.000; top1 answer [True, True, True]
