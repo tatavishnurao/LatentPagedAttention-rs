@@ -1,0 +1,8 @@
+latex/*.aux
+latex/*.log
+latex/*.fls
+latex/*.fdb_latexmk
+latex/*.out
+latex/*.blg
+latex/*.bbl
+latex/build.log
