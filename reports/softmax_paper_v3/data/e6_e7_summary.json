@@ -1,5 +1,141 @@
 {
  "e6": {
+  "smollm2-360m": {
+   "rows": [
+    {
+     "N": 256,
+     "sink_rate_0p3": 0.732638888888889,
+     "sink_rate_0p8": 0.09027777777777779,
+     "mean_first_token_mass": 0.45653734815383795,
+     "max_layer_first_token_mass": 0.6815826133313547,
+     "mean_entropy_global": 2.0998661783130474,
+     "mean_ln_visible": 5.413875707182309,
+     "entropy_over_ln_visible": 0.38786745242918363,
+     "mean_row_mass": 1.0
+    },
+    {
+     "N": 512,
+     "sink_rate_0p3": 0.7097222222222221,
+     "sink_rate_0p8": 0.044444444444444446,
+     "mean_first_token_mass": 0.42513168943676183,
+     "max_layer_first_token_mass": 0.6663873808428535,
+     "mean_entropy_global": 2.365368557303393,
+     "mean_ln_visible": 6.174827228410347,
+     "entropy_over_ln_visible": 0.38306635470225703,
+     "mean_row_mass": 1.0
+    },
+    {
+     "N": 1024,
+     "sink_rate_0p3": 0.7215277777777778,
+     "sink_rate_0p8": 0.041666666666666664,
+     "mean_first_token_mass": 0.4255766872060627,
+     "max_layer_first_token_mass": 0.6916266785542474,
+     "mean_entropy_global": 2.5331037714849773,
+     "mean_ln_visible": 6.900227012561346,
+     "entropy_over_ln_visible": 0.36710441074962485,
+     "mean_row_mass": 1.0
+    },
+    {
+     "N": 2048,
+     "sink_rate_0p3": 0.6173611111111111,
+     "sink_rate_0p8": 0.021527777777777774,
+     "mean_first_token_mass": 0.3740154486106002,
+     "max_layer_first_token_mass": 0.6475534337294651,
+     "mean_entropy_global": 2.766148403910564,
+     "mean_ln_visible": 7.609118614313423,
+     "entropy_over_ln_visible": 0.3635307246633263,
+     "mean_row_mass": 1.0
+    },
+    {
+     "N": 4096,
+     "sink_rate_0p3": 0.42361111111111116,
+     "sink_rate_0p8": 0.015277777777777779,
+     "mean_first_token_mass": 0.282259396632536,
+     "max_layer_first_token_mass": 0.5692175855118774,
+     "mean_entropy_global": 3.1499646250463975,
+     "mean_ln_visible": 8.310046013186627,
+     "entropy_over_ln_visible": 0.37905501606705194,
+     "mean_row_mass": 1.0
+    },
+    {
+     "N": 8192,
+     "sink_rate_0p3": 0.41041666666666665,
+     "sink_rate_0p8": 0.012500000000000002,
+     "mean_first_token_mass": 0.24631095732217512,
+     "max_layer_first_token_mass": 0.5733437961717653,
+     "mean_entropy_global": 3.238055068601279,
+     "mean_ln_visible": 9.00706072059075,
+     "entropy_over_ln_visible": 0.35950185849184585,
+     "mean_row_mass": 1.0
+    }
+   ],
+   "entropy_slope_vs_lnN": 0.32992962641093593,
+   "needle": {
+    "fixed_head": [
+     24,
+     10
+    ],
+    "rows": [
+     {
+      "N": 256,
+      "w_fixed": 0.9613009482209236,
+      "w_best": 0.9613009482209236,
+      "D_fixed": 8.753735968721186,
+      "D_best": 8.753735968721186,
+      "top1_rate": 1.0,
+      "p_answer": 0.7255907037727028
+     },
+     {
+      "N": 512,
+      "w_fixed": 0.9659947877746996,
+      "w_best": 0.9659947877746996,
+      "D_fixed": 9.583014215112367,
+      "D_best": 9.583014215112367,
+      "top1_rate": 1.0,
+      "p_answer": 0.8096388940655231
+     },
+     {
+      "N": 1024,
+      "w_fixed": 0.8816965614497955,
+      "w_best": 0.8816965614497955,
+      "D_fixed": 8.939089891207132,
+      "D_best": 8.939089891207132,
+      "top1_rate": 1.0,
+      "p_answer": 0.5769541274291422
+     },
+     {
+      "N": 2048,
+      "w_fixed": 0.9161786610241999,
+      "w_best": 0.9161786610241999,
+      "D_fixed": 10.015654359314572,
+      "D_best": 10.015654359314572,
+      "top1_rate": 1.0,
+      "p_answer": 0.8161205991609655
+     },
+     {
+      "N": 4096,
+      "w_fixed": 0.31499179493270785,
+      "w_best": 0.7163955918155503,
+      "D_fixed": 7.5406377705499645,
+      "D_best": 9.244174175004275,
+      "top1_rate": 1.0,
+      "p_answer": 0.6107979173216441
+     },
+     {
+      "N": 8192,
+      "w_fixed": 0.0923159552292692,
+      "w_best": 0.9158595892891223,
+      "D_fixed": 6.725111909075581,
+      "D_best": 11.398167376207635,
+      "top1_rate": 1.0,
+      "p_answer": 0.6753673331175186
+     }
+    ]
+   },
+   "n_global_layers": 32,
+   "n_layers": 32,
+   "bos": false
+  },
   "vanilla-340m": {
    "rows": [
     {

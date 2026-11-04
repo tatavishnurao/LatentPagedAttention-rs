@@ -63,7 +63,7 @@ This paper re-tests the four claims and measures the related behaviour in five o
 \toprule
 \# & Claim (paraphrased) & Source & Verdict \\
 \midrule
-C1a & With bounded logits, every global-attention coefficient is $\Theta(1/n)$ & \citet[Thm.~2.2]{velickovic} & Fixed heads disperse; other heads take over (partial: 3 of 5 models) \\
+C1a & With bounded logits, every global-attention coefficient is $\Theta(1/n)$ & \citet[Thm.~2.2]{velickovic} & Fixed heads disperse; other heads take over (3 of 5 models run) \\
 C1b & Entropy-based adaptive temperature sharpens attention at inference & \citet[Fig.~4]{velickovic} & Holds inside the fitted regime; inactive above \polyHi{} nats \\
 C2 & First-token sinks are common; non-normalised attention removes them & \citet{barbero,gu,softpick} & Holds in the matched pair \\
 C3 & Target gradient is zero beyond $c\approx5.5$ (bf16), 16.6 (fp32), 36.7 (fp64) & \citet[\S1--2]{barron} & Holds for $C{=}2$; earlier for $C\geq113$ \\
@@ -158,7 +158,7 @@ softpick-340M & $24\times16$ & global, softpick & 256--4,096 & \pplSoftpick \\
 \centering\includegraphics[width=\linewidth]{figures/e6_needle.png}
 \caption{Needle weight for a fixed head (dotted: fixed-gap law) and for the best head at each $N$.}\label{fig:needle}
 \end{figure}
-\paragraph{C2: sinks.} In vanilla-340M, \sinkFirstVanilla\% of heads are sinks at 256 tokens, close to the 63.41\% reported for the authors' 340M softmax model \citep{softpick}. The rate falls to \sinkLastVanilla\% at 4,096 tokens. Gu et al.\ also report their sink metric decreasing with sequence length \citep{gu}. Softpick-340M has no sinks at any length (Table~\ref{tab:e6}, Figure~\ref{fig:sinks}). \pending{Qwen3, Gemma 3 and SmolLM2 rows: filled from the finished runs.}
+\paragraph{C2: sinks.} In vanilla-340M, \sinkFirstVanilla\% of heads are sinks at 256 tokens, close to the 63.41\% reported for the authors' 340M softmax model \citep{softpick}. The rate falls to \sinkLastVanilla\% at 4,096 tokens. Gu et al.\ also report their sink metric decreasing with sequence length \citep{gu}. Softpick-340M has no sinks at any length (Table~\ref{tab:e6}, Figure~\ref{fig:sinks}). SmolLM2-360M shows the same decline (Table~\ref{tab:e6}). \pending{Qwen3-0.6B and Gemma-3-1B-it: runs stopped early to save compute; rerun with \texttt{code/e6\_probes.py}.}
 
 \paragraph{C1a: dispersion in real heads.} In vanilla-340M, the best head at 256 tokens falls from weight \needleFixedFirstVanilla{} to \needleFixedLastVanilla{} at 4,096 tokens, faster than the fixed-gap law. Yet the best head at each length keeps \needleBestLastVanilla{}, and the model answers correctly in \needleTopOneVanilla{} cases (Figure~\ref{fig:needle}). A probe that tracks one head would overstate the loss of retrieval ability.
 

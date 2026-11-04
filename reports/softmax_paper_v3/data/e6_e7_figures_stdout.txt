@@ -1,0 +1,7 @@
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_paper_v3/figures/e6_sinks.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_paper_v3/figures/e6_entropy.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_paper_v3/figures/e6_needle.png
+wrote /home/user/LatentPagedAttention-rs/reports/softmax_paper_v3/data/e6_e7_summary.json
+smollm2-360m: N 256->8192: sink rate 0.733->0.410; first-token mass 0.457->0.246; H/lnN 0.388->0.360; entropy slope vs lnN 0.330; needle fixed w 0.961->0.0923 (D 8.75->6.73); best w 0.961->0.916; top1 [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+vanilla-340m: N 256->4096: sink rate 0.626->0.106; first-token mass 0.382->0.088; H/lnN 0.524->0.612; entropy slope vs lnN 0.756; needle fixed w 0.782->0.0019 (D 6.82->2.03); best w 0.782->0.767; top1 [1.0, 1.0, 1.0, 1.0, 1.0]
+softpick-340m: N 256->4096: sink rate 0.000->0.000; first-token mass 0.001->0.000; H/lnN 0.080->0.097; entropy slope vs lnN 0.127; needle fixed w 0.690->0.0737 (D 6.34->5.79); best w 0.690->0.635; top1 [1.0, 1.0, 1.0, 1.0, 0.6666666666666666]
