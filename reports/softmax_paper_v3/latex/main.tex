@@ -169,7 +169,7 @@ softpick-340M & $24\times16$ & global, softpick & 256--4,096 & \pplSoftpick \\
 \item \textbf{The exception:} with \texttt{--rl-on-policy-target} and deterministic inference, SGLang computes \texttt{log\_softmax} in bfloat16.
 \item \textbf{The cost on synthetic logits:} with a 151,936-token vocabulary, bfloat16 \texttt{log\_softmax} returns exactly 0 once the target leads by gap \logpBfGap{} ($p\gtrsim0.996$). fp32 does so only at gap \logpFpGap.
 \end{itemize}
-\pending{E7: exact-zero rate on real text; B4: returned log-probs from running servers.}
+\textbf{On real text (Qwen3-0.6B, $3\times2{,}048$ Gutenberg tokens):} of 503 tokens with $p>0.9$, bfloat16 \texttt{log\_softmax} returns exactly 0 for 173 (34\%); fp32 \texttt{log\_softmax}, fp32 \texttt{log(softmax)} and bf16-rounded logits read in fp32 return none. The smallest probability that came back as exactly 0 was 0.9959, matching the synthetic threshold. \pending{E7 on the other four models; B4 on running servers.}
 
 \section{Implications for serving}
 \begin{itemize}[leftmargin=*,itemsep=1pt]

@@ -1,0 +1,1 @@
+qwen3-0.6b: tokens 6141, p>0.9: 503; exact zeros fp32 0, log(softmax) 0, bf16 173, bf16-logits->fp32 0; bf16 max err 9.93e-03; smallest p with bf16 log p == 0: 0.9958864608640356
