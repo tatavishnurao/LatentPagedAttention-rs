@@ -36,8 +36,8 @@ def run(name):
             lo = model(x, use_cache=False).logits[0, :-1].float()
         y = x[0, 1:, None]
         for a in range(0, lo.shape[0], 128):  # chunked so large vocabularies (Gemma 3: 262,144) fit in memory
-            l, t = lo[a:a + 128], y[a:a + 128]
-            g = lambda v: v.gather(-1, t)[:, 0].double()
+            l, yy = lo[a:a + 128], y[a:a + 128]
+            g = lambda v: v.gather(-1, yy)[:, 0].double()
             cols["ref"].append(g(torch.log_softmax(l.double(), -1)))
             cols["fp32"].append(g(torch.log_softmax(l, -1)))
             cols["logsm"].append(g(torch.log(torch.softmax(l, -1))))
