@@ -35,12 +35,14 @@ def run(name):
         with torch.no_grad():
             lo = model(x, use_cache=False).logits[0, :-1].float()
         y = x[0, 1:, None]
-        g = lambda a: a.gather(-1, y)[:, 0].double()
-        cols["ref"].append(g(torch.log_softmax(lo.double(), -1)))
-        cols["fp32"].append(g(torch.log_softmax(lo, -1)))
-        cols["logsm"].append(g(torch.log(torch.softmax(lo, -1))))
-        cols["bf16"].append(g(torch.log_softmax(lo.bfloat16(), -1)))
-        cols["bf16in"].append(g(torch.log_softmax(lo.bfloat16().float(), -1)))
+        for a in range(0, lo.shape[0], 128):  # chunked so large vocabularies (Gemma 3: 262,144) fit in memory
+            l, t = lo[a:a + 128], y[a:a + 128]
+            g = lambda v: v.gather(-1, t)[:, 0].double()
+            cols["ref"].append(g(torch.log_softmax(l.double(), -1)))
+            cols["fp32"].append(g(torch.log_softmax(l, -1)))
+            cols["logsm"].append(g(torch.log(torch.softmax(l, -1))))
+            cols["bf16"].append(g(torch.log_softmax(l.bfloat16(), -1)))
+            cols["bf16in"].append(g(torch.log_softmax(l.bfloat16().float(), -1)))
         del lo
     c = {k: torch.cat(v).numpy() for k, v in cols.items()}
     p = np.exp(c["ref"])
